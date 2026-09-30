@@ -8,6 +8,10 @@ The framework helps a job seeker assess vacancies and prepare compensation expec
 A defensible fixed-cash compensation range the job seeker can state to a recruiter for a specific vacancy. It reflects comparable pay in the job seeker's residence market and the vacancy's circumstances; bonus and equity are separate.
 _Avoid_: precise salary, guaranteed offer
 
+**Application salary**:
+The candidate's fixed-cash asking range for an application, with its currency, pay period, contract type, and pay basis. It may be explicitly unknown; advertised vacancy pay and employer offers are separate information.
+_Avoid_: advertised salary, offered salary
+
 **Residence market**:
 The job seeker's location used to select local compensation comparisons, including for a remote vacancy.
 _Avoid_: employer headquarters market

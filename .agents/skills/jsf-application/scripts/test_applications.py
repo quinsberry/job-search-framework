@@ -29,16 +29,19 @@ def check():
         data = dict(company='Example, "Company"', position="Engineer", work_type="remote",
                     status="ready", vacancy_link="https://example.com/jobs/1",
                     notes="Recruiter: LinkedIn\nZażółć", applied_at="",
-                    next_interview="", next_interview_at="", interview_stages="")
+                    next_interview="", next_interview_at="", interview_stages="",
+                    salary="25,000–30,000 PLN/month, B2B, before VAT")
         assert not run("inspect")["exists"]
         assert not directory.exists()
         run("update", {"status": "applied"}, "--application-id", "missing", ok=False)
         run("add", {key: value for key, value in data.items() if key != "notes"}, ok=False)
+        run("add", {key: value for key, value in data.items() if key != "salary"}, ok=False)
         assert not directory.exists()
         added = run("add", data)
         identity = added["application_id"]
         row = run("inspect")["records"][0]
         assert row["notes"] == data["notes"] and row["company"] == data["company"]
+        assert row["salary"] == data["salary"]
         created = row["created_at"]
         table = Path(added["path"])
         before = table.read_bytes()
@@ -57,6 +60,12 @@ def check():
         row = run("inspect")["records"][0]
         assert row["notes"] == data["notes"] + "\nLatest conversation: email"
         assert row["created_at"] == created and row["company"] == data["company"]
+        assert row["salary"] == data["salary"]
+        new_salary = "120,000 EUR/year, gross employment"
+        run("update", {"salary": new_salary}, "--application-id", identity)
+        assert run("inspect")["records"][0]["salary"] == new_salary
+        run("update", {"salary": ""}, "--application-id", identity)
+        assert run("inspect")["records"][0]["salary"] == ""
         run("update", {"notes": "Replacement"}, "--application-id", identity, "--notes-mode", "replace")
         assert run("inspect")["records"][0]["notes"] == "Replacement"
         run("update", {"notes": ""}, "--application-id", identity, "--notes-mode", "clear")
@@ -64,6 +73,25 @@ def check():
         separate = run("add", data, "--allow-duplicate")
         assert separate["application_id"] != identity
         assert len(run("inspect")["records"]) == 2
+
+        # Migrate the preceding schema without changing any historical values.
+        previous = root / "previous-schema"
+        previous.mkdir()
+        previous_table = previous / "applications_table.csv"
+        previous_row = {key: value for key, value in row.items() if key != "salary"}
+        with previous_table.open("w", encoding="utf-8", newline="") as target:
+            writer = csv.DictWriter(target, fieldnames=list(previous_row))
+            writer.writeheader()
+            writer.writerow(previous_row)
+        before = previous_table.read_bytes()
+        assert run("inspect", destination=previous)["missing_columns"] == ["salary"]
+        run("add", data, destination=previous, ok=False)
+        assert previous_table.read_bytes() == before
+        migrated = run("migrate", destination=previous)
+        assert migrated["added_columns"] == ["salary"]
+        assert Path(migrated["backup"]).read_bytes() == before
+        restored = run("inspect", destination=previous)["records"][0]
+        assert restored.pop("salary") == "" and restored == previous_row
 
         legacy = root / "legacy"
         legacy.mkdir()

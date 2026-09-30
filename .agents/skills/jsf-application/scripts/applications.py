@@ -18,7 +18,7 @@ from uuid import uuid4
 COLUMNS = [
     "application_id", "company", "position", "work_type", "status",
     "vacancy_link", "notes", "created_at", "applied_at", "next_interview",
-    "next_interview_at", "interview_stages",
+    "next_interview_at", "interview_stages", "salary",
 ]
 BUSINESS = set(COLUMNS) - {"application_id", "created_at"}
 STATUSES = {"ready", "applied", "screening", "interviewing", "offer",

@@ -61,7 +61,8 @@ Status: ready-for-agent
 - `next_step` → `next_interview`.
 - `next_step_at` → `next_interview_at`.
 - `stages` → `interview_stages`.
-- Final column order: `application_id`, `company`, `position`, `work_type`, `status`, `vacancy_link`, `notes`, `created_at`, `applied_at`, `next_interview`, `next_interview_at`, `interview_stages`.
+- Final column order: `application_id`, `company`, `position`, `work_type`, `status`, `vacancy_link`, `notes`, `created_at`, `applied_at`, `next_interview`, `next_interview_at`, `interview_stages`, `salary`.
+- The later [salary extension](../jsf-application-salary/spec.md) adds the candidate's asking range as one descriptive column. Ask when omitted on creation, accept explicit unknown as blank, and preserve it on unrelated updates and during migration.
 
 The user confirmed the complete design and final column names. Implementation is authorized.
 

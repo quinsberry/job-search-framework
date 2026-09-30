@@ -1,6 +1,6 @@
 ---
 name: jsf-application
-description: Add or update job application records in applications_table.csv in a user-provided directory. Track application status, interview stages, the next interview, and recruiter conversation notes; ask for missing inputs without choosing business defaults.
+description: Add or update job application records in applications_table.csv in a user-provided directory. Track asking salary, application status, interview stages, the next interview, and recruiter conversation notes; ask for missing inputs without choosing business defaults.
 ---
 
 # JSF Application
@@ -11,7 +11,8 @@ Record a candidacy; `ready` records have not yet been submitted. This skill reco
 
 - Require a destination directory on every invocation. Never substitute the current directory or a previously used directory unless the user explicitly identifies it.
 - Determine whether the request adds a record or updates one. Ask if ambiguous.
-- For additions, require `vacancy_link`, `company`, `position`, `work_type`, `status`, `notes`, `next_interview`, `next_interview_at`, and `interview_stages`. Require `applied_at` for submitted applications; for `ready`, it is empty because submission has not happened.
+- For additions, require `vacancy_link`, `company`, `position`, `work_type`, `status`, `salary`, `notes`, `next_interview`, `next_interview_at`, and `interview_stages`. Require `applied_at` for submitted applications; for `ready`, it is empty because submission has not happened.
+- `salary` is the candidate's fixed-cash asking range. Ask for the amount/range, currency, pay period, contract type, and pay basis when missing or incomplete; accept explicit “unknown” as an empty salary. Store it as one descriptive string, e.g. `25,000–30,000 PLN/month, B2B, before VAT` or `120,000 EUR/year, gross employment`. Do not substitute advertised pay, an offer, an inferred estimate, or an automatic salary conversion. Advertised pay and offers can go in notes; bonus and equity are separate from fixed cash. Preserve salary on updates unless the user explicitly changes or clears it.
 - Ask for omitted required fields in one concise batch and wait. Accept explicit “no notes”, “none”, “unknown”, or “not scheduled” as empty values for notes, interview fields, and unknown application dates. Company, position, work type, status, and vacancy link cannot be empty. Do not interpret silence as an empty value.
 - Read the vacancy link when company, position, or work type is missing. Propose extracted facts and get user confirmation before accepting them. If the page is inaccessible or unclear, ask for missing facts; explicit user values are sufficient. Ask about conflicts rather than replacing user values.
 - For updates, require the directory, `application_id`, and intended changes. A supplied vacancy link can help find records, but show matching records and have the user identify the application ID before updating. Preserve unspecified fields; do not ask for all fields again. Ask for required facts missing from a legacy record that would prevent the update.
@@ -23,7 +24,7 @@ Record a candidacy; `ready` records have not yet been submitted. This skill reco
 
 New files use this column order:
 
-`application_id, company, position, work_type, status, vacancy_link, notes, created_at, applied_at, next_interview, next_interview_at, interview_stages`
+`application_id, company, position, work_type, status, vacancy_link, notes, created_at, applied_at, next_interview, next_interview_at, interview_stages, salary`
 
 | Column | Meaning and accepted values |
 | --- | --- |
@@ -38,6 +39,7 @@ New files use this column order:
 | `next_interview` | Upcoming interview part, e.g. `hr-interview`, `tech-interview-2`, `behavioral-interview`, `leadership-interview`, `ceo-interview`. Employer-specific names are allowed. This is not an application task such as follow-up or submission. |
 | `next_interview_at` | `YYYY-MM-DD` or ISO 8601 date and time with an explicit offset, e.g. `2026-10-05T14:00:00+02:00`. Blank when explicitly unscheduled/unknown. Ask for the user's timezone when a time has none; resolve the offset for the supplied date using that timezone, including daylight saving time. Never assume the machine timezone. |
 | `interview_stages` | Expected interview sequence, separated by `; `, e.g. `hr-interview; tech-interview-1; tech-interview-2; ceo-interview`. Initially unknown is allowed. This is the plan, not a completion history. |
+| `salary` | Candidate's fixed-cash asking range with currency, period, contract type, and pay basis, or blank when explicitly unknown. Ask if omitted on creation. Existing records receive a blank salary during migration. |
 
 `ready` means prepared but not submitted; `applied` means submitted; `screening` means initial review; `interviewing` means the interview process; `offer` means an offer was received; `rejected` means employer rejection; `withdraw` means candidate withdrawal; `closed` means the vacancy ended without an individual rejection. Allow any valid status change; interview sequences vary. Interview stages describe purpose, so a technical assessment by a CTO can be `tech-interview-N`; titles and completion details can go in notes.
 
@@ -51,7 +53,7 @@ Use [scripts/applications.py](scripts/applications.py) for reading and writing. 
    `rtk python3 <skill-dir>/scripts/applications.py migrate --directory <user-directory>`
    Migration creates a backup and reports its path. Do not silently translate legacy statuses or reinterpret existing columns; ask for any necessary record corrections.
 3. On add, if the vacancy link already exists, show the matching records and ask whether to update an identified record or create a separate application. Only pass `--allow-duplicate` after the user explicitly chooses a separate record. The helper matches exact stored URLs; inspect for obvious equivalent links differing by tracking parameters and ask if ambiguous.
-4. Write a temporary UTF-8 JSON object containing the confirmed fields. Use empty strings for explicitly empty values, strings for dates, and a semicolon-separated string for stages. Never pass `application_id` or `created_at` in this object. On add, include all ten business columns. On update, include only intended changes.
+4. Write a temporary UTF-8 JSON object containing the confirmed fields. Use empty strings for explicitly empty values, strings for dates, and a semicolon-separated string for stages. Never pass `application_id` or `created_at` in this object. On add, include all eleven business columns, including `salary`. On update, include only intended changes.
 5. Add:
    `rtk python3 <skill-dir>/scripts/applications.py add --directory <user-directory> --data-file <json-file>`
    Update:
