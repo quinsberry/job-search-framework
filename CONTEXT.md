@@ -4,6 +4,29 @@ The framework helps a job seeker assess vacancies and prepare compensation expec
 
 ## Language
 
+**Search criteria**:
+The job seeker's requirements and preferences used to discover and assess vacancies, including role, compensation and location eligibility.
+
+**Qualifying vacancy**:
+A vacancy with evidence satisfying every mandatory search criterion and no confirmed exclusion. Qualifying vacancies count toward the requested vacancy count.
+_Avoid_: inspected listing, possible match
+
+**Vacancy needing clarification**:
+A vacancy with missing or ambiguous evidence for at least one mandatory search criterion and no confirmed disqualifying condition.
+_Avoid_: qualifying vacancy, confirmed match
+
+**Advertised compensation**:
+The employer's published fixed-cash pay amount or range for a vacancy, with its contract type, currency, pay period and pay basis. It is distinct from the candidate's asking range and an employer offer.
+
+**Discovery budget**:
+The limit on search effort used to find qualifying vacancies. It is separate from the requested count of qualifying vacancies.
+
+**Vacancy snapshot**:
+The vacancy facts and supporting evidence observed at a recorded time. It preserves what was known for a search assessment even when the live posting later changes.
+
+**Duplicate vacancy**:
+Another appearance of the same hiring opening, including appearances in different sources or search runs. Similar company names and titles alone do not establish that two listings describe the same opening.
+
 **Asking range**:
 A defensible fixed-cash compensation range the job seeker can state to a recruiter for a specific vacancy. It reflects comparable pay in the job seeker's residence market and the vacancy's circumstances; bonus and equity are separate.
 _Avoid_: precise salary, guaranteed offer
