@@ -1,5 +1,9 @@
 ## Agent skills
 
+### Skill authoring
+
+Use the project's modular skill and Python execution conventions. See `docs/agents/skills.md`.
+
 ### Issue tracker
 
 Issues and specs are tracked as local Markdown files under `.scratch/`. See `docs/agents/issue-tracker.md`.

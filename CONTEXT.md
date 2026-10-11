@@ -4,6 +4,10 @@ The framework helps a job seeker assess vacancies and prepare compensation expec
 
 ## Language
 
+**Candidate profile**:
+The candidate's source-backed professional facts, including experience, skills, projects, education and languages. It is distinct from search preferences, compensation expectations and vacancy-specific application materials.
+_Avoid_: tailored CV, search criteria
+
 **Search criteria**:
 The job seeker's requirements and preferences used to discover and assess vacancies, including role, compensation and location eligibility.
 
@@ -26,6 +30,12 @@ The vacancy facts and supporting evidence observed at a recorded time. It preser
 
 **Duplicate vacancy**:
 Another appearance of the same hiring opening, including appearances in different sources or search runs. Similar company names and titles alone do not establish that two listings describe the same opening.
+
+**Vacancy history**:
+The recorded observations of a hiring opening across searches. It distinguishes changes to the opening from the progress or outcome of an individual candidacy.
+
+**Hiring task**:
+An action the candidate needs to take during the hiring process, such as preparing for an interview, following up with a recruiter, or deciding on an offer. It is distinct from an interview stage or application status.
 
 **Asking range**:
 A defensible fixed-cash compensation range the job seeker can state to a recruiter for a specific vacancy. It reflects comparable pay in the job seeker's residence market and the vacancy's circumstances; bonus and equity are separate.
