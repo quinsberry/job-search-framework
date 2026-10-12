@@ -1,5 +1,11 @@
 # JSF Profile
 
+## Current extension
+
+The user moved CV-to-search-config setup into this existing skill rather than creating a separate `jsf-config`, and requested removing the stale JSON artifact. `jsf-profile` now owns `search-config.yml` alongside professional facts and README. The new config contract and decisions are recorded in `.scratch/jsf-config/spec.md`.
+
+Persist only canonical professional YAML and generated README; JSON is an on-demand validated export of current YAML, never a saved cache. Apply/render remove a legacy `candidate/profile.json`; read-only export does not mutate files. Historical references below to three persisted views describe the initial implementation, superseded by this extension.
+
 Status: ready-for-agent
 Implementation: complete
 

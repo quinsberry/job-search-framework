@@ -11,6 +11,8 @@ For a plain-language vacancy-search request, use this skill without requiring `$
 
 ## Collect criteria
 
+When the user asks to search using an explicit workspace's `search-config.yml`, use the owning `jsf-profile` helper's `export-search --workspace <workspace>` in its Python environment. It reads current YAML, validates required choices, and emits the existing JSON criteria contract. Keep that operational JSON temporary and feed it to this skill's helpers. If export fails, report missing/invalid choices; do not bypass placeholders or substitute profile experience as preferences. Read candidate expertise through `jsf-profile export --workspace <workspace>` when needed, never a saved `profile.json`. Vacancy assessment remains this skill's responsibility.
+
 Read [references/contracts.md](references/contracts.md) for the input, snapshot, evidence and adapter contracts. Collect sources, titles, qualifying target count, candidate country, and explicit seniority, compensation, technical and work location choices. Ask only for missing required information. `null` means no restriction for supported fields; empty technical lists mean no technical restrictions. Do not invent business requirements.
 
 Use multiple titles, levels and work arrangements as alternatives within each category. All mandatory criteria must pass. Distinguish legal contract (B2B/UoP), work location arrangement (remote/hybrid/onsite), and vacancy type (Product/Outsource/Outstaff). Candidate geography and stated employer restrictions matter even for remote work. Capture office and work-authorization constraints when supplied.

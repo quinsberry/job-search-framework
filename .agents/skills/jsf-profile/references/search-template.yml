@@ -1,0 +1,72 @@
+# Edit this file to choose your next job. CV expertise lives in the profile below.
+# __FILL_ME__ means unfinished; examples in comments are never active values.
+schema_version: 1
+profile_ref: candidate/profile.yaml
+criteria:
+  # Fill this field. Example: [linkedin]. Unfilled fallback: [linkedin].
+  sources: __FILL_ME__
+  # Fill this field. Example: [frontend engineer, software engineer]. No fallback.
+  titles: __FILL_ME__
+  # Fill this field. Example: 10. Number of qualifying vacancies, not inspected ads.
+  target_count: __FILL_ME__
+  candidate:
+    # Fill this field. Example: poland. Current residence, not a former office.
+    country: __FILL_ME__
+    # Fill this field. Example: warsaw. Unfilled fallback: unspecified (null).
+    city: __FILL_ME__
+    # Fill this field. Example: [polish work permit]. null disables this filter.
+    # Unfilled fallback: null. [] means no listed permissions, not unrestricted.
+    work_authorization: __FILL_ME__
+  # Fill this field. Example: [senior, staff]. Explicit null means no restriction.
+  seniorities: __FILL_ME__
+  # Fill this field. Example: [remote, hybrid]. Explicit null means no restriction.
+  work_arrangements: __FILL_ME__
+  # Fill this field. Example: ['warsaw, poland']. Unfilled fallback: null.
+  office_locations: __FILL_ME__
+  # Fill this field with your search minima, not a particular application's ask.
+  # Explicit null means no compensation restriction. Examples:
+  # compensation:
+  #   - {contract: b2b, minimum: 25000, currency: PLN, period: month, basis: before_vat}
+  #   - {contract: uop, minimum: 80000, currency: EUR, period: year, basis: gross}
+  # Supported currencies: PLN, EUR, USD; periods: month, year, hour.
+  compensation: __FILL_ME__
+  technical:
+    # Fill this field. Example: [react, typescript]. Explicit [] means unrestricted.
+    # CV experience does not automatically make a technology mandatory.
+    required: __FILL_ME__
+    # Fill this field. Example: [next.js]. Unfilled fallback: [].
+    preferred: __FILL_ME__
+    # Fill this field. Example: [primarily java]. Unfilled fallback: [].
+    excluded: __FILL_ME__
+  vacancy_types:
+    # Fill this field. Example: [product]. Unfilled fallback: null (unrestricted).
+    required: __FILL_ME__
+    # Fill this field. Example: [product]. Unfilled fallback: [].
+    preferred: __FILL_ME__
+    # Fill this field. Example: [outstaff]. Unfilled fallback: [].
+    excluded: __FILL_ME__
+  # Fill this field. Example: [Example Company]. Unfilled fallback: [].
+  company_exclusions: __FILL_ME__
+  # Fill this field. Example: [next.js, 'vacancy_type:product'].
+  # Unfilled fallback: technical preferences followed by vacancy-type preferences.
+  preferences: __FILL_ME__
+  # Fill this field. Example: 14. Unfilled fallback: null (no age restriction).
+  posting_age_days: __FILL_ME__
+  # Fill this field. Example: 100. Unfilled fallback: target_count * 10.
+  discovery_budget: __FILL_ME__
+  conversions:
+    # Fill only when known. Example: 160. No guessed working-hour assumption.
+    hours_per_month: __FILL_ME__
+    # Fill this complete object only when a currency conversion is needed.
+    # A wholly unfilled FX object is omitted; a partly filled object blocks export.
+    fx:
+      # Fill this field. Example: '2026-10-12'. Quote dates to keep them strings.
+      date: __FILL_ME__
+      # Fill this field with the actual dated rate source URL.
+      # Example: 'https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html'
+      source: __FILL_ME__
+      # Fill this field. Example: EUR.
+      base: __FILL_ME__
+      # Fill this field. Shape example: {EUR: 1, PLN: 4.3, USD: 1.1}.
+      # These numbers illustrate the shape; they are not current exchange rates.
+      rates: __FILL_ME__

@@ -123,11 +123,13 @@ class ProfileTests(unittest.TestCase):
         apply_plan(self.workspace, plan(None, self.initial))
         existing = load(self.workspace)
         files = {p.name: p.read_bytes() for p in (self.workspace / "candidate").iterdir()}
+        times = {p.name: p.stat().st_mtime_ns for p in (self.workspace / "candidate").iterdir()}
         replay = plan(existing, self.initial)
         self.assertEqual(replay["profile"], existing)
         apply_plan(self.workspace, replay)
         self.assertEqual(files, {p.name: p.read_bytes() for p in (self.workspace / "candidate").iterdir()})
-        self.assertEqual(json.loads(files["profile.json"]), summary(existing))
+        self.assertEqual(times, {p.name: p.stat().st_mtime_ns for p in (self.workspace / "candidate").iterdir()})
+        self.assertEqual(set(files), {"profile.yaml", "README.md"})
 
     def test_multiple_evidence_entries_are_idempotent_on_first_reimport(self):
         fact = self.initial["records"][1]["facts"]["technologies"]
@@ -245,6 +247,27 @@ class ProfileTests(unittest.TestCase):
         (directory / "README.md").write_text("Untrusted edits", encoding="utf-8")
         (directory / "profile.json").write_text("{}", encoding="utf-8")
         self.assertEqual(summary(load(self.workspace))["outcome"], "ready")
+
+    def test_export_reads_yaml_edits_and_render_removes_legacy_json(self):
+        import yaml
+        apply_plan(self.workspace, plan(None, self.initial))
+        directory = self.workspace / 'candidate'
+        path = directory / 'profile.yaml'
+        profile = load(self.workspace)
+        profile['issues'].append('User edited YAML')
+        path.write_text('# Keep this comment\n' + yaml.safe_dump(profile))
+        legacy = directory / 'profile.json'
+        legacy.write_text('{}')
+        helper = str(Path(__file__).with_name('profile.py'))
+        before = path.read_bytes()
+        exported = subprocess.run([sys.executable, helper, 'export', '--workspace', str(self.workspace)], capture_output=True, text=True, check=True)
+        self.assertIn('User edited YAML', json.loads(exported.stdout)['issues'])
+        self.assertEqual(path.read_bytes(), before)
+        self.assertTrue(legacy.exists())  # Export remains read-only.
+        subprocess.run([sys.executable, helper, 'render', '--workspace', str(self.workspace)], capture_output=True, check=True)
+        self.assertFalse(legacy.exists())
+        self.assertEqual(path.read_bytes(), before)
+        self.assertIn('User edited YAML', (directory / 'README.md').read_text())
 
     def test_source_cannot_overlap_readme_output(self):
         path = self.workspace / "candidate" / "README.md"

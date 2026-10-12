@@ -378,10 +378,7 @@ def read_json(path):
         raise ValidationError(f"cannot read JSON: {exc}") from None
 
 
-def load(workspace):
-    path = Path(workspace) / "candidate" / "profile.yaml"
-    if not path.exists():
-        return None
+def read_yaml(path):
     yaml = yaml_module()
     class StrictLoader(yaml.SafeLoader):
         pass
@@ -397,11 +394,18 @@ def load(workspace):
     try:
         profile = yaml.load(path.read_text(encoding="utf-8"), Loader=StrictLoader)
     except (OSError, yaml.YAMLError) as exc:
-        raise ValidationError(f"cannot read profile YAML: {exc}") from None
-    return validate_profile(profile)
+        raise ValidationError(f"cannot read YAML: {exc}") from None
+    return profile
+
+
+def load(workspace):
+    path = Path(workspace) / "candidate" / "profile.yaml"
+    return validate_profile(read_yaml(path)) if path.exists() else None
 
 
 def atomic_write(path, content):
+    if path.exists() and path.read_text(encoding='utf-8') == content:
+        return
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     try:
@@ -435,6 +439,7 @@ def ensure_preserved(current, proposed):
 
 def protect_sources(workspace, sources):
     targets = {(Path(workspace) / "candidate" / name).resolve() for name in ("profile.yaml", "profile.json", "README.md")}
+    targets.add((Path(workspace) / "search-config.yml").resolve())
     for source in sources:
         if source.get("path"):
             require(Path(source["path"]).resolve() not in targets, "source CV overlaps an output artifact; move/copy it to a separate source path first")
@@ -447,10 +452,11 @@ def persist(workspace, profile, canonical=True):
     markdown = render(profile)
     yaml_text = yaml_module().safe_dump(profile, allow_unicode=True, sort_keys=False) if canonical else None
     directory = Path(workspace) / "candidate"
-    atomic_write(directory / "profile.json", encoded(result))
-    atomic_write(directory / "README.md", markdown)
-    if canonical:
+    if canonical and load(workspace) != profile:
         atomic_write(directory / "profile.yaml", yaml_text)
+    atomic_write(directory / "README.md", markdown)
+    # Remove the formerly generated cache only on an explicit write operation.
+    (directory / "profile.json").unlink(missing_ok=True)
     return result
 
 
@@ -480,6 +486,12 @@ def main():
     for name in ("export", "render"):
         command = commands.add_parser(name)
         command.add_argument("--workspace", required=True)
+    for name in ('init-search', 'validate-search', 'export-search'):
+        command = commands.add_parser(name)
+        command.add_argument('--workspace', required=True)
+        if name == 'init-search':
+            command.add_argument('--country')
+            command.add_argument('--city')
     args = parser.parse_args()
     try:
         if hasattr(args, "workspace"):
@@ -492,13 +504,21 @@ def main():
             protect_sources(args.workspace, changes["sources"])
         elif args.command == "apply":
             result = apply_plan(args.workspace, read_json(args.plan))
+        elif args.command in {'init-search', 'validate-search', 'export-search'}:
+            from search_config import initialize, inspect_config, export
+            if args.command == 'init-search':
+                result = initialize(args.workspace, args.country, args.city)
+            elif args.command == 'validate-search':
+                result = inspect_config(args.workspace)
+            else:
+                result = export(args.workspace)
         else:
             profile = load(args.workspace)
             require(profile is not None, "workspace has no candidate/profile.yaml")
             result = summary(profile) if args.command == "export" else persist(args.workspace, profile, canonical=False)
         sys.stdout.write(encoded(result))
         return 0
-    except (ValidationError, OSError) as exc:
+    except (ValidationError, OSError, ValueError, TypeError, RecursionError) as exc:
         sys.stderr.write(f"jsf-profile: {exc}\n")
         return 2
 

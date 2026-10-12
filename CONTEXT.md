@@ -11,6 +11,9 @@ _Avoid_: tailored CV, search criteria
 **Search criteria**:
 The job seeker's requirements and preferences used to discover and assess vacancies, including role, compensation and location eligibility.
 
+**Search configuration**:
+The job seeker's editable choices for a vacancy search, linked to their professional profile. It can contain unfinished decisions; past experience alone does not establish desired roles or mandatory vacancy requirements.
+
 **Qualifying vacancy**:
 A vacancy with evidence satisfying every mandatory search criterion and no confirmed exclusion. Qualifying vacancies count toward the requested vacancy count.
 _Avoid_: inspected listing, possible match

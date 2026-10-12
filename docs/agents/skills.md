@@ -10,6 +10,7 @@ Use the existing `skill-creator` when creating or updating skills. These convent
 - Describe natural-language use cases in skill descriptions so users do not need explicit skill mentions. Keep implicit invocation enabled for these skills.
 - Each persistent artifact has one owning skill. Consumers read it or request updates through the owner's contract; they do not implement competing writers.
 - Require an explicit workspace. Distinguish read-only operations from mutations. Use deterministic evaluation and idempotent writes where applicable; declare external observations, timestamps and other changing inputs.
+- Read candidate facts through `jsf-profile export` and workspace search criteria through `jsf-profile export-search`. These validate current YAML; do not consume a persisted candidate JSON cache. `jsf-profile` owns both professional facts and CV-based search setup, in separate YAML files.
 - Keep specialist skills independently usable. The lifecycle coordinator selects and composes their operations without duplicating domain logic or directly editing their data.
 - Verify meaningful behavior, especially parsing, money, state preservation and replay. Use the existing skill validation workflow.
 - Deliver one skill at a time: settle its contract, implement it, verify it, then move to the next skill. Initial workflows run on demand; scheduling is a later integration using the same entrypoints.
