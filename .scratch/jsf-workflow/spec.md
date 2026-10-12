@@ -46,6 +46,7 @@ The foundations of these proposals were accepted in round 2; per-skill details a
 ## Current frontier
 
 - `jsf-profile` is implemented and verified; its accepted behavior and checks are recorded in `.scratch/jsf-profile/spec.md`.
+- `jsf-vacancies` is implemented: one Python helper owns saved vacancy history, deduplication, changes and explicit review choices. Its settled contract and verification are recorded in `.scratch/jsf-vacancies/spec.md`.
 - Other skills' detailed contracts remain deferred under the user's sequential delivery instruction.
 
 Original design branches:

@@ -126,7 +126,9 @@ Acquisition schedules queries round-robin, preserves unprocessed cards and sourc
 
 ## Output
 
-Results contain normalized `criteria`, ranked `matches` capped at the target, separate `needs_clarification` and `rejected` lists, `coverage`, and the full `snapshot`. Each assessed vacancy includes facts/evidence, per-criterion checks, compensation comparisons, preference satisfaction, warnings, aliases and provenance.
+Results contain normalized `criteria`, ranked `matches` capped at the target, separate `needs_clarification` and `rejected` lists, `coverage`, and the full `snapshot`. The additive `assessments` list retains all assessed groups, including qualifying overflow beyond the target, for history consumers. Each assessed vacancy includes facts/evidence, per-criterion checks, compensation comparisons, preference satisfaction, warnings, aliases and provenance.
+
+LinkedIn's explicit closure banner sets `active: false` and records `closure_evidence` (`kind: closed_banner`, exact `quote`). HTTP 404 sets `fetch_status: not_found`, `active: null` and `availability_reason: http_404`; it means an unavailable URL, not confirmed closure. Evaluation also recognizes legacy `not_found` records with `active: false` as uncertain availability.
 
 Preference ranking is lexicographic in the user's ordering: satisfying the first preference outranks satisfying only later preferences. Tie-break by posting date descending, then stable ID ascending. Unknown posting dates sort last. This is not a probabilistic fit score.
 

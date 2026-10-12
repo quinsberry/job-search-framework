@@ -1,6 +1,7 @@
 """LinkedIn public URL adapter. No credentials, browser, or JavaScript runtime."""
 
 from html.parser import HTMLParser
+import re
 import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urljoin, urlsplit
@@ -107,7 +108,10 @@ def details(candidate, body):
         if label and value and label.plain().casefold() in labels:
             out[labels[label.plain().casefold()]] = value.plain()
     # A missing closure banner does not establish that a posting remains active.
-    out["active"] = False if "no longer accepting applications" in root.plain().casefold() else None
+    closure = re.search(r"no longer accepting applications", root.plain(), re.IGNORECASE)
+    out["active"] = False if closure else None
+    if closure:
+        out["closure_evidence"] = {"kind": "closed_banner", "quote": closure.group(0)}
     apply = root.find(lambda n: n.attrs.get("id") == "topbar-apply" and bool(n.attrs.get("href")))
     if apply:
         href = urljoin(candidate["url"], apply[0].attrs["href"])
@@ -176,5 +180,5 @@ class LinkedIn:
     def detail(self, candidate):
         body = self.fetch(candidate["url"])
         if body is None:
-            return {**candidate, "fetch_status": "not_found", "active": False, "facts": {}}
+            return {**candidate, "fetch_status": "not_found", "active": None, "availability_reason": "http_404", "facts": {}}
         return details(candidate, body)

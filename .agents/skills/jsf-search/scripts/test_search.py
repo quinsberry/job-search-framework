@@ -7,7 +7,7 @@ import tempfile
 import unittest
 
 from evaluate import ValidationError, canonical_url, criteria, evaluate, report
-from linkedin import cards, details
+from linkedin import LinkedIn, cards, details
 from search import acquire, encoded
 
 
@@ -94,6 +94,22 @@ class EvaluationTests(unittest.TestCase):
         v = vacancy()
         v["facts"]["eligible_countries"]["value"] = ["germany"]
         self.assertEqual(len(evaluate(config(), snapshot(v))["rejected"]), 1)
+
+    def test_404_is_unavailable_even_in_legacy_snapshot(self):
+        v = vacancy()
+        v.update(fetch_status="not_found", active=False, description=None, facts={})
+        r = evaluate(config(), snapshot(v))
+        self.assertFalse(r["rejected"])
+        self.assertEqual(len(r["needs_clarification"]), 1)
+        checks = r["needs_clarification"][0]["checks"]
+        self.assertTrue(any(x["criterion"] == "availability" and x["status"] == "unknown" for x in checks))
+
+    def test_assessments_include_qualifying_overflow(self):
+        c = config()
+        c["target_count"] = 1
+        r = evaluate(c, snapshot(vacancy(), vacancy("2")))
+        self.assertEqual(len(r["matches"]), 1)
+        self.assertEqual(len(r["assessments"]), 2)
 
     def test_hybrid_office_and_authorization(self):
         c, v = config(), vacancy()
@@ -226,6 +242,15 @@ DETAIL_HTML = '''<h1 class="topcard__title">Frontend Engineer</h1>
 
 
 class ParserTests(unittest.TestCase):
+    def test_404_and_closure_banner_are_distinct(self):
+        adapter = LinkedIn(delay=0)
+        adapter.fetch = lambda url: None
+        v = adapter.detail(cards(CARD_HTML)[0])
+        self.assertEqual(v["fetch_status"], "not_found")
+        self.assertIsNone(v["active"])
+        closed = details(cards(CARD_HTML)[0], DETAIL_HTML + "No longer accepting applications")
+        self.assertEqual(closed["closure_evidence"]["kind"], "closed_banner")
+
     def test_nested_html_details_and_stable_id(self):
         raw = cards(CARD_HTML)[0]
         self.assertEqual((raw["source_id"], raw["title"]), ("123", "Frontend & UI Engineer"))

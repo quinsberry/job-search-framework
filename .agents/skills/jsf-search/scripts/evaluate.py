@@ -314,7 +314,10 @@ def assess(v, c, observed_at):
         checks.append({"criterion": name, "status": status, "reason": reason})
 
     check("description", "pass" if v.get("fetch_status", "ok") == "ok" and (v.get("description") or "").strip() else "unknown", "An accessible full description is required")
-    if v.get("active") is False:
+    if v.get("fetch_status") == "not_found":
+        check("availability", "unknown", "Posting URL unavailable (HTTP 404); closure is unconfirmed")
+        warnings.append("Activity is unconfirmed")
+    elif v.get("active") is False:
         check("activity", "fail", "Posting is confirmed closed")
     elif v.get("active") is True:
         check("activity", "pass", "Posting is confirmed active")
@@ -474,7 +477,8 @@ def evaluate(data, snapshot):
                      "stopping_reason": "target_met" if complete else coverage.get("stopping_reason", "snapshot_complete"),
                      "shortfall": max(0, c["target_count"] - len(matches))})
     return {"schema_version": 1, "outcome": outcome, "criteria": c, "matches": matches[:c["target_count"]],
-            "needs_clarification": unclear, "rejected": rejected, "coverage": coverage, "snapshot": s}
+            "needs_clarification": unclear, "rejected": rejected, "assessments": matches + unclear + rejected,
+            "coverage": coverage, "snapshot": s}
 
 
 def report(result):

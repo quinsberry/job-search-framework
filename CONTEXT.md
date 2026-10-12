@@ -34,6 +34,12 @@ Another appearance of the same hiring opening, including appearances in differen
 **Vacancy history**:
 The recorded observations of a hiring opening across searches. It distinguishes changes to the opening from the progress or outcome of an individual candidacy.
 
+**Not observed vacancy**:
+A previously known vacancy that does not appear in a particular later search. This does not establish that the vacancy is closed or that a candidacy was rejected.
+
+**Vacancy review choice**:
+The candidate's explicit decision to leave a saved vacancy unreviewed, shortlist it, or dismiss it. It is separate from evidence-based fit and application status, and survives posting changes.
+
 **Hiring task**:
 An action the candidate needs to take during the hiring process, such as preparing for an interview, following up with a recruiter, or deciding on an offer. It is distinct from an interview stage or application status.
 
