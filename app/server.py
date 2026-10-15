@@ -11,6 +11,7 @@ from urllib.parse import parse_qs, urlsplit
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / '.agents/skills/jsf-workflow/scripts'))
 import workflow
 import codex_bridge
+import readiness
 from modules import search_config, tracking
 
 
@@ -59,6 +60,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, (STATIC / url.path[1:]).read_bytes(), 'text/javascript' if url.path.endswith('.js') else 'text/css')
             if url.path == '/api/session':
                 return self.send(200, {'workspace': self.server.initial_workspace, 'codex': codex_bridge.status()})
+            if url.path == '/api/readiness':
+                return self.send(200, readiness.inspect(parse_qs(url.query).get('path', [''])[0]))
             if url.path == '/api/workspace':
                 workspace = workflow.workspace_path(parse_qs(url.query).get('path', [''])[0])
                 data = workflow.table(workspace)

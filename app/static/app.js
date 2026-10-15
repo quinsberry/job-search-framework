@@ -1,6 +1,6 @@
 const $ = id => document.getElementById(id);
 const token = document.querySelector('meta[name="jsf-token"]').content;
-let workspace = '', data = null, filter = 'all', codexReady = false, pending = 0, poll = null;
+let workspace = '', data = null, filter = 'all', setup = null, setupChecking = false, trackerError = '', pending = 0, poll = null;
 const drafts = new Map(), queues = new Map(), selected = new Map(), expanded = new Set();
 const statuses = ['ready','applied','screening','interviewing','offer','rejected','withdraw','closed'];
 const node = (tag, text, cls) => { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; if (cls) n.className = cls; return n; };
@@ -10,6 +10,41 @@ async function api(path, payload) {
   const value = await response.json();
   if (!response.ok) { const e = new Error(value.error || 'Request failed'); e.confirmation = value.confirmation_required; throw e; }
   return value;
+}
+function renderSetup() {
+  const labels={ready:'✓ Ready',warning:'! Usable with warnings',blocked:'✕ Needs attention',pending:'○ Not checked'};
+  $('setup-checks').replaceChildren();
+  for(const check of setup?.checks || []) {
+    const item=node('li',undefined,'setup-item '+check.state);
+    const heading=node('div',undefined,'setup-item-heading');
+    heading.append(node('strong',check.label),node('span',labels[check.state],'setup-state'));
+    item.append(heading,node('p',check.message));
+    if(check.request) {
+      const copy=node('button','Copy setup request','quiet');copy.type='button';
+      const fallback=node('textarea');fallback.value=check.request;fallback.readOnly=true;fallback.hidden=true;fallback.setAttribute('aria-label','Setup request to copy');
+      copy.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(check.request);copy.textContent='Copied — paste into your agent';}catch{fallback.hidden=false;fallback.select();copy.textContent='Select and copy the request below';}});
+      item.append(copy,fallback);
+    }
+    $('setup-checks').append(item);
+  }
+  const blockers=(setup?.checks || []).filter(c=>['blocked','pending'].includes(c.state));
+  const running=data?.job?.state==='running';
+  let reason=setupChecking?'Checking setup…':!setup?'Setup could not be checked. Recheck setup to retry.':blockers.length?'Before searching: '+blockers.map(c=>c.label+' — '+c.message).join(' · '):'Ready to search.';
+  if(trackerError)reason='Could not load tracked jobs: '+trackerError;
+  else if(running)reason='A search is already running. You can search again when it finishes.';
+  $('search-reason').textContent=reason;
+  $('find').disabled=setupChecking||!setup?.ready||!!trackerError||running;
+  $('find').title=reason;$('find').setAttribute('aria-describedby','search-reason');
+  const connected=setup?.checks.find(c=>c.key==='workspace')?.state==='ready';
+  document.querySelector('.local').textContent=connected?'✓ Workspace opened':'○ No workspace opened';
+  const codex=setup?.checks.find(c=>c.key==='codex');
+  if(codex)$('connection').textContent=codex.message;
+}
+async function recheckSetup() {
+  setupChecking=true;$('recheck').disabled=true;renderSetup();
+  try { setup=await api('/api/readiness?path='+encodeURIComponent(workspace)); }
+  catch(e) { setup=null;error(e.message); }
+  finally { setupChecking=false;$('recheck').disabled=false;renderSetup(); }
 }
 function application(row) { return row.applications.find(a => a.application_id === selected.get(row.vacancy_id)) || (row.applications.length === 1 ? row.applications[0] : null); }
 function currentValue(row, field) {
@@ -86,7 +121,7 @@ function render() {
   const visible=data.rows.filter(r=>(filter==='all'||r.applied===(filter==='applied'))&&`${r.values.company} ${r.values.title}`.toLowerCase().includes(query));
   $('empty').hidden=visible.length>0;
   $('empty').querySelector('h3').textContent=data.rows.length?'No matching opportunities.':'A fresh start.';
-  $('empty').querySelector('p').textContent=data.rows.length?'Try another filter or search term.':'Complete your search config, then find your first jobs.';
+  $('empty').querySelector('p').textContent=data.rows.length?'Try another filter or search term.':setup?.ready?'Ready to find your first opportunities.':'Complete the highlighted setup steps.';
   for(const row of visible){
     const tr=node('tr'); tr.dataset.id=row.vacancy_id;
     const add=content=>{const td=node('td');td.append(content);tr.append(td);return td;};
@@ -125,22 +160,24 @@ async function refresh(initial=false){
   if(!workspace)return;
   try{
     const incoming=await api('/api/workspace?path='+encodeURIComponent(workspace));
+    trackerError='';
     if(initial||(!pending&&!drafts.size&&!document.activeElement?.closest('#rows'))){data=incoming;render();}
     $('board').hidden=false;
-    const config=incoming.config;
-    $('workspace-message').textContent=config.outcome==='ready'?'Ready to search. '+(config.profile_status==='partial'?'Your profile still has unknown or disputed facts. ':'')+'Changes save in this workspace.':'Search setup needs attention: '+[...(config.missing_fields||[]),...(config.errors||[])].join('; ')+'. Use jsf-profile to complete setup.';
-    $('find').disabled=config.outcome!=='ready'||!codexReady||incoming.job?.state==='running';
+    if(data)data.job=incoming.job;
+    $('workspace-message').textContent='Changes save in '+incoming.workspace;
+    renderSetup();
     $('job').hidden=!incoming.job;$('job').textContent=incoming.job?.message||'';
     $('unlinked').hidden=!incoming.unlinked_applications.length;
     $('unlinked-rows').replaceChildren(...incoming.unlinked_applications.map(a=>node('div',`${a.company} · ${a.position} · ${a.status} · ${a.vacancy_link}`)));
     clearTimeout(poll);if(incoming.job?.state==='running')poll=setTimeout(()=>refresh(),2000);
-  }catch(e){error(e.message);}
+  }catch(e){trackerError=e.message;renderSetup();error(e.message);}
 }
-$('workspace-form').addEventListener('submit',async e=>{e.preventDefault();if(pending||drafts.size){error('Finish or retry unsaved edits before switching workspaces.');return;}error();clearTimeout(poll);$('board').hidden=true;data=null;workspace=$('workspace').value.trim();await refresh(true);});
+$('workspace-form').addEventListener('submit',async e=>{e.preventDefault();if(pending||drafts.size){error('Finish or retry unsaved edits before switching workspaces.');return;}error();clearTimeout(poll);$('board').hidden=true;data=null;workspace=$('workspace').value.trim();trackerError='';setup=null;await recheckSetup();if(setup?.checks.find(c=>c.key==='workspace')?.state==='ready')await refresh(true);});
 $('find-form').addEventListener('submit',async e=>{e.preventDefault();error();try{await api('/api/find',{workspace,count:Number($('count').value)});await refresh();}catch(e){error(e.message);}});
-$('refresh').addEventListener('click',()=>{if(pending||drafts.size){error('Your unsaved edits are still visible. Save or retry them before refreshing.');return;}refresh(true);});
+$('recheck').addEventListener('click',async()=>{error();await recheckSetup();if(workspace&&setup?.checks.find(c=>c.key==='workspace')?.state==='ready')await refresh();});
+$('refresh').addEventListener('click',()=>{if(pending||drafts.size){error('Your unsaved edits are still visible. Save or retry them before refreshing.');return;}recheckSetup().then(()=>refresh(true));});
 $('adopt').addEventListener('click',async()=>{if(pending||drafts.size){error('Finish unsaved edits before importing applications.');return;}try{await api('/api/adopt-applications',{workspace});await refresh(true);}catch(e){error(e.message);}});
 $('query').addEventListener('input',render);
 document.querySelectorAll('[data-filter]').forEach(button=>button.addEventListener('click',()=>{filter=button.dataset.filter;document.querySelectorAll('[data-filter]').forEach(b=>{b.classList.toggle('active',b===button);b.setAttribute('aria-pressed',String(b===button));});render();}));
 window.addEventListener('beforeunload',e=>{if(pending||drafts.size){e.preventDefault();e.returnValue='';}});
-(async()=>{try{const session=await api('/api/session');codexReady=session.codex.ready;$('connection').textContent=session.codex.message;if(session.workspace){$('workspace').value=session.workspace;workspace=session.workspace;await refresh(true);}}catch(e){error(e.message);}})();
+(async()=>{try{const session=await api('/api/session');if(session.workspace){$('workspace').value=session.workspace;workspace=session.workspace;}await recheckSetup();if(workspace)await refresh(true);}catch(e){error(e.message);}})();

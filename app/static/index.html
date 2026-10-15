@@ -12,6 +12,11 @@
     <section class="intro"><div><p class="eyebrow">A LITTLE STRUCTURE. MORE POSSIBILITY.</p><h1>Your next chapter.</h1><p class="subtitle">Find the right opportunities. Keep your progress in one place.</p></div><span id="connection" class="connection">Checking Codex…</span></section>
     <form id="workspace-form" class="workspace"><label for="workspace">Workspace folder</label><div class="workspace-controls"><input id="workspace" name="workspace" placeholder="/Users/you/job-search" autocomplete="off" required><button type="submit" class="secondary">Open workspace <span aria-hidden="true">↗</span></button></div><p id="workspace-message">Choose the folder containing your profile and search configuration.</p></form>
     <div id="error" role="alert" hidden></div>
+    <section class="setup" aria-labelledby="setup-heading">
+      <div class="setup-heading"><h2 id="setup-heading">Search setup</h2><button id="recheck" type="button" class="secondary">Recheck setup</button></div>
+      <ul id="setup-checks" aria-live="polite"><li>Checking setup…</li></ul>
+      <p id="search-reason" role="status">Checking search requirements…</p>
+    </section>
     <section id="board" hidden>
       <div class="board-heading"><div><h2>Opportunities <span id="total" class="count">0</span></h2><p id="summary">Your cumulative list. Your choices stay yours.</p></div><form id="find-form"><label for="count">New jobs</label><input id="count" type="number" min="1" step="1" value="10" required><button id="find" type="submit">Find opportunities <span aria-hidden="true">＋</span></button></form></div>
       <div id="job" role="status" hidden></div>

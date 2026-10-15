@@ -127,6 +127,51 @@ class HTTPTests(unittest.TestCase):
         self.assertEqual(response['error'], 'Sign in first')
         self.assertFalse(self.server.jobs)
 
+    def readiness(self, path=None):
+        from urllib.parse import quote
+        with patch('server.codex_bridge.status', return_value={'ready': True, 'message': 'ChatGPT login detected'}):
+            status, result = self.request('/api/readiness?path=' + quote(self.workspace if path is None else path))
+        self.assertEqual(status, 200)
+        return result
+
+    def test_readiness_allows_partial_profile_and_reads_current_config(self):
+        import yaml
+        path = self.fixture.workspace / 'candidate/profile.yaml'
+        profile = yaml.safe_load(path.read_text())
+        profile['issues'].append('Some experience details are unknown')
+        path.write_text(yaml.safe_dump(profile))
+        result = self.readiness()
+        self.assertTrue(result['ready'])
+        self.assertEqual(next(c for c in result['checks'] if c['key'] == 'profile')['state'], 'warning')
+        config = self.fixture.workspace / 'search-config.yml'
+        content = yaml.safe_load(config.read_text())
+        content['criteria']['titles'] = '__FILL_ME__'
+        config.write_text(yaml.safe_dump(content))
+        result = self.readiness()
+        self.assertFalse(result['ready'])
+        check = next(c for c in result['checks'] if c['key'] == 'config')
+        self.assertIn('titles', check['message'])
+        self.assertIn(self.workspace, check['request'])
+
+    def test_readiness_missing_workspace_and_profile_are_explained(self):
+        checks = self.readiness('')['checks']
+        self.assertEqual([c['state'] for c in checks[:3]], ['pending', 'pending', 'pending'])
+        self.assertEqual(self.readiness(self.workspace + '/absent')['checks'][0]['state'], 'blocked')
+        (self.fixture.workspace / 'candidate/profile.yaml').unlink()
+        check = self.readiness()['checks'][1]
+        self.assertEqual(check['state'], 'blocked')
+        self.assertIn('missing', check['message'])
+        self.assertIn('CV', check['request'])
+
+    def test_readiness_survives_corrupt_tracker_and_rechecks_codex(self):
+        (self.fixture.workspace / 'applications_table.csv').write_text('broken')
+        self.assertTrue(self.readiness()['ready'])
+        with patch('server.codex_bridge.status', return_value={'ready': False, 'message': 'Sign in first'}):
+            status, result = self.request('/api/readiness?path=' + self.workspace)
+        self.assertEqual(status, 200)
+        self.assertFalse(result['ready'])
+        self.assertEqual(result['checks'][-1]['message'], 'Sign in first')
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -14,6 +14,9 @@ The job seeker's requirements and preferences used to discover and assess vacanc
 **Search configuration**:
 The job seeker's editable choices for a vacancy search, linked to their professional profile. It can contain unfinished decisions; past experience alone does not establish desired roles or mandatory vacancy requirements.
 
+**Search readiness**:
+Whether the selected workspace, usable candidate profile, search preferences and AI connection satisfy the prerequisites for starting a search. Optional unknown profile facts can produce warnings without blocking search. Readiness does not guarantee live source access or available AI capacity.
+
 **Qualifying vacancy**:
 A vacancy with evidence satisfying every mandatory search criterion and no confirmed exclusion. Qualifying vacancies count toward the requested vacancy count.
 _Avoid_: inspected listing, possible match
