@@ -9,6 +9,8 @@ Discover and assess vacancies only. Deduplicate within this search, including co
 
 For a plain-language vacancy-search request, use this skill without requiring `$jsf-search`. Extract criteria already supplied in the request and conversation, then ask only for missing required choices before searching. A vague request such as “find me a job” starts criteria collection; it does not authorize invented criteria or applying to jobs.
 
+For requests to add N **new** jobs to an explicit workspace's cumulative tracker, excluding saved history/applications, use `jsf-workflow` to compose this skill with the owners of those records. This skill's standalone count is qualifying vacancies within the current search; it does not implement previous-run exclusions.
+
 ## Collect criteria
 
 When the user asks to search using an explicit workspace's `search-config.yml`, use the owning `jsf-profile` helper's `export-search --workspace <workspace>` in its Python environment. It reads current YAML, validates required choices, and emits the existing JSON criteria contract. Keep that operational JSON temporary and feed it to this skill's helpers. If export fails, report missing/invalid choices; do not bypass placeholders or substitute profile experience as preferences. Read candidate expertise through `jsf-profile export --workspace <workspace>` when needed, never a saved `profile.json`. Vacancy assessment remains this skill's responsibility.

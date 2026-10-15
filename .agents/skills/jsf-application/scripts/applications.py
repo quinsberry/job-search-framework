@@ -58,11 +58,11 @@ def validate_date(value, timestamp=False):
     raise ValueError("Use YYYY-MM-DD" + (" or an ISO timestamp with timezone offset" if timestamp else ""))
 
 
-def validate_record(row):
-    for field in ("company", "position", "work_type", "status", "vacancy_link"):
+def validate_record(row, allow_unknown_work_type=False):
+    for field in ("company", "position", "status", "vacancy_link") + (() if allow_unknown_work_type else ('work_type',)):
         if not row.get(field, "").strip():
             raise ValueError(f"Missing required value: {field}")
-    if row["work_type"] not in {"remote", "hybrid", "onsite"}:
+    if row["work_type"] not in ({'', 'remote', 'hybrid', 'onsite'} if allow_unknown_work_type else {"remote", "hybrid", "onsite"}):
         raise ValueError("work_type must be remote, hybrid, or onsite")
     if row["status"] not in STATUSES:
         raise ValueError("Unsupported status: " + row["status"])
@@ -162,7 +162,14 @@ def operate(args):
             elif args.notes_mode != "replace":
                 data["notes"] = "\n".join(v for v in (row["notes"], data["notes"]) if v)
         row.update(data)
-        validate_record(row)
+        validate_record(row, allow_unknown_work_type=bool(row.get('vacancy_id')))
+        if 'submitted' in row and 'status' in data:
+            if row['status'] == 'ready':
+                row['submitted'] = 'false'
+            elif row['status'] in {'applied', 'screening', 'interviewing', 'offer', 'rejected', 'withdraw'}:
+                row['submitted'] = 'true'
+        if 'submitted' in row and data.get('applied_at'):
+            row['submitted'] = 'true'
         changed = [field for field in data if row[field] != original[field]]
     write_table(path, columns or COLUMNS, rows)
     return {"path": str(path), "application_id": row["application_id"],

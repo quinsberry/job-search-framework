@@ -7,6 +7,8 @@ description: Add or update job application records in applications_table.csv in 
 
 Record a candidacy; `ready` records have not yet been submitted. This skill records data locally and does not submit applications or contact recruiters.
 
+The local `jsf-workflow` table uses [scripts/tracking.py](scripts/tracking.py) for explicit direct user edits. This narrow mode permits unknown salary/date/interview fields and work arrangement, as agreed for checkbox recording; ordinary conversational additions retain the required-input workflow below. It adds optional `vacancy_id` and `submitted` columns for stable linkage and explicit submission state. Existing tables require confirmation and a backup before upgrade. `tracking.edit` accepts workspace, vacancy ID/aliases, known listing details, intended changes, optional application ID and confirmation. Multiple candidacies require a selection. Checking never infers today's date; unchecking means correction to ready, not withdrawal, clears submission date and retains interview details. Hiring-progress corrections require explicit confirmation. Keep `submitted` consistent with status when updating a table through the standard helper. Never create a separate UI-owned application store.
+
 ## Inputs and confirmation
 
 - Require a destination directory on every invocation. Never substitute the current directory or a previously used directory unless the user explicitly identifies it.

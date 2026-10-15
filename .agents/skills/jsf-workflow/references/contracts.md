@@ -1,0 +1,25 @@
+# Workflow contracts
+
+## Inputs and outputs
+
+The local Python app lives at `app/server.py`, with HTML/CSS/JavaScript in `app/static/`. Python mechanics live in this skill's `scripts/`. It requires the four sibling specialists for profile, search, history and applications. No application data is stored in the frontend or copied into an independent database.
+
+- `workflow.py list --workspace PATH`: read-only versioned JSON with cumulative `rows`, original evidence/fit, user corrections, review choice, all matching application records and a row revision. Unlinked applications are returned separately rather than silently discarded. Their URLs still exclude already tracked jobs during search, including ready/unsubmitted records.
+- `workflow.py find --workspace PATH --count N`: on-demand LinkedIn acquisition and Codex interpretation. Returns requested/found/shortfall, new qualifying IDs and coverage. The count is positive and transient. Discovery budget is inherited unless its config placeholder uses the documented automatic N × 10 default. Unknown mandatory evidence remains clarification.
+- The UI's explicit “Add existing applications to this table” action calls `adopt_applications`: application-only records become editable unassessed vacancies through the history owner. It does not rewrite their application CSV or claim live posting availability. Existing observations are retained when identities already match.
+- `app/server.py [--workspace PATH] [--port 8765]`: loopback-only local server. The UI loads a user-selected existing directory. It needs no website account or API key. Connect the installed Codex CLI using its normal ChatGPT login, outside the browser. The CLI owns authentication; the app checks status and does not handle credentials.
+
+Codex runs in an isolated temporary working directory, read-only, without loading user config, with a JSON response schema, a five-minute timeout and explicit no-tool instructions. Provider API-key environment variables are removed to prevent silent API billing fallback. The model returns only indexed facts; raw fields/identities are never accepted back from the model. Each quotation and resulting fit is evaluated by the existing search helper before saving history. Candidate expertise is passed as context, not extra mandatory search conditions. Model availability, subscription limits and source access are external dependencies.
+
+## Writes and editing
+
+- History, observations, redirects, review choices and user corrections remain owned by `jsf-vacancies`. Corrections are separate from raw observations and survive fresh snapshots/identity bridges. Simultaneous contradictory corrections during a merge fail rather than choose a winner.
+- Applications remain owned by `jsf-application`. Its `tracking.py` supports minimal direct user edits, unknown work arrangements, and optional `vacancy_id`/`submitted` columns. Upgrading an existing table requires confirmation and creates a byte-preserving backup. Existing extra columns/IDs/values remain intact. Canonical source/application URLs and historical redirects bridge identities; no company/title fuzzy joins.
+- `workflow/last-search.json` stores the last run's coverage/result; `workflow/vacancies.md` is a generated snapshot of the cumulative table after a search. The interactive table reads current owner files, not this report. Direct edits may make the Markdown report old; it is never authoritative.
+- HTTP edits include a row revision. Changed rows reject stale edits. The UI retains failed edits for an explicit retry/rebase, with visible Saving/Saved/Failed feedback. Per-row requests are serialized. In-process reads/writes share a lock; source acquisition/AI run outside it so editing remains available during search. Run one app process/writer per workspace. Direct concurrent CLI/file edits are outside this first version's locking contract.
+
+All display fields use text/native inputs, not model-produced HTML. Inputs are validated by owners. HTTP writes require a session token and same-origin requests; Host is restricted to loopback. The server has no public binding option. It is a local single-user app, not a hosted multi-user service. Multiple application records must be selected explicitly for edits. Checking records submission without inventing date/salary. Unchecking resets status/date to ready/unknown, retains interview details, and requires confirmation when hiring progress exists. Withdrawal remains a distinct submitted state.
+
+## Verification
+
+Run `scripts/test_workflow.py` in the profile dependency environment, and `app/test_server.py` for HTTP behavior. Specialist regression tests remain in their owning skills. Live LinkedIn/Codex access is not required by automated tests: inject source adapters and an interpretation function, then exercise the real validators/history/application persistence. Real browser checks should use a temporary fictional workspace, never a candidate's workspace.

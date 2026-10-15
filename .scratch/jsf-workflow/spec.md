@@ -48,6 +48,7 @@ The foundations of these proposals were accepted in round 2; per-skill details a
 - `jsf-profile` is implemented and verified; its accepted behavior and checks are recorded in `.scratch/jsf-profile/spec.md`.
 - CV-based search setup is added to `jsf-profile`, with separate editable `search-config.yml` and fresh JSON exports instead of persisted `profile.json`; no sixth skill is created. See `.scratch/jsf-config/spec.md`.
 - `jsf-vacancies` is implemented: one Python helper owns saved vacancy history, deduplication, changes and explicit review choices. Its settled contract and verification are recorded in `.scratch/jsf-vacancies/spec.md`.
+- `jsf-workflow` now delivers the local-first workspace search/editor slice, using Codex and the existing owners. See `.scratch/jsf-workspace-search/spec.md`. General lifecycle planning and richer hiring-task features remain separate future work, not claims of this first UI release.
 - Other skills' detailed contracts remain deferred under the user's sequential delivery instruction.
 
 Original design branches:

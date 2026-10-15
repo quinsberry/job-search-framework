@@ -124,6 +124,8 @@ To add a source, create a Python adapter and register its factory in `search.ADA
 
 Acquisition schedules queries round-robin, preserves unprocessed cards and source errors, and stops repeated page signatures instead of imposing an arbitrary candidate ceiling. Unsupported adapters fail before network access. A LinkedIn MCP adapter can implement this same contract when a suitable tool exists.
 
+Python callers can pass `acquire(..., stop_at_target=False)` when a coordinator owns an additional target such as N previously unseen matches. This continues within the supplied discovery budget and source coverage; it does not read history or change fit evaluation. The standalone default remains stopping at the current-search qualifying target.
+
 ## Output
 
 Results contain normalized `criteria`, ranked `matches` capped at the target, separate `needs_clarification` and `rejected` lists, `coverage`, and the full `snapshot`. The additive `assessments` list retains all assessed groups, including qualifying overflow beyond the target, for history consumers. Each assessed vacancy includes facts/evidence, per-criterion checks, compensation comparisons, preference satisfaction, warnings, aliases and provenance.

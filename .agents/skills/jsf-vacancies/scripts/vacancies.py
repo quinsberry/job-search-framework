@@ -15,6 +15,7 @@ from evaluate import ValidationError, canonical_url, criteria, identities, times
 
 
 STATES = {"unreviewed", "shortlisted", "dismissed"}
+EDITABLE = {'title', 'company', 'location', 'description', 'url', 'work_type', 'advertised_compensation', 'notes'}
 FIELDS = ("title", "company", "location", "description", "seniority_label", "employment_type", "active")
 
 
@@ -74,6 +75,10 @@ def validate(history):
         review = record.get("review")
         require(isinstance(review, dict) and isinstance(review.get("state"), str) and review["state"] in STATES, "invalid review state")
         require(isinstance(record.get("review_conflicts"), list), "invalid review conflicts")
+        require(isinstance(record.get('overrides', {}), dict), 'invalid vacancy corrections')
+        for field, correction in record.get('overrides', {}).items():
+            require(field in EDITABLE and isinstance(correction, dict) and isinstance(correction.get('value'), str), 'invalid vacancy correction')
+            timestamp(correction.get('at'), 'correction.at')
         if review.get("at") is not None:
             timestamp(review["at"], "review.at")
     for old in history["redirects"]:
@@ -123,8 +128,57 @@ def view(record):
     return {"vacancy_id": record["id"], "aliases": record["aliases"], "known": known,
             "first_seen": min(o["first_seen"] for o in observations), "last_seen": latest,
             "availability": availability, "field_conflicts": conflicts,
+            "corrections": record.get('overrides', {}),
             "review": record["review"], "review_conflicts": record["review_conflicts"],
             "latest_assessment": assessment}
+
+
+def correct(existing, identifier, changes, at):
+    """Store user corrections separately from immutable source observations."""
+    history = deepcopy(validate(existing))
+    identifier = resolve(history, identifier)
+    require(identifier in history['vacancies'], 'unknown vacancy')
+    require(isinstance(changes, dict) and bool(changes) and not set(changes) - EDITABLE, 'invalid correction fields')
+    require(all(isinstance(v, str) for v in changes.values()), 'corrections must be strings')
+    if 'url' in changes:
+        canonical_url(changes['url'])
+    if 'work_type' in changes:
+        require(changes['work_type'] in {'', 'remote', 'hybrid', 'onsite'}, 'invalid work arrangement')
+    at = timestamp(at, 'correction time').isoformat(timespec='microseconds')
+    corrections = history['vacancies'][identifier].setdefault('overrides', {})
+    for field, value in changes.items():
+        require(field not in corrections or at >= corrections[field]['at'], 'correction precedes an existing edit')
+        if corrections.get(field, {}).get('value') != value:
+            corrections[field] = {'value': value, 'at': at}
+    return history
+
+
+def register_application(existing, application, at):
+    """Explicitly bring an existing application into the editable vacancy list."""
+    history = deepcopy(validate(existing))
+    url = canonical_url(application['vacancy_link'])
+    posting = {'source': 'application', 'url': url, 'title': application.get('position') or None,
+               'company': application.get('company') or None, 'description': None,
+               'fetch_status': 'unverified', 'origin': 'user application record',
+               'work_type': application.get('work_type', '')}
+    primary, keys = identities(posting)
+    old_id = application.get('vacancy_id')
+    if old_id:
+        keys.add(old_id)
+    matching = [key for key, r in history['vacancies'].items() if set(r['aliases']) & keys]
+    if matching:
+        record = merge_records(history, matching)
+    else:
+        record = {'id': primary, 'aliases': [], 'observations': {}, 'assessments': {},
+                  'review': {'state': 'unreviewed', 'at': None, 'note': ''}, 'review_conflicts': []}
+        history['vacancies'][primary] = record
+    record['aliases'] = sorted(set(record['aliases']) | keys)
+    if old_id and old_id != record['id'] and old_id not in history['vacancies']:
+        history['redirects'][old_id] = record['id']
+    at = timestamp(at, 'import time').isoformat(timespec='microseconds')
+    if not matching:
+        add_entry(record['observations'], digest(posting), {'posting': posting}, at)
+    return validate(history)
 
 
 def scope_key(c):
@@ -154,6 +208,12 @@ def merge_records(history, identifiers):
     for old in sorted(set(identifiers) - {survivor}):
         other = history["vacancies"].pop(old)
         target["aliases"] = sorted(set(target["aliases"]) | set(other["aliases"]))
+        for field, correction in other.get('overrides', {}).items():
+            current = target.setdefault('overrides', {}).get(field)
+            if current is None or correction['at'] > current['at']:
+                target['overrides'][field] = deepcopy(correction)
+            elif correction['at'] == current['at'] and correction['value'] != current['value']:
+                raise ValidationError('identity merge has conflicting simultaneous user corrections')
         for key in ("observations", "assessments"):
             for entry_id, entry in other[key].items():
                 add_entry(target[key], entry_id, entry, entry["first_seen"])
@@ -342,7 +402,11 @@ def main():
     reviewing.add_argument("--state", required=True, choices=sorted(STATES))
     reviewing.add_argument("--at", required=True)
     reviewing.add_argument("--note", default="")
-    for command in (importing, listing, reviewing):
+    correcting = sub.add_parser('correct')
+    correcting.add_argument('--vacancy-id', required=True)
+    correcting.add_argument('--changes', required=True, help='JSON file containing user correction fields')
+    correcting.add_argument('--at', required=True)
+    for command in (importing, listing, reviewing, correcting):
         command.add_argument("--workspace", required=True)
     args = parser.parse_args()
     try:
@@ -357,6 +421,11 @@ def main():
             if updated != history:
                 save(args.workspace, updated)
             result = {"schema_version": 1, "vacancies": [view(r) for r in updated["vacancies"].values()]}
+        elif args.command == 'correct':
+            updated = correct(history, args.vacancy_id, read(args.changes), args.at)
+            if updated != history:
+                save(args.workspace, updated)
+            result = {'schema_version': 1, 'vacancies': [view(r) for r in updated['vacancies'].values()]}
         else:
             result = {"schema_version": 1, "vacancies": [view(r) for _, r in sorted(history["vacancies"].items()) if args.state is None or r["review"]["state"] == args.state]}
         sys.stdout.write(encoded(result))

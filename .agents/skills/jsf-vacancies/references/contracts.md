@@ -25,6 +25,10 @@ All commands emit versioned JSON on stdout. Validation/read/write failures emit 
 
 The sole persisted file is `<workspace>/vacancies/history.json`: schema version, vacancies keyed by ID, old-ID redirects, search scopes and imported-input hashes. Each vacancy retains unique posting observations and criteria-backed assessments with first/last observation timestamps. Repeated payloads extend their observation span. Older inputs enrich history without replacing newer facts. Writes replace this file atomically. Use one writer per workspace.
 
+Records may also contain `overrides`, a field-to-`{value, at}` mapping of explicit user corrections. `correct(history, id, changes, at)` is pure and validates supported fields/URLs/work arrangements; empty strings explicitly clear a display field. `view` returns these separately as `corrections`. Consumers combine them with original fields for display, never rewrite observations or source-based assessments. A proven identity bridge retains the newest correction per field; contradictory simultaneous edits reject the merge.
+
+`register_application(history, application, at)` supports an explicit UI import of application-only vacancies. A new record has application provenance and unverified source activity, without an invented assessment. Known identities are linked without replacing existing source observations. `at` is the import time, not an invented historical posting timestamp.
+
 ## Identity, scope and availability
 
 Reuse search identity: source ID/canonical posting URL, shared application URL, or employer plus requisition ID. Never merge by company/title resemblance. Proven identity bridges merge saved records, preserve observations and redirect previous IDs. Conflicting explicit review choices are retained for the user to resolve through `review`; posting changes never reset a choice.

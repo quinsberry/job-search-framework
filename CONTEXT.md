@@ -37,6 +37,12 @@ Another appearance of the same hiring opening, including appearances in differen
 **Vacancy history**:
 The recorded observations of a hiring opening across searches. It distinguishes changes to the opening from the progress or outcome of an individual candidacy.
 
+**Tracked vacancy**:
+A hiring opening retained for later review, including inspected listings and openings brought in from an existing application. Being tracked does not establish fit or submission.
+
+**Submission mark**:
+The candidate's explicit indication that an application was submitted. Correcting this mark to not applied is distinct from withdrawing an application that was submitted. A submission can have an unknown date.
+
 **Not observed vacancy**:
 A previously known vacancy that does not appear in a particular later search. This does not establish that the vacancy is closed or that a candidacy was rejected.
 

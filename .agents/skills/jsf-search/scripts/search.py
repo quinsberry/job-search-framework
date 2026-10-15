@@ -17,7 +17,7 @@ from linkedin import LinkedIn
 ADAPTERS = {"linkedin": LinkedIn}
 
 
-def acquire(data, snapshot=None, batch_size=10, delay=2.0, adapters=None):
+def acquire(data, snapshot=None, batch_size=10, delay=2.0, adapters=None, stop_at_target=True):
     c = criteria(data)
     adapters = ADAPTERS if adapters is None else adapters
     if set(c["sources"]) - set(adapters):
@@ -62,7 +62,7 @@ def acquire(data, snapshot=None, batch_size=10, delay=2.0, adapters=None):
             s["coverage"]["sources"].setdefault(name, {"pages": 0, "candidates": 0, "errors": []})
             state["queries"].extend({"source": name, "query": query, "offset": 0, "pending": [],
                                      "exhausted": False, "seen_pages": []} for query in expected_queries[name])
-    if existing["outcome"] == "target_met":
+    if stop_at_target and existing["outcome"] == "target_met":
         s["coverage"]["stopping_reason"] = "target_met"
         return s
     seen = set()
