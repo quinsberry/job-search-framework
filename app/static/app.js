@@ -19,6 +19,7 @@ function renderSetup() {
     const heading=node('div',undefined,'setup-item-heading');
     heading.append(node('strong',check.label),node('span',labels[check.state],'setup-state'));
     item.append(heading,node('p',check.message));
+    if(check.details?.length){const details=node('details'),list=node('ul');details.append(node('summary','View details ('+check.details.length+')'));list.append(...check.details.map(text=>node('li',text)));details.append(list);item.append(details);}
     if(['profile','config'].includes(check.key)&&setup?.checks.find(c=>c.key==='workspace')?.state==='ready') {
       const action=node('button',check.key==='profile'?'Set up profile':'Set search preferences','secondary');action.type='button';
       action.addEventListener('click',()=>startGuided(check.key));item.append(action);

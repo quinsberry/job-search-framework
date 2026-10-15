@@ -190,6 +190,22 @@ class HTTPTests(unittest.TestCase):
         self.assertEqual((self.fixture.workspace / 'search-config.yml').read_bytes(), before)
         self.assertEqual(self.request('/setup.js')[0], 200)
 
+    def test_profile_warning_explains_missing_proficiency_without_blocking_search(self):
+        from modules import candidate
+        profile = candidate.load(self.fixture.workspace)
+        source = next(iter(profile['sources'].values()))
+        proposal = candidate.plan(profile, {'schema_version': 1, 'sources': [], 'records': [
+            {'id': 'react', 'section': 'skills', 'facts': {'name': {'value': 'React', 'evidence': [
+                {'source_id': source['id'], 'page': 1, 'quote': 'React'}]}}}]})
+        candidate.apply_plan(self.fixture.workspace, proposal)
+        result = self.readiness()
+        check = next(c for c in result['checks'] if c['key'] == 'profile')
+        self.assertTrue(result['ready'])
+        self.assertEqual(check['state'], 'warning')
+        self.assertIn('1 missing detail', check['message'])
+        self.assertIn('do not block searching', check['message'])
+        self.assertEqual(check['details'], ['React: proficiency level not specified'])
+
 
 if __name__ == '__main__':
     unittest.main()
