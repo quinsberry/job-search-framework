@@ -172,6 +172,24 @@ class HTTPTests(unittest.TestCase):
         self.assertFalse(result['ready'])
         self.assertEqual(result['checks'][-1]['message'], 'Sign in first')
 
+    def test_guided_preferences_require_token_and_keep_drafts_separate(self):
+        payload = {'workspace': self.workspace, 'kind': 'config'}
+        self.assertEqual(self.request('/api/setup/start', payload, token=False)[0], 403)
+        status, result = self.request('/api/setup/start', payload)
+        self.assertEqual(status, 200)
+        session = result['session']
+        self.assertEqual(session['state'], 'questions')
+        from urllib.parse import quote
+        current = self.request('/api/setup?path=' + quote(self.workspace))[1]['session']
+        self.assertEqual(current, session)
+        before = (self.fixture.workspace / 'search-config.yml').read_bytes()
+        self.assertEqual(self.request('/api/setup/save', {'workspace': self.workspace, 'id': session['id'], 'revision': session['revision']})[0], 400)
+        status, result = self.request('/api/setup/cancel', {'workspace': self.workspace, 'id': session['id'], 'revision': session['revision']})
+        self.assertEqual(status, 200)
+        self.assertEqual(result['session']['state'], 'cancelled')
+        self.assertEqual((self.fixture.workspace / 'search-config.yml').read_bytes(), before)
+        self.assertEqual(self.request('/setup.js')[0], 200)
+
 
 if __name__ == '__main__':
     unittest.main()

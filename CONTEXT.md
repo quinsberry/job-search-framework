@@ -17,6 +17,9 @@ The job seeker's editable choices for a vacancy search, linked to their professi
 **Search readiness**:
 Whether the selected workspace, usable candidate profile, search preferences and AI connection satisfy the prerequisites for starting a search. Optional unknown profile facts can produce warnings without blocking search. Readiness does not guarantee live source access or available AI capacity.
 
+**Setup draft**:
+An unfinished profile or search-preferences setup containing submitted answers and proposed changes. It can be resumed or discarded. It becomes active information only after the job seeker reviews and saves it.
+
 **Qualifying vacancy**:
 A vacancy with evidence satisfying every mandatory search criterion and no confirmed exclusion. Qualifying vacancies count toward the requested vacancy count.
 _Avoid_: inspected listing, possible match

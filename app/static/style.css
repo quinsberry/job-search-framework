@@ -121,6 +121,7 @@ h1{
   border-radius:6px;
   color:var(--ink)}
 .workspace p{
+  overflow-wrap:anywhere;
   margin:9px 0 0;
   color:var(--muted);
   font-size:12px}
@@ -438,3 +439,21 @@ footer{
 .setup-item.blocked .setup-state {color:#a32e28}
 .setup-item textarea {width:100%;min-height:100px;margin-top:8px}
 #search-reason {font-size:13px;overflow-wrap:anywhere}
+dialog {width:min(760px,calc(100% - 28px));max-height:90vh;padding:26px;border:1px solid #d9ded5;border-radius:16px;color:inherit;background:#fffefb;box-shadow:0 20px 80px #152a2540}
+dialog::backdrop {background:#10251e70}
+dialog h2 {font-size:24px;margin:0}
+.guided-question {border:1px solid #d9ded5;border-radius:8px;padding:16px;margin:18px 0;min-width:0}
+.guided-question legend {font-weight:600;padding:0 5px}
+.question-help {font-size:13px;margin:0 0 10px}
+.question-controls {display:grid;gap:8px;margin-top:8px}
+.question-controls textarea {width:100%;min-height:80px}
+.question-controls input:not([type=checkbox]),.question-controls select,.guided-question>select {width:100%;min-width:0}
+.choice {display:flex;align-items:center;gap:8px;font-size:14px}
+.choice input {width:18px;height:18px}
+.pay-row {display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px;border:1px solid #d9ded5;border-radius:8px}
+.guided-actions {display:flex;gap:10px;flex-wrap:wrap;margin:20px 0 0}
+.guided-review {white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.6;max-height:50vh;overflow:auto;padding:16px;background:#f4f5f0;border-radius:8px}
+#guided-error {padding:12px;color:#a32e28;background:#fff1ee;border-radius:8px;overflow-wrap:anywhere}
+#setup-progress {padding:14px;border-top:1px solid #d9ded5;font-size:14px}
+#guided-fields>label {display:block;margin:16px 0 6px}
+#guided-fields>select,#guided-cv {width:100%;max-width:100%}

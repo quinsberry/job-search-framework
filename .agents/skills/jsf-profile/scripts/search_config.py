@@ -67,9 +67,7 @@ def resolve(data):
     return c, applied
 
 
-def inspect_config(workspace):
-    path = Path(workspace) / 'search-config.yml'
-    data = read_yaml(path)
+def validate_document(data):
     require(isinstance(data, dict) and set(data) == {'schema_version', 'profile_ref', 'criteria'}, 'invalid search config fields')
     require(type(data['schema_version']) is int and data['schema_version'] == 1, 'search config schema_version must be 1')
     require(data['profile_ref'] == 'candidate/profile.yaml', 'profile_ref must be candidate/profile.yaml')
@@ -90,13 +88,19 @@ def inspect_config(workspace):
             normalized = criteria(c)
         except SearchError as exc:
             errors.append(str(exc))
+    return {'schema_version': 1, 'outcome': 'ready' if not missing and not errors else 'partial',
+            'missing_fields': missing, 'defaults': defaults, 'errors': errors, 'criteria': normalized}
+
+
+def inspect_config(workspace):
+    path = Path(workspace) / 'search-config.yml'
+    result = validate_document(read_yaml(path))
     profile = load(workspace)
     profile_status = summary(profile)['outcome'] if profile is not None else 'missing'
     if profile_status in {'missing', 'needs_clarification'}:
-        errors.append('candidate/profile.yaml needs supported CV facts; use jsf-profile intake')
-    return {'schema_version': 1, 'outcome': 'ready' if not missing and not errors else 'partial',
-            'path': str(path.resolve()), 'missing_fields': missing, 'defaults': defaults,
-            'errors': errors, 'profile_status': profile_status, 'criteria': normalized}
+        result['errors'].append('candidate/profile.yaml needs supported CV facts; use jsf-profile intake')
+        result['outcome'] = 'partial'
+    return {**result, 'path': str(path.resolve()), 'profile_status': profile_status}
 
 
 def initialize(workspace, country=None, city=None):

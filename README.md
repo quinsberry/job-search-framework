@@ -15,7 +15,9 @@ Open **http://127.0.0.1:8765** and enter your job-search workspace folder. Alter
 
 Set up the workspace first with `jsf-profile`: import your PDF/Markdown CV and complete the required choices in `search-config.yml`. You can ask the agent: “Set up my job-search profile from `/path/CV.pdf` in `/path/workspace`.”
 
-The Search setup checklist explains what is ready or blocking search. Use **Copy setup request** to paste a repair request into your agent, then **Recheck setup** after changes. Amber profile warnings permit search; red blockers must be resolved. Rechecking also refreshes Codex login status.
+The Search setup checklist explains what is ready or blocking search. Click **Set up profile** to choose a PDF/Markdown CV or reuse an imported one. Click **Set search preferences** to answer the search-choice forms. The dialog collects answers, shows a draft for review, and changes active files only when you click **Save profile/preferences**. Amber profile warnings permit search; red blockers must be resolved. Recheck setup also refreshes Codex login status.
+
+Close the dialog to browse your jobs and use **Continue setup** later. Submitted answers survive refreshes and server restarts; interrupted AI steps offer Retry. Back/Revise let you change answers. Cancel discards the draft. One setup runs per workspace. Uploaded CVs must be under 10 MB and have readable text; OCR is not included. CV interpretation uses your connected Codex subscription; preference forms run in Python without an AI call. Setup completion refreshes readiness and does not automatically search.
 
 The app keeps one cumulative table. Edit a field and leave it to save; check Applied to record your own submission. Date, salary and interview details can remain unknown. Use All / Not applied / Applied filters and expand Details for longer fields and original evidence. The UI reports failed saves and retains the edit for retry.
 

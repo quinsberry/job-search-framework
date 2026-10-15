@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / '.agents/skills/jsf
 import workflow
 import codex_bridge
 import readiness
+import setup_sessions
 from modules import search_config, tracking
 
 
@@ -56,12 +57,15 @@ class Handler(BaseHTTPRequestHandler):
             if url.path == '/':
                 content = (STATIC / 'index.html').read_text().replace('__SESSION_TOKEN__', self.server.token)
                 return self.send(200, content.encode(), 'text/html')
-            if url.path in {'/app.js', '/style.css'}:
+            if url.path in {'/app.js', '/setup.js', '/style.css'}:
                 return self.send(200, (STATIC / url.path[1:]).read_bytes(), 'text/javascript' if url.path.endswith('.js') else 'text/css')
             if url.path == '/api/session':
                 return self.send(200, {'workspace': self.server.initial_workspace, 'codex': codex_bridge.status()})
             if url.path == '/api/readiness':
                 return self.send(200, readiness.inspect(parse_qs(url.query).get('path', [''])[0]))
+            if url.path == '/api/setup':
+                workspace = workflow.workspace_path(parse_qs(url.query).get('path', [''])[0])
+                return self.send(200, {'session': setup_sessions.current(workspace)})
             if url.path == '/api/workspace':
                 workspace = workflow.workspace_path(parse_qs(url.query).get('path', [''])[0])
                 data = workflow.table(workspace)
@@ -83,10 +87,25 @@ class Handler(BaseHTTPRequestHandler):
             if origin and origin != 'http://' + self.headers.get('Host'):
                 return self.send(403, {'error': 'Cross-origin writes are disabled'})
             size = int(self.headers.get('Content-Length', 0))
-            if size < 1 or size > 1000000 or self.headers.get_content_type() != 'application/json':
-                return self.send(400, {'error': 'Send a JSON request under 1 MB'})
+            limit = 15000000 if self.path == '/api/setup/source' else 1000000
+            if size < 1 or size > limit or self.headers.get_content_type() != 'application/json':
+                return self.send(400, {'error': 'Request too large or invalid JSON content type'})
             data = json.loads(self.rfile.read(size))
             workspace = workflow.workspace_path(data['workspace'])
+            if self.path == '/api/setup/start':
+                return self.send(200, {'session': setup_sessions.start(workspace, data['kind'])})
+            if self.path.startswith('/api/setup/'):
+                action = self.path.rsplit('/', 1)[1]
+                args = (workspace, data['id'], data['revision'])
+                if action == 'source':
+                    session = setup_sessions.choose_source(*args, source_id=data.get('source_id'), upload=data.get('upload'))
+                elif action == 'answer':
+                    session = setup_sessions.answer(*args, data['answers'])
+                elif action in {'retry', 'edit', 'rebase', 'back', 'save', 'cancel'}:
+                    session = getattr(setup_sessions, action)(*args)
+                else:
+                    return self.send(404, {'error': 'Unknown setup action'})
+                return self.send(200, {'session': session})
             if self.path == '/api/edit':
                 row = workflow.edit_row(workspace, data['vacancy_id'], data['field'], data['value'],
                                         data['revision'], data.get('application_id'), data.get('confirm') is True)
