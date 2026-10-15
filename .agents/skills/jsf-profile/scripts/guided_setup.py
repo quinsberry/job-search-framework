@@ -1,5 +1,6 @@
 """Guided profile intake and search preferences, owned by jsf-profile."""
 from copy import deepcopy
+import difflib
 import io
 import json
 from pathlib import Path
@@ -169,6 +170,22 @@ def user_source(answers):
         return source
 
 
+def markdown_source(original, edited):
+    candidate.string(edited, 'Profile draft')
+    candidate.require(len(edited) <= 200000, 'Profile draft must be under 200,000 characters')
+    changes = []
+    matcher = difflib.SequenceMatcher(None, original.splitlines(), edited.splitlines(), autojunk=False)
+    before, after = original.splitlines(), edited.splitlines()
+    for tag, a, b, c, d in matcher.get_opcodes():
+        if tag == 'equal':
+            continue
+        if a != b:
+            changes.append('I removed these draft lines:\n' + '\n'.join(before[a:b]))
+        if c != d:
+            changes.append('I added these draft lines:\n' + '\n'.join(after[c:d]))
+    return user_source({'markdown_edits': '\n\n'.join(changes)}) if changes else None
+
+
 def profile_prompt(existing, sources, transcript):
     contract = (Path(__file__).resolve().parents[1] / 'references/contracts.md').read_text()
     return ('You are the interpretation stage of jsf-profile guided intake. Follow the profile contract below. '
@@ -182,6 +199,14 @@ def profile_prompt(existing, sources, transcript):
             'All options are strings and the user may provide a custom answer. Never ask the same skipped question again. '
             'If supported facts are sufficient and there are no useful unanswered questions, return questions: [] for final review. '
             'A partial profile is allowed. If no usable facts exist, ask for clarification. '
+            'A conversation entry with markdown_edit is a directly edited profile draft, not a request for a revision interview. '
+            'Use its before/after Markdown and draft_profile IDs to apply the precise user changes. '
+            'Changed professional claims are explicit corrections backed by the accompanying user source; '
+            'unchanged claims retain their original evidence. Do not reinterpret unchanged facts as user assertions. '
+            'Removed accepted claims can be cleared to null through explicit correction; preserve existing records and source history. '
+            'Formatting and source-attribution edits cannot rewrite original evidence. Regenerate the readable view from validated facts. '
+            'Return questions: [] after direct edits unless an actual ambiguity prevents understanding an edit; '
+            'do not ask optional intake questions or ask the user to restate their Markdown changes. '
             'Profile data only changes after the user reviews and explicitly saves.\n\n' + contract + '\n\nDATA\n' +
             candidate.encoded({'existing_profile': existing, 'sources': sources, 'conversation': transcript}))
 

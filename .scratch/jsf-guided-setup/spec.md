@@ -28,3 +28,9 @@ Coordinator: `jsf-workflow/scripts/setup_sessions.py` stores a nonauthoritative 
 - Browser checks verified preference edit/review/save and readiness refresh, configured default count, Back, cancellation, native CV selection, custom question answers, reload/resume, review/save and 390px layout without horizontal overflow.
 - Actual PDF text extraction through the upload path was verified separately. A live Codex subscription interpreted a fictional CV and an explicit correction into validated review drafts without writing an active profile.
 - No real candidate workspace data or live job discovery was changed by testing. Login remains owned by the Codex CLI; other guided JSF workflows are deferred.
+
+## Follow-up: direct Markdown editing
+
+The user requested editing the displayed profile Markdown instead of using Revise and answering a correction question. Profile review is now an editable textarea. Review changes submits a bounded, persisted interpretation turn using only changed lines as new user evidence, then returns to a validated generated preview. Save profile remains explicit. Failed edits remain editable/retryable, and legacy correction-question drafts resume directly in the editor without losing their proposed facts.
+
+Verified with 16 guided-session tests, 12 HTTP tests and 25 profile tests, JavaScript syntax checks, and a live fictional-CV browser edit/review/save. The saved correction validates through the profile owner; no real active profile/configuration was edited during testing.

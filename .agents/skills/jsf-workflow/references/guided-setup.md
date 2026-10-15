@@ -14,6 +14,8 @@ Preference questions are deterministic Python forms with typed inputs, explicit 
 
 ## HTTP/UI
 
+Profile review uses an editable Markdown textarea. `POST /api/setup/markdown` takes the normal workspace/id/revision plus `text` (nonblank, at most 200,000 characters). Review changes persists the submitted text before a bounded interpretation turn, then returns to review; Save remains a separate explicit action. Failed interpretation retains the editable submission and supports correction/retry. Unsubmitted edits survive closing/reopening the dialog in the same page, with an unload warning; submission is required for restart persistence. Source history and active artifacts remain unchanged until Save. Config review still uses the typed preference forms.
+
 `GET /api/setup?path=...` reads/resumes display state. `POST /api/setup/start` accepts workspace and kind. `POST /api/setup/{source,answer,back,edit,rebase,retry,save,cancel}` requires workspace, id, revision and the action's typed data. Source takes either source_id or `{upload:{name,data}}`, with base64 data. Answer takes `{answers:{question_id:value}}`. Errors use the app's existing JSON error contract and leave active files intact unless a user-authorized Save itself encountered a partial filesystem failure.
 
 All writes retain local Host, same-origin and session-token checks. Only source upload has a larger (15 MB JSON) request limit; other requests remain below 1 MB. Files are never served through an arbitrary-path endpoint. The browser uses native dialog/forms and text rendering; models do not supply executable HTML.

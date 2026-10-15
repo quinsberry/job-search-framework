@@ -1,5 +1,6 @@
 let guided=null, guidedPoll=null, guidedWorkspace='', guidedBusy=false;
 let guidedGetters=new Map();
+const markdownEdits=new Map();
 const terminalSetup=s=>!s||['complete','cancelled'].includes(s.state);
 function guidedError(message='') { $('guided-error').hidden=!message;$('guided-error').textContent=message; }
 function showGuided() { if(!$('setup-dialog').open)$('setup-dialog').showModal(); }
@@ -32,20 +33,23 @@ async function startGuided(kind) {
 }
 async function guidedAction(action,extra={}) {
   if(guidedBusy)return;
+  if(markdownEdits.has(guided.id)&&!['markdown','cancel'].includes(action)){guidedError('Review your Markdown changes before continuing.');return;}
   guidedBusy=true;guidedError();
   $('setup-dialog').setAttribute('aria-busy','true');
   $('setup-dialog').querySelectorAll('button').forEach(b=>b.disabled=true);
   const target=guidedWorkspace;
+  const draftId=guided.id,editor=$('profile-draft');if(editor)editor.readOnly=true;
   try {
     guided=(await api('/api/setup/'+action,{workspace:guidedWorkspace,id:guided.id,revision:guided.revision,...extra})).session;
     if(workspace!==target){await loadGuided();return;}
+    if(['markdown','cancel'].includes(action))markdownEdits.delete(draftId);
     updateGuidedBanner();renderGuided();
     if(guided.state==='processing')guidedPoll=setTimeout(loadGuided,800);
     if(guided.state==='complete') {
       $('setup-dialog').close();await recheckSetup();if(workspace)await refresh();
     }
   }catch(e){guidedError(e.message);}
-  finally{guidedBusy=false;$('setup-dialog').removeAttribute('aria-busy');$('setup-dialog').querySelectorAll('button').forEach(b=>b.disabled=false);}
+  finally{guidedBusy=false;if(editor)editor.readOnly=false;$('setup-dialog').removeAttribute('aria-busy');$('setup-dialog').querySelectorAll('button').forEach(b=>b.disabled=false);}
 }
 function selectControl(options,value,label) {
   const el=node('select');el.setAttribute('aria-label',label);
@@ -108,9 +112,9 @@ function renderGuided() {
   $('guided-form').hidden=!['source','questions'].includes(guided.state);
   $('guided-back').hidden=!(guided.kind==='config'&&guided.state==='questions'&&guided.stage>0);
   $('guided-save').hidden=guided.state!=='review';$('guided-save').textContent=guided.kind==='profile'?'Save profile':'Save preferences';
-  $('guided-edit').hidden=guided.state!=='review';$('guided-rebase').hidden=guided.state!=='review';
+  $('guided-edit').hidden=guided.state!=='review'||guided.kind==='profile';$('guided-rebase').hidden=guided.state!=='review';
   $('guided-retry').hidden=guided.state!=='failed';$('guided-cancel').hidden=terminalSetup(guided);
-  if(guided.state==='source'||guided.state==='failed'&&guided.kind==='profile') {
+  if(guided.state==='source'||guided.state==='failed'&&guided.kind==='profile'&&!guided.edited_markdown) {
     $('guided-form').hidden=false;
     const pick=selectControl([['','Choose an imported CV…'],...(guided.existing_sources||[]).map(s=>[s.id,s.name])],'','Imported CV');
     const upload=inputControl('file','','Choose another CV');upload.accept='.pdf,.md';upload.id='guided-cv';
@@ -120,15 +124,27 @@ function renderGuided() {
   }else if(guided.state==='questions') {
     $('guided-next').textContent=guided.kind==='config'&&guided.stage===3?'Review preferences':'Continue';
     for(const q of guided.questions){const field=node('fieldset',undefined,'guided-question');field.append(node('legend',q.label+(q.required?' *':' (optional)')));if(q.help)field.append(node('p',q.help,'question-help'));guidedGetters.set(q.id,questionControl(q,field));$('guided-fields').append(field);}
-  }else if(guided.state==='review') {
-    $('guided-fields').append(node('pre',guided.review,'guided-review'));$('guided-form').hidden=false;$('guided-next').hidden=true;
+  }else if(guided.state==='review'||guided.kind==='profile'&&guided.state==='failed'&&guided.edited_markdown) {
+    if(guided.kind==='profile') {
+      const editor=node('textarea',undefined,'guided-review');editor.id='profile-draft';editor.setAttribute('aria-label','Profile draft Markdown');editor.spellcheck=false;
+      const draft=markdownEdits.get(guided.id);
+      editor.value=draft?.revision===guided.revision?draft.text:guided.state==='failed'?guided.edited_markdown:guided.review;
+      if(draft&&draft.revision!==guided.revision)markdownEdits.delete(guided.id);
+      const updated=()=>{const changed=editor.value!==(guided.state==='failed'?guided.edited_markdown:guided.review);$('guided-save').textContent=guided.state==='failed'||editor.value!==guided.review?'Review changes':'Save profile';if(changed)markdownEdits.set(guided.id,{revision:guided.revision,text:editor.value});else markdownEdits.delete(guided.id);};
+      editor.addEventListener('input',updated);updated();
+      $('guided-fields').append(node('label','Edit your profile draft directly'),editor,node('p','Review changes validates your edits and refreshes the preview. Save profile then applies the reviewed facts.','question-help'));
+      $('guided-save').hidden=false;
+    }else $('guided-fields').append(node('pre',guided.review,'guided-review'));
+    $('guided-form').hidden=false;$('guided-next').hidden=true;
   }else if(guided.state==='processing') {
     $('guided-fields').append(node('p','You can close this dialog and browse your jobs. We’ll keep the progress here.'));$('guided-form').hidden=false;$('guided-next').hidden=true;
   }
-  if(['source','questions','failed'].includes(guided.state))$('guided-next').hidden=false;
+  if(['source','questions'].includes(guided.state)||guided.state==='failed'&&!guided.edited_markdown)$('guided-next').hidden=false;
 }
 $('guided-form').addEventListener('submit',async e=>{e.preventDefault();try{if(guidedGetters.has('source'))await guidedAction('source',await guidedGetters.get('source')());else{const answers=Object.fromEntries([...guidedGetters].map(([id,get])=>[id,get()]));await guidedAction('answer',{answers});}}catch(e){guidedError(e.message);}});
-for(const action of ['save','retry','edit','rebase','back'])$('guided-'+action).addEventListener('click',()=>guidedAction(action));
+for(const action of ['retry','edit','rebase','back'])$('guided-'+action).addEventListener('click',()=>guidedAction(action));
+$('guided-save').addEventListener('click',()=>{const editor=$('profile-draft');if(guided.kind==='profile'&&editor&&(guided.state==='failed'||editor.value!==guided.review))guidedAction('markdown',{text:editor.value});else guidedAction('save');});
+window.addEventListener('beforeunload',e=>{if(markdownEdits.size){e.preventDefault();e.returnValue='';}});
 $('guided-cancel').addEventListener('click',()=>{if(confirm('Discard this setup draft? Your active profile, preferences and tracked jobs will stay unchanged.'))guidedAction('cancel');});
 $('hide-setup').addEventListener('click',()=>$('setup-dialog').close());
 $('continue-setup').addEventListener('click',async()=>{await loadGuided();renderGuided();showGuided();});

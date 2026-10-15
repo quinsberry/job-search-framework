@@ -41,13 +41,18 @@ def write(workspace, session):
 def public(session):
     if session is None:
         return None
-    fields = ('schema_version', 'id', 'revision', 'kind', 'state', 'message', 'questions', 'review', 'stage', 'existing_sources')
+    fields = ('schema_version', 'id', 'revision', 'kind', 'state', 'message', 'questions', 'review', 'stage', 'existing_sources', 'edited_markdown')
     return {key: deepcopy(session[key]) for key in fields if key in session}
 
 
 def current(workspace):
     with workflow.LOCK:
         session = read(workspace)
+        if (session and session['kind'] == 'profile' and session['state'] == 'questions' and 'proposal' in session
+                and len(session['questions']) == 1 and session['questions'][0]['id'] == 'corrections'
+                and session['questions'][0]['label'] == 'What would you like to correct or add?'):
+            session.update(state='review', questions=[], message='Edit your profile draft directly, then review the changes before saving.')
+            write(workspace, session)
         if session and session['state'] == 'processing' and session['id'] not in ACTIVE:
             session.update(state='failed', message='Setup was interrupted by a server restart. Your draft and submitted answers are saved. Retry to continue.')
             write(workspace, session)
@@ -107,7 +112,7 @@ def process_profile(workspace, snapshot, event):
         proposal = owner.profile_plan(snapshot['base_profile'], snapshot['sources'], response['changes_json'])
         skipped_ids, skipped_labels = set(), set()
         for turn in snapshot['transcript']:
-            for old in turn['questions']:
+            for old in turn.get('questions', []):
                 if not turn['answers'].get(old['id']):
                     skipped_ids.add(old['id'])
                     skipped_labels.add(candidate.normalized(old['label']))
@@ -120,6 +125,7 @@ def process_profile(workspace, snapshot, event):
                             if not line.startswith('Generated from candidate/profile.yaml.'))
         snapshot.update(state='questions' if questions else 'review', message=response['message'], questions=questions,
                         proposal=proposal, review=preview)
+        snapshot.pop('edited_markdown', None)
     except Exception as exc:
         snapshot.update(state='failed', message=str(exc))
     with workflow.LOCK:
@@ -218,8 +224,26 @@ def edit(workspace, identifier, revision):
         if session['kind'] == 'config':
             session.update(stage=0, state='questions', questions=owner.config_questions(session['original'], session['answers'], 0), message=owner.GROUP_TITLES[0])
         else:
-            session.update(state='questions', questions=[dict(id='corrections', label='What would you like to correct or add?', help='Only provide professional facts you want recorded. Leave blank to keep the draft.', type='text', required=False, options=[])], message='Add a correction, then review the updated profile.')
+            session.update(state='review', questions=[], message='Edit your profile draft directly, then review the changes before saving.')
         return write(workspace, session)
+
+
+def markdown(workspace, identifier, revision, text):
+    with workflow.LOCK:
+        session = require_current(workspace, identifier, revision)
+        candidate.require(session['kind'] == 'profile' and session['state'] in {'review', 'failed'} and 'proposal' in session, 'Only an interpreted profile draft can be edited')
+        source = owner.markdown_source(session['review'], text)
+        if source is None:
+            if session['state'] == 'failed':
+                session.update(state='review', message='Previous profile draft restored for review.')
+                session.pop('edited_markdown', None)
+                return write(workspace, session)
+            return public(session)
+        session['sources'].append(source)
+        session['transcript'].append({'markdown_edit': {'before': session['review'], 'after': text,
+                                                       'draft_profile': session['proposal']['profile']}})
+        session['edited_markdown'] = text
+        return launch(workspace, session)
 
 
 def save(workspace, identifier, revision):

@@ -101,6 +101,8 @@ class Handler(BaseHTTPRequestHandler):
                     session = setup_sessions.choose_source(*args, source_id=data.get('source_id'), upload=data.get('upload'))
                 elif action == 'answer':
                     session = setup_sessions.answer(*args, data['answers'])
+                elif action == 'markdown':
+                    session = setup_sessions.markdown(*args, data['text'])
                 elif action in {'retry', 'edit', 'rebase', 'back', 'save', 'cancel'}:
                     session = getattr(setup_sessions, action)(*args)
                 else:

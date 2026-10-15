@@ -246,6 +246,61 @@ class SetupTests(unittest.TestCase):
         self.assertIsNotNone(processes[0].poll())
         self.assertIn('cancelled',errors[0])
 
+    def test_direct_markdown_edits_are_reviewed_grounded_and_saved_explicitly(self):
+        session=sessions.start(self.workspace,'profile')
+        before=(self.workspace/'candidate/profile.yaml').read_bytes()
+        with patch('setup_sessions.codex_bridge.guided_profile',side_effect=self.completed_profile):
+            self.call('choose_source',session,source_id=session['existing_sources'][0]['id'])
+            review=self.wait()
+        edited=review['review']+'\n- **Location:** Krakow, Poland\n'
+        def interpret(prompt,cancel=None):
+            data=json.loads(prompt.split('\n\nDATA\n')[-1])
+            turn=data['conversation'][-1]['markdown_edit']
+            self.assertEqual(turn['after'],edited)
+            source=data['sources'][-1]
+            self.assertNotIn('Ada Example',source['pages'][0]['text'])
+            fact=dict(value='Krakow, Poland',correction=True,evidence=[dict(source_id=source['id'],page=1,quote='Krakow, Poland')])
+            return dict(message='Review edited facts.',questions=[],changes_json=json.dumps(dict(schema_version=1,sources=[],records=[dict(id='identity',section='identity',facts={'location':fact})])))
+        with patch('setup_sessions.codex_bridge.guided_profile',side_effect=interpret):
+            self.call('markdown',review,edited)
+            updated=self.wait()
+        self.assertEqual(updated['state'],'review',updated['message'])
+        self.assertEqual((self.workspace/'candidate/profile.yaml').read_bytes(),before)
+        self.assertIn('Krakow',updated['review'])
+        self.call('save',updated)
+        identity=candidate.load(self.workspace)['records'][0]
+        self.assertEqual(identity['facts']['location']['value'],'Krakow, Poland')
+        self.assertTrue(identity['facts']['location']['user_corrected'])
+
+    def test_markdown_failures_retain_editable_text_and_unchanged_text_is_noop(self):
+        session=sessions.start(self.workspace,'profile')
+        with patch('setup_sessions.codex_bridge.guided_profile',side_effect=self.completed_profile):
+            self.call('choose_source',session,source_id=session['existing_sources'][0]['id'])
+            review=self.wait()
+        self.assertEqual(self.call('markdown',review,review['review']),review)
+        text=review['review']+'\nMy current residence is Krakow.'
+        with patch('setup_sessions.codex_bridge.guided_profile',side_effect=ValueError('Connection lost')):
+            self.call('markdown',review,text)
+            failed=self.wait()
+        self.assertEqual(failed['edited_markdown'],text)
+        self.assertEqual(failed['state'],'failed')
+        with patch('setup_sessions.codex_bridge.guided_profile',side_effect=self.completed_profile):
+            self.call('markdown',failed,text+' Poland.')
+            self.assertEqual(self.wait()['state'],'review')
+
+    def test_existing_revision_question_resumes_as_an_editable_review(self):
+        session=sessions.start(self.workspace,'profile')
+        with patch('setup_sessions.codex_bridge.guided_profile',side_effect=self.completed_profile):
+            self.call('choose_source',session,source_id=session['existing_sources'][0]['id'])
+            review=self.wait()
+        legacy=sessions.read(self.workspace)
+        legacy.update(state='questions',questions=[dict(id='corrections',label='What would you like to correct or add?',help='',type='text',required=False,options=[])])
+        sessions.write(self.workspace,legacy)
+        resumed=sessions.current(self.workspace)
+        self.assertEqual(resumed['state'],'review')
+        self.assertEqual(resumed['review'],review['review'])
+        self.assertEqual(self.call('edit',resumed)['state'],'review')
+
 
 if __name__ == '__main__':
     unittest.main()
