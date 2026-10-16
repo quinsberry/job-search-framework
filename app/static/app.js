@@ -18,10 +18,29 @@ function renderSetup() {
     const item=node('li',undefined,'setup-item '+check.state);
     const heading=node('div',undefined,'setup-item-heading');
     heading.append(node('strong',check.label),node('span',labels[check.state],'setup-state'));
-    item.append(heading,node('p',check.message));
+    item.append(heading);
+    if(check.key==='profile')item.append(node('p','Your experience and skills, used to assess job fit.','setup-purpose'));
+    if(check.key==='config')item.append(node('p','Choose the roles, pay and working arrangements you want.','setup-purpose'));
+    item.append(node('p',check.message));
     if(check.details?.length){const details=node('details'),list=node('ul');details.append(node('summary','View details ('+check.details.length+')'));list.append(...check.details.map(text=>node('li',text)));details.append(list);item.append(details);}
+    if(check.diagnostics?.length){const details=node('details'),list=node('ul');details.append(node('summary','Technical details'));list.append(...check.diagnostics.map(text=>node('li',text)));details.append(list);item.append(details);}
     if(['profile','config'].includes(check.key)&&setup?.checks.find(c=>c.key==='workspace')?.state==='ready') {
-      const action=node('button',check.key==='profile'?(['ready','warning'].includes(check.state)?'Edit profile':'Set up profile'):(check.state==='ready'?'Edit preferences':'Set search preferences'),'secondary');action.type='button';
+      const draft=typeof setupDraft==='function'?setupDraft(check.key):null;
+      let actionLabel=check.key==='profile'?(['ready','warning'].includes(check.state)?'Edit profile':'Set up profile'):(check.state==='ready'?'Edit preferences':'Set preferences');
+      if(draft&&!terminalSetup(draft)) {
+        const active=draft.state==='processing',waiting=draft.state==='questions',review=draft.state==='review';
+        const activity=node('div',undefined,'card-activity '+(active?'working':draft.state==='failed'?'failed':'waiting'));
+        const status=node('div',undefined,'activity-heading');status.setAttribute('role','status');
+        if(active){const spinner=node('span',undefined,'spinner');spinner.setAttribute('aria-hidden','true');status.append(spinner);}
+        const label=active?(draft.message||'Preparing your profile…'):review?'Draft ready to review':waiting?(check.key==='profile'?'A few questions need your answers':'Your preferences draft is unfinished'):draft.state==='failed'?'Import needs attention':'CV import is unfinished';
+        status.append(node('strong',label));activity.append(status);
+        if(active&&draft.started_at){activity.append(elapsedLabel(draft.started_at));const slow=node('p','Taking longer than usual. You can return later.','slow-hint');slow.dataset.slowStart=draft.started_at;activity.append(slow);}
+        if(active&&check.key==='profile'&&['ready','warning'].includes(check.state))activity.append(node('p','Your saved profile is still ready to use.'));
+        item.append(activity);
+        actionLabel=active?'View progress':review?(check.key==='profile'?'Review profile':'Review preferences'):waiting?(check.key==='profile'?'Answer questions':'Continue preferences'):draft.state==='failed'?'View import issue':'Continue profile';
+      }
+      const action=node('button',actionLabel,'secondary');action.type='button';
+      action.disabled=typeof guidedBusy!=='undefined'&&(guidedBusy||!!guidedPending);
       action.addEventListener('click',()=>startGuided(check.key));item.append(action);
     }
     $('setup-checks').append(item);

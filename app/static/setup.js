@@ -4,55 +4,103 @@ const markdownEdits=new Map();
 const terminalSetup=s=>!s||['complete','cancelled'].includes(s.state);
 function guidedError(message='') { $('guided-error').hidden=!message;$('guided-error').textContent=message; }
 function showGuided() { if(!$('setup-dialog').open)$('setup-dialog').showModal(); }
-function updateGuidedBanner() {
-  const sessions=[...guidedSessions.filter(s=>s&&s.kind!==guided?.kind),guided].filter(s=>!terminalSetup(s));
-  $('setup-progress').hidden=!sessions.length;
-  $('setup-progress-text').textContent='Unfinished drafts: '+sessions.map(s=>s.kind==='profile'?'candidate profile':'search preferences').join(', ')+'. Open the matching setup point to continue.';
+let guidedPending=null, progressConnectionError=false;
+const progressStages=[['uploading','Sending CV'],['reading','Reading document'],['preparing','Preparing profile'],['validating','Checking draft']];
+function setupDraft(kind) {
+  if(guidedWorkspace!==workspace)return null;
+  if(guidedPending?.kind===kind)return guidedPending;
+  return guided?.kind===kind?guided:guidedSessions.find(s=>s?.kind===kind);
 }
-
+function elapsedText(start) {
+  const seconds=Math.max(0,Math.floor((Date.now()-Date.parse(start))/1000));
+  return Number.isFinite(seconds)?Math.floor(seconds/60)+':'+String(seconds%60).padStart(2,'0')+' elapsed':'Working…';
+}
+function elapsedLabel(start) {
+  const label=node('span',elapsedText(start),'elapsed');label.dataset.startedAt=start;return label;
+}
+function updateElapsed() {
+  document.querySelectorAll('[data-started-at]').forEach(el=>el.textContent=elapsedText(el.dataset.startedAt));
+  document.querySelectorAll('[data-slow-start]').forEach(el=>el.hidden=Date.now()-Date.parse(el.dataset.slowStart)<60000);
+}
+setInterval(updateElapsed,1000);
+function renderActivity() {
+  const job=guidedPending||guided,active=job?.state==='processing',box=$('guided-activity');
+  box.hidden=!active;box.replaceChildren();
+  $('hide-setup').textContent=active?'Close and continue later':'Close';
+  if(!active)return;
+  const heading=node('div',undefined,'activity-heading');
+  const spinner=node('span',undefined,'spinner');spinner.setAttribute('aria-hidden','true');
+  heading.append(spinner,node('strong',job.message||'Preparing your profile…'));
+  if(job.started_at)heading.append(elapsedLabel(job.started_at));
+  box.append(heading);
+  const steps=node('ol',undefined,'progress-steps');steps.setAttribute('aria-label','CV import stages');
+  const index=progressStages.findIndex(([phase])=>phase===job.phase);
+  for(const [i,[phase,name]] of progressStages.entries()) {
+    const label=phase==='uploading'&&job.phase!=='uploading'?'CV received':name;
+    const step=node('li',(index>i?'✓ ':index===i?'● ':'○ ')+label,index>i?'done':index===i?'current':'');
+    if(index===i)step.setAttribute('aria-current','step');steps.append(step);
+  }
+  box.append(steps,node('p','You can close this window and return from the Candidate profile card. Your saved profile stays unchanged.','question-help'));
+  if(job.started_at){const slow=node('p','This is taking longer than usual. You can close this window and return later.','slow-hint');slow.dataset.slowStart=job.started_at;box.append(slow);}
+  if(progressConnectionError)box.append(node('p','Connection lost. Retrying the progress check…','slow-hint'));
+  updateElapsed();
+}
+function updateSetupActivity() {renderSetup();renderActivity();}
+function scheduleGuidedPoll() {
+  clearTimeout(guidedPoll);
+  if(guidedSessions.some(s=>s?.state==='processing')||guided?.state==='processing')guidedPoll=setTimeout(()=>loadGuided(),1200);
+}
 async function loadGuided(kind=guidedKind) {
   clearTimeout(guidedPoll);
-  if(!workspace){guided=null;guidedSessions=[];updateGuidedBanner();return;}
+  if(!workspace){guided=null;guidedSessions=[];updateSetupActivity();return true;}
   const requestedWorkspace=workspace;
   try {
     const result=await api('/api/setup?path='+encodeURIComponent(requestedWorkspace)+(kind?'&kind='+encodeURIComponent(kind):''));
-    if(workspace!==requestedWorkspace)return;
-    const changed=guided?.revision!==result.session?.revision||guidedWorkspace!==workspace;
-    guided=result.session;guidedSessions=result.sessions||[];guidedWorkspace=workspace;updateGuidedBanner();
-    if(changed&&$('setup-dialog').open)renderGuided();
-    if(guided?.state==='processing')guidedPoll=setTimeout(()=>loadGuided(),1200);
-  }catch(e){error(e.message);}
+    if(workspace!==requestedWorkspace)return false;
+    const changed=guided?.revision!==result.session?.revision||guided?.phase!==result.session?.phase||guidedWorkspace!==workspace;
+    const activityChanged=changed||progressConnectionError||JSON.stringify(guidedSessions)!==JSON.stringify(result.sessions||[]);
+    guided=result.session;guidedSessions=result.sessions||[];guidedWorkspace=workspace;progressConnectionError=false;
+    if(changed&&$('setup-dialog').open&&!guidedBusy)renderGuided();
+    if(activityChanged)updateSetupActivity();scheduleGuidedPoll();return true;
+  }catch(e){progressConnectionError=true;if($('setup-dialog').open)guidedError('Could not check progress. Your draft is kept. '+e.message);else error(e.message);renderActivity();scheduleGuidedPoll();return false;}
 }
 async function startGuided(kind) {
-  if(guidedBusy)return;
+  if(guidedBusy||guidedPending)return;
   try {
-    guidedKind=kind;await loadGuided(kind);
+    guidedKind=kind;if(!await loadGuided(kind))return;
     if(!terminalSetup(guided)){showGuided();renderGuided();return;}
     guidedBusy=true;
     guided=(await api('/api/setup/start',{workspace,kind})).session;guidedWorkspace=workspace;
-    updateGuidedBanner();renderGuided();showGuided();
-  }catch(e){error(e.message);}finally{guidedBusy=false;}
+    updateSetupActivity();renderGuided();showGuided();
+  }catch(e){error(e.message);}finally{guidedBusy=false;renderSetup();}
+}
+function beginActivity(phase,message) {
+  guidedPending={id:guided.id,kind:guided.kind,state:'processing',phase,message,started_at:new Date().toISOString()};
+  updateSetupActivity();
 }
 async function guidedAction(action,extra={}) {
   if(guidedBusy)return;
   if(markdownEdits.has(guided.id)&&!['markdown','cancel','save'].includes(action)){guidedError('Save your profile edits before continuing.');return;}
   guidedBusy=true;guidedError();
-  $('setup-dialog').setAttribute('aria-busy','true');
-  $('setup-dialog').querySelectorAll('button').forEach(b=>b.disabled=true);
+  if(guided.kind==='profile'&&['source','answer','retry'].includes(action)&&!guidedPending)beginActivity(action==='source'?'uploading':'preparing',action==='source'?'Sending your CV…':'Preparing your profile…');
+  updateSetupActivity();
+  $('guided-form').inert=true;
+  $('setup-dialog').querySelectorAll('button:not(#hide-setup)').forEach(b=>b.disabled=true);
   const target=guidedWorkspace;
   const draftId=guided.id,editor=$('profile-draft');if(editor)editor.readOnly=true;
   try {
     guided=(await api('/api/setup/'+action,{workspace:guidedWorkspace,id:guided.id,revision:guided.revision,...extra})).session;
+    guidedPending=null;
     if(workspace!==target){await loadGuided();return;}
     if(['markdown','cancel','save'].includes(action))markdownEdits.delete(draftId);
-    updateGuidedBanner();renderGuided();
-    if(guided.state==='processing')guidedPoll=setTimeout(()=>loadGuided(),800);
+    updateSetupActivity();renderGuided();scheduleGuidedPoll();
     if(guided.state==='complete') {
       $('setup-dialog').close();await recheckSetup();if(workspace)await refresh();
     }
   }catch(e){guidedError(e.message);}
-  finally{guidedBusy=false;if(editor)editor.readOnly=false;$('setup-dialog').removeAttribute('aria-busy');$('setup-dialog').querySelectorAll('button').forEach(b=>b.disabled=false);}
+  finally{guidedBusy=false;guidedPending=null;updateSetupActivity();if(editor)editor.readOnly=false;$('guided-form').inert=false;$('setup-dialog').querySelectorAll('button').forEach(b=>b.disabled=false);}
 }
+
 function selectControl(options,value,label) {
   const el=node('select');el.setAttribute('aria-label',label);
   for(const option of options){const o=node('option',Array.isArray(option)?option[1]:option);o.value=Array.isArray(option)?option[0]:option;el.append(o);}
@@ -110,13 +158,16 @@ function renderGuided() {
   if(!guided)return;
   guidedError();guidedGetters=new Map();$('guided-fields').replaceChildren();
   $('guided-heading').textContent=guided.kind==='profile'?'Candidate profile':'Search preferences';
-  $('guided-message').textContent=guided.message;
+  $('guided-message').textContent=guided.state==='processing'?'We’re turning your CV into a profile you can review.':guided.message;
+  renderActivity();
+  $('guided-cancel').textContent=guided.state==='processing'?'Cancel import':'Discard draft';
   $('guided-form').hidden=!['source','questions'].includes(guided.state);
   $('guided-back').hidden=!(guided.kind==='config'&&guided.state==='questions'&&guided.stage>0);
   $('guided-save').hidden=guided.state!=='review';$('guided-save').textContent=guided.kind==='profile'?'Save profile':'Save preferences';
   $('guided-edit').hidden=guided.state!=='review'||guided.kind==='profile';$('guided-rebase').hidden=guided.state!=='review';
   $('guided-import').hidden=!(guided.kind==='profile'&&guided.state==='review');
-  $('guided-retry').hidden=guided.state!=='failed';$('guided-cancel').hidden=terminalSetup(guided);
+  $('guided-retry').hidden=!guided.can_retry;$('guided-cancel').hidden=terminalSetup(guided);
+  if(guided.state==='failed'&&guided.failure_detail){const details=node('details');details.append(node('summary','Technical details'),node('p',guided.failure_detail));$('guided-fields').append(details);$('guided-form').hidden=false;$('guided-next').hidden=true;}
   if(guided.state==='source'||guided.state==='failed'&&guided.kind==='profile'&&!guided.edited_markdown) {
     $('guided-form').hidden=false;
     const pick=selectControl([['','Choose an imported CV…'],...(guided.existing_sources||[]).map(s=>[s.id,s.name])],'','Imported CV');
@@ -140,15 +191,14 @@ function renderGuided() {
     }else $('guided-fields').append(node('pre',guided.review,'guided-review'));
     $('guided-form').hidden=false;$('guided-next').hidden=true;
   }else if(guided.state==='processing') {
-    $('guided-fields').append(node('p','You can close this dialog and browse your jobs. We’ll keep the progress here.'));$('guided-form').hidden=false;$('guided-next').hidden=true;
+    $('guided-form').hidden=true;$('guided-next').hidden=true;
   }
   if(['source','questions'].includes(guided.state)||guided.state==='failed'&&!guided.edited_markdown)$('guided-next').hidden=false;
 }
-$('guided-form').addEventListener('submit',async e=>{e.preventDefault();try{if(guidedGetters.has('source'))await guidedAction('source',await guidedGetters.get('source')());else{const answers=Object.fromEntries([...guidedGetters].map(([id,get])=>[id,get()]));await guidedAction('answer',{answers});}}catch(e){guidedError(e.message);}});
+$('guided-form').addEventListener('submit',async e=>{e.preventDefault();if(guidedBusy||guidedPending)return;try{if(guidedGetters.has('source')){beginActivity('uploading','Sending your CV…');await guidedAction('source',await guidedGetters.get('source')());}else{const answers=Object.fromEntries([...guidedGetters].map(([id,get])=>[id,get()]));await guidedAction('answer',{answers});}}catch(e){guidedPending=null;updateSetupActivity();guidedError(e.message);}});
 for(const action of ['retry','edit','rebase','back'])$('guided-'+action).addEventListener('click',()=>guidedAction(action));
 $('guided-save').addEventListener('click',()=>{const editor=$('profile-draft');guidedAction('save',guided.kind==='profile'&&editor?{text:editor.value}:{});});
 $('guided-import').addEventListener('click',()=>guidedAction('import_cv'));
 window.addEventListener('beforeunload',e=>{if(markdownEdits.size){e.preventDefault();e.returnValue='';}});
 $('guided-cancel').addEventListener('click',()=>{if(confirm('Discard this setup draft? Your active profile, preferences and tracked jobs will stay unchanged.'))guidedAction('cancel');});
 $('hide-setup').addEventListener('click',()=>$('setup-dialog').close());
-$('continue-setup').addEventListener('click',async()=>{await loadGuided();const next=!terminalSetup(guided)?guided:guidedSessions.find(s=>!terminalSetup(s));if(next)await startGuided(next.kind);});

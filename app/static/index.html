@@ -16,7 +16,6 @@
       <div class="setup-heading"><h2 id="setup-heading">Search setup</h2><button id="recheck" type="button" class="secondary">Recheck setup</button></div>
       <ol id="setup-checks" aria-live="polite"><li>Checking setup…</li></ol>
       <p id="search-reason" role="status">Checking search requirements…</p>
-      <div id="setup-progress" hidden><span id="setup-progress-text"></span> <button id="continue-setup" type="button" class="secondary">Continue setup</button></div>
     </section>
     <section id="board" hidden>
       <div class="board-heading"><div><h2>Opportunities <span id="total" class="count">0</span></h2><p id="summary">Your cumulative list. Your choices stay yours.</p></div><form id="find-form"><label for="count">New jobs</label><input id="count" type="number" min="1" step="1" value="10" required><button id="find" type="submit">Find opportunities <span aria-hidden="true">＋</span></button></form></div>
@@ -30,6 +29,7 @@
   <dialog id="setup-dialog" aria-labelledby="guided-heading">
     <div class="setup-heading"><h2 id="guided-heading">Guided setup</h2><button id="hide-setup" type="button" class="quiet">Close</button></div>
     <p id="guided-message" role="status"></p>
+    <div id="guided-activity" class="activity-panel" hidden></div>
     <p id="guided-error" role="alert" hidden></p>
     <form id="guided-form"><div id="guided-fields"></div><div class="guided-actions"><button id="guided-back" type="button" class="secondary" hidden>Back</button><button id="guided-next" type="submit">Continue</button></div></form>
     <div class="guided-actions"><button id="guided-import" type="button" class="secondary" hidden>Import another CV</button><button id="guided-edit" type="button" class="secondary" hidden>Revise draft</button><button id="guided-rebase" type="button" class="secondary" hidden>Review against current files</button><button id="guided-save" type="button" hidden>Save</button><button id="guided-retry" type="button" hidden>Retry</button><button id="guided-cancel" type="button" class="quiet">Cancel setup</button></div>

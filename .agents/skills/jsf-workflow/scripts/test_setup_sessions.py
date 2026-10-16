@@ -189,9 +189,13 @@ class SetupTests(unittest.TestCase):
 
     def test_upload_rejects_traversal_unreadable_and_invalid_base64(self):
         session=self.call('import_cv', sessions.start(self.workspace,'profile'))
-        for upload in [dict(name='../CV.md',data='YQ=='),dict(name='CV.md',data='not base64'),dict(name='CV.md',data=base64.b64encode(b' ').decode())]:
+        for upload in [dict(name='../CV.md',data='YQ=='),dict(name='CV.md',data='not base64')]:
             with self.assertRaises(ValueError):self.call('choose_source',session,upload=upload)
         self.assertEqual(sessions.current(self.workspace)['state'],'source')
+        self.call('choose_source',session,upload=dict(name='CV.md',data=base64.b64encode(b' ').decode()))
+        failed=self.wait()
+        self.assertEqual(failed['state'],'failed')
+        self.assertIn('readable',failed['message'])
 
     def test_cross_field_error_can_be_repaired_with_back_and_retains_final_answers(self):
         session=sessions.start(self.workspace,'config')
@@ -304,6 +308,87 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(sessions.start(self.workspace,'profile')['id'],session['id'])
         self.call('save',session)
         self.assertEqual(sessions.current(self.workspace,'config')['id'],config['id'])
+
+
+    def test_reading_is_async_and_cancellable_before_ai(self):
+        started,release=threading.Event(),threading.Event()
+        real_import=candidate.import_source
+        def slow_import(*args):
+            started.set();release.wait(2)
+            return real_import(*args)
+        session=self.call('import_cv',sessions.start(self.workspace,'profile'))
+        original=candidate.load(self.workspace)
+        with patch.object(candidate,'import_source',side_effect=slow_import),patch.object(sessions.codex_bridge,'guided_profile',side_effect=AssertionError('Cancelled import must not call AI')):
+            processing=self.call('choose_source',session,upload=dict(name='CV.md',data=base64.b64encode(b'Example CV').decode()))
+            self.assertTrue(started.wait(1))
+            self.assertEqual(processing['phase'],'reading')
+            self.assertIn('started_at',processing)
+            config=sessions.start(self.workspace,'config')
+            self.assertEqual(config['kind'],'config')
+            cancelled=self.call('cancel',processing)
+            release.set()
+            deadline=time.monotonic()+2
+            while session['id'] in sessions.ACTIVE and time.monotonic()<deadline:time.sleep(.01)
+        self.assertEqual(sessions.current(self.workspace,'profile'),cancelled)
+        self.assertEqual(candidate.load(self.workspace),original)
+        self.assertNotIn(session['id'],sessions.ACTIVE)
+
+    def test_confirmed_phases_keep_revision_cancellable_and_saved_profile_usable(self):
+        ai_started,ai_release,validation_started,validation_release=[threading.Event() for _ in range(4)]
+        def ai(prompt,cancel=None):
+            ai_started.set();ai_release.wait(2);return self.completed_profile(prompt)
+        real_plan=owner.profile_plan
+        def validate(*args):
+            validation_started.set();validation_release.wait(2);return real_plan(*args)
+        session=self.call('import_cv',sessions.start(self.workspace,'profile'))
+        before=candidate.load(self.workspace)
+        with patch.object(sessions.codex_bridge,'guided_profile',side_effect=ai),patch.object(owner,'profile_plan',side_effect=validate):
+            processing=self.call('choose_source',session,source_id=session['existing_sources'][0]['id'])
+            self.assertTrue(ai_started.wait(1))
+            self.assertEqual(sessions.current(self.workspace,'profile')['phase'],'preparing')
+            ai_release.set();self.assertTrue(validation_started.wait(1))
+            checking=sessions.current(self.workspace,'profile')
+            self.assertEqual(checking['phase'],'validating')
+            self.assertEqual(checking['revision'],processing['revision'])
+            self.assertEqual(candidate.load(self.workspace),before)
+            self.call('cancel',processing)
+            validation_release.set()
+            deadline=time.monotonic()+2
+            while session['id'] in sessions.ACTIVE and time.monotonic()<deadline:time.sleep(.01)
+        self.assertEqual(sessions.current(self.workspace,'profile')['state'],'cancelled')
+        self.assertEqual(candidate.load(self.workspace),before)
+
+    def test_timeout_retains_inputs_and_only_explicit_retry_starts_another_turn(self):
+        session=self.call('import_cv',sessions.start(self.workspace,'profile'))
+        before=candidate.load(self.workspace)
+        with patch.object(sessions.codex_bridge,'guided_profile',side_effect=ValueError('Codex timed out.')) as ai:
+            self.call('choose_source',session,source_id=session['existing_sources'][0]['id'])
+            failed=self.wait()
+            self.assertEqual(failed['state'],'failed')
+            self.assertTrue(failed['can_retry'])
+            self.assertIn('took too long',failed['message'])
+            self.assertIn('timed out',failed['failure_detail'])
+            for _ in range(3):sessions.current(self.workspace,'profile')
+            self.assertEqual(ai.call_count,1)
+        stored=sessions.read(self.workspace,'profile')
+        self.assertTrue(stored['sources'])
+        with patch.object(sessions.codex_bridge,'guided_profile',side_effect=self.completed_profile):
+            self.call('retry',failed)
+            review=self.wait()
+        self.assertEqual(review['state'],'review')
+        self.assertEqual(candidate.load(self.workspace),before)
+
+
+    def test_failed_upload_can_be_replaced_by_an_existing_cv(self):
+        session=self.call('import_cv',sessions.start(self.workspace,'profile'))
+        self.call('choose_source',session,upload=dict(name='Empty.md',data=base64.b64encode(b' ').decode()))
+        failed=self.wait()
+        self.assertEqual(failed['state'],'failed')
+        self.assertIn('pending_upload',sessions.read(self.workspace,'profile'))
+        with patch.object(sessions.codex_bridge,'guided_profile',side_effect=self.completed_profile):
+            self.call('choose_source',failed,source_id=session['existing_sources'][0]['id'])
+            self.assertEqual(self.wait()['state'],'review')
+        self.assertNotIn('pending_upload',sessions.read(self.workspace,'profile'))
 
 
 

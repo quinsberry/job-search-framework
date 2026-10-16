@@ -50,7 +50,7 @@ The setup points are ordered as follows:
 3. **Candidate profile** — import a PDF/Markdown CV, or edit your existing profile. Imported CVs can be reused. Ordinary manual edits save without AI.
 4. **Search preferences** — configure roles, compensation, work arrangements and other search criteria in the forms. No CV upload is required.
 
-Profile and preferences have separate drafts. Closing a dialog keeps submitted progress; active information changes only after **Save**. Unsaved editor text must be saved before refreshing or closing the browser.
+Profile and preferences have separate drafts and card actions. CV import shows a loader, confirmed stages and elapsed time. Close the dialog and use View progress, Answer questions or Review profile on the Candidate profile card to return. Failures retain your inputs and offer Retry; background completion does not reopen the dialog. Closing a dialog keeps submitted progress; active information changes only after **Save**. Unsaved editor text must be saved before refreshing or closing the browser.
 
 The first successful save of a legacy profile converts it to `candidate/profile.md`, retaining evidence separately and backing up the previous files. Opening a workspace does not migrate its profile.
 

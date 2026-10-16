@@ -23,6 +23,7 @@ Whether the selected workspace, usable candidate profile, search preferences and
 
 **Setup draft**:
 An unfinished profile or search-preferences setup containing submitted answers and proposed changes. It can be resumed or discarded. It becomes active information only after the job seeker reviews and saves it.
+A new draft does not invalidate previously saved usable information. It may be processing, awaiting answers, or ready for review independently of the saved setup's readiness.
 
 **Qualifying vacancy**:
 A vacancy with evidence satisfying every mandatory search criterion and no confirmed exclusion. Qualifying vacancies count toward the requested vacancy count.

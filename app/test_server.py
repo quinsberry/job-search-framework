@@ -150,7 +150,8 @@ class HTTPTests(unittest.TestCase):
         result = self.readiness()
         self.assertFalse(result['ready'])
         check = next(c for c in result['checks'] if c['key'] == 'config')
-        self.assertIn('titles', check['message'])
+        self.assertIn('preferred roles', check['message'])
+        self.assertIn('titles', check['diagnostics'])
         self.assertIn(self.workspace, check['request'])
 
     def test_readiness_missing_workspace_and_profile_are_explained(self):
@@ -161,7 +162,7 @@ class HTTPTests(unittest.TestCase):
         (self.fixture.workspace / 'candidate/profile.md').unlink()
         check = next(c for c in self.readiness()['checks'] if c['key']=='profile')
         self.assertEqual(check['state'], 'blocked')
-        self.assertIn('missing', check['message'])
+        self.assertIn('Add your CV', check['message'])
         self.assertIn('CV', check['request'])
 
     def test_readiness_survives_corrupt_tracker_and_rechecks_codex(self):

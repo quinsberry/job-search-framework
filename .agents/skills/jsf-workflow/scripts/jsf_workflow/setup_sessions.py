@@ -1,6 +1,7 @@
 """Durable, revisioned guided setup. Specialist helpers own domain changes."""
 import base64
 from copy import deepcopy
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 import re
@@ -49,8 +50,10 @@ def write(workspace, session):
 def public(session):
     if session is None:
         return None
-    fields = ('schema_version', 'id', 'revision', 'kind', 'state', 'message', 'questions', 'review', 'stage', 'existing_sources', 'edited_markdown')
-    return {key: deepcopy(session[key]) for key in fields if key in session}
+    fields = ('schema_version', 'id', 'revision', 'kind', 'state', 'message', 'questions', 'review', 'stage', 'existing_sources', 'edited_markdown', 'phase', 'started_at', 'failure_detail')
+    result = {key: deepcopy(session[key]) for key in fields if key in session}
+    result['can_retry'] = session['state'] == 'failed' and bool(session.get('sources') or session.get('pending_upload'))
+    return result
 
 
 def current(workspace, kind=None):
@@ -107,7 +110,11 @@ def start(workspace, kind):
 
 def launch(workspace, session):
     event = threading.Event()
-    session.update(state='processing', message='Reading your CV and preparing the next step…', questions=[])
+    reading = bool(session.get('pending_upload'))
+    session.pop('failure_detail', None)
+    session.update(state='processing', phase='reading' if reading else 'preparing',
+                   started_at=datetime.now(timezone.utc).isoformat(),
+                   message='Reading your document…' if reading else 'Preparing your profile with Codex…', questions=[])
     ACTIVE[session['id']] = event
     result = write(workspace, session)
     worker = threading.Thread(target=process_profile, args=(workspace, deepcopy(session), event), daemon=True)
@@ -115,9 +122,27 @@ def launch(workspace, session):
     return result
 
 
+def progress(workspace, snapshot, event, phase, message):
+    with workflow.LOCK:
+        live = read(workspace, snapshot['kind'])
+        if event.is_set() or not live or (live['id'], live['revision']) != (snapshot['id'], snapshot['revision']):
+            return False
+        snapshot.update(phase=phase, message=message)
+        # Progress does not change answers or invalidate an in-flight Cancel request.
+        candidate.atomic_write(path(workspace, snapshot['kind']), candidate.encoded(snapshot))
+        return True
+
+
 def process_profile(workspace, snapshot, event):
     try:
+        if snapshot.get('pending_upload'):
+            snapshot['sources'] = [candidate.import_source(workspace, snapshot['pending_upload'])]
+            snapshot.pop('pending_upload')
+        if not progress(workspace, snapshot, event, 'preparing', 'Preparing your profile with Codex…'):
+            raise ValueError('Setup cancelled or replaced')
         response = codex_bridge.guided_profile(owner.profile_prompt(snapshot['base_profile'], snapshot['sources'], snapshot['transcript']), event)
+        if not progress(workspace, snapshot, event, 'validating', 'Checking your profile draft…'):
+            raise ValueError('Setup cancelled or replaced')
         candidate.require(isinstance(response, dict) and isinstance(response.get('message'), str), 'Invalid guided setup response')
         questions = response.get('questions')
         candidate.require(isinstance(questions, list) and len(questions) <= 6, 'Codex returned too many or invalid questions')
@@ -143,10 +168,16 @@ def process_profile(workspace, snapshot, event):
         candidate.require(questions or proposal['outcome'] != 'needs_clarification', 'No supported CV facts were found. Choose a readable CV or supply clarifying answers.')
         preview = owner.profile_review(proposal)
         snapshot.update(state='questions' if questions else 'review', message=response['message'], questions=questions,
-                        proposal=proposal, review=preview)
+                        phase='ready', proposal=proposal, review=preview)
         snapshot.pop('edited_markdown', None)
     except Exception as exc:
-        snapshot.update(state='failed', message=str(exc))
+        detail = str(exc)
+        message = ('Preparing your profile took too long. Your CV and answers are saved. Try again when you’re ready.'
+                   if 'timed out' in detail.lower() else
+                   'We couldn’t finish reading your document. Choose a readable PDF or Markdown CV, or retry.'
+                   if snapshot.get('pending_upload') else
+                   'We couldn’t prepare your profile. Your CV and answers are saved. Check your connection or Codex sign-in, then retry.')
+        snapshot.update(state='failed', phase='failed', message=message, failure_detail=detail)
     with workflow.LOCK:
         live = read(workspace, snapshot['kind'])
         if live and live['id'] == snapshot['id'] and live['revision'] == snapshot['revision'] and not event.is_set():
@@ -173,10 +204,12 @@ def choose_source(workspace, identifier, revision, source_id=None, upload=None):
             directory.mkdir(parents=True, exist_ok=True)
             file = directory / name
             file.write_bytes(raw)
-            source = candidate.import_source(workspace, file)
+            session['pending_upload'] = str(file)
+            source = None
         else:
             source = owner.select_cv(session['base_profile'], source_id, workspace)
-        session['sources'] = [source]
+            session.pop('pending_upload', None)
+        session['sources'] = [source] if source else []
         session['transcript'] = []
         return launch(workspace, session)
 
@@ -218,7 +251,7 @@ def answer(workspace, identifier, revision, answers):
 def retry(workspace, identifier, revision):
     with workflow.LOCK:
         session = require_current(workspace, identifier, revision)
-        candidate.require(session['state'] == 'failed' and session['kind'] == 'profile' and session['sources'], 'Choose a CV before retrying')
+        candidate.require(session['state'] == 'failed' and session['kind'] == 'profile' and (session['sources'] or session.get('pending_upload')), 'Choose a CV before retrying')
         return launch(workspace, session)
 
 
