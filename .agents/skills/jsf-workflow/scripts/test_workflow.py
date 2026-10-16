@@ -226,6 +226,29 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(self.row()['fit'], 'match')
         self.assertEqual((self.workspace / 'search-config.yml').read_bytes(), before)
 
+    def test_ten_jobs_stops_at_target_or_inspection_limit_and_reports_both(self):
+        for qualifying in (True, False):
+            with self.subTest(qualifying=qualifying):
+                c = config()
+                c['discovery_budget'] = 12
+                self.write_config(c)
+                inspected, messages = [], []
+                class Adapter:
+                    page_size = 25
+                    def __init__(self, delay=0): pass
+                    def queries(self, c): return [{}]
+                    def page(self, q, offset): return [vacancy(str(i)) for i in range(offset + 1, offset + 26)]
+                    def detail(self, v):
+                        inspected.append(v['source_id'])
+                        return {**v, 'facts': {}}
+                def interpret(c, records, expertise):
+                    return [vacancy()['facts'] if qualifying else {} for r in records]
+                result = workflow.find_jobs(self.workspace, 10, progress=messages.append, interpreter=interpret, adapters={'linkedin': Adapter}, delay=0)
+                self.assertEqual(result['found'], 10 if qualifying else 0)
+                self.assertEqual(len(inspected), 10 if qualifying else 12)
+                self.assertEqual(result['coverage']['stopping_reason'], 'target_met' if qualifying else 'discovery_budget')
+                self.assertTrue(all('of 10' in message and '12' in message for message in messages), messages)
+
     def test_budget_shortfall_and_invalid_ai_evidence(self):
         c = config(); c.update(target_count=1, discovery_budget=1)
         self.write_config(c)

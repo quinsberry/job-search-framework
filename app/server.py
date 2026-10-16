@@ -133,12 +133,16 @@ class Handler(BaseHTTPRequestHandler):
                 with self.server.job_lock:
                     if self.server.jobs.get(key, {}).get('state') == 'running':
                         return self.send(409, {'error': 'A search is already running in this workspace'})
-                    job = {'state': 'running', 'message': 'Starting search…'}
+                    job = {'state': 'running', 'message': f'Starting search for {count} new matching jobs…'}
                     self.server.jobs[key] = job
                 def run():
                     try:
                         result = workflow.find_jobs(workspace, count, progress=lambda message: job.update(message=message))
-                        job.update(state='complete', message=f"Added {result['found']} of {result['requested']} new qualifying jobs.", result=result)
+                        reason = result.get('coverage', {}).get('stopping_reason')
+                        explanation = {'discovery_budget': 'Inspection limit reached.',
+                                       'source_exhausted': 'No more listings available from the source.',
+                                       'source_failure': 'Source access prevented further searching.'}.get(reason, '')
+                        job.update(state='complete', message=f"Search finished. Added {result['found']} of {result['requested']} new matching jobs. {explanation}".strip(), result=result)
                     except Exception as exc:
                         job.update(state='failed', message=str(exc))
                 threading.Thread(target=run, daemon=True).start()

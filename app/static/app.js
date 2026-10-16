@@ -47,7 +47,7 @@ function renderSetup() {
   }
   const blockers=(setup?.checks || []).filter(c=>['blocked','pending'].includes(c.state));
   const running=data?.job?.state==='running';
-  let reason=setupChecking?'Checking setup…':!setup?'Setup could not be checked. Recheck setup to retry.':blockers.length?'Before searching: '+blockers.map(c=>c.label+' — '+c.message).join(' · '):'Ready to search.';
+  let reason=setupChecking?'Checking setup…':!setup?'Setup could not be checked. Recheck setup to retry.':blockers.length?'Before searching: '+blockers.map(c=>c.label+' — '+c.message).join(' · '):'Ready to search. The target counts new matching jobs; rejected and uncertain listings do not count.';
   if(trackerError)reason='Could not load tracked jobs: '+trackerError;
   else if(running)reason='A search is already running. You can search again when it finishes.';
   $('search-reason').textContent=reason;

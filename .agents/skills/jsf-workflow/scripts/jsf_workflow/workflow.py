@@ -99,14 +99,19 @@ def find_jobs(workspace, count, progress=lambda message: None, interpreter=codex
     with LOCK:
         known = set(vacancies.known_identities(workspace)['identities']) | set(tracking.known_identities(workspace)['identities'])
     snapshot = None
-    qualified = []
+    qualified, result = [], None
+    def report_progress(stage):
+        coverage = result['coverage'] if result else {}
+        progress(f"{stage} Found {min(count, len(qualified))} of {count} new matches; "
+                 f"checked {coverage.get('inspected_count', 0)} of {c['discovery_budget']} listings "
+                 f"({coverage.get('rejected_count', 0)} rejected, {coverage.get('clarification_count', 0)} need clarification).")
     while True:
-        progress('Fetching LinkedIn listings…')
+        report_progress('Fetching LinkedIn listings…')
         previous = len(snapshot['vacancies']) if snapshot else 0
         snapshot = search.acquire(c, snapshot, min(5, max(1, count - len(qualified))), delay, adapters, stop_at_target=False)
         incoming = snapshot['vacancies'][previous:]
         if incoming:
-            progress(f'Codex is assessing {len(incoming)} listings…')
+            report_progress(f'Codex is assessing {len(incoming)} listings…')
             facts = interpreter(c, deepcopy(incoming), expertise)
             if len(facts) != len(incoming):
                 raise ValueError('Interpreter returned the wrong number of records')
@@ -119,12 +124,13 @@ def find_jobs(workspace, count, progress=lambda message: None, interpreter=codex
             imported = vacancies.import_results(vacancies.load(workspace), result)
             if not imported['replayed']:
                 vacancies.save(workspace, imported['history'])
-        progress(f'Found {min(count, len(qualified))} of {count} new matches; inspected {result["coverage"]["inspected_count"]}.')
+        report_progress('Batch saved.')
         if len(qualified) >= count or snapshot['coverage']['stopping_reason'] != 'batch_complete':
             break
     outcome = {'schema_version': 1, 'requested': count, 'found': min(count, len(qualified)),
                'shortfall': max(0, count - len(qualified)), 'vacancy_ids': [r['vacancy_id'] for r in qualified[:count]],
                'coverage': result['coverage']}
+    outcome['coverage']['inspection_limit'] = c['discovery_budget']
     outcome['coverage']['stopping_reason'] = 'target_met' if len(qualified) >= count else snapshot['coverage']['stopping_reason']
     with LOCK:
         search.write(workspace / 'workflow' / 'last-search.json', search.encoded(outcome))
