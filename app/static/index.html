@@ -20,12 +20,24 @@
     <section id="board" hidden>
       <div class="board-heading"><div><h2>Opportunities <span id="total" class="count">0</span></h2><p id="summary">Your cumulative list. Your choices stay yours.</p></div><form id="find-form"><label for="count">New matches</label><input id="count" type="number" min="1" step="1" value="10" required><button id="find" type="submit">Find opportunities <span aria-hidden="true">＋</span></button></form></div>
       <div id="job" role="status" hidden></div>
-      <div class="toolbar"><nav aria-label="Filter vacancies"><button type="button" class="filter active" data-filter="all" aria-pressed="true">All</button><button type="button" class="filter" data-filter="not" aria-pressed="false">Not applied</button><button type="button" class="filter" data-filter="applied" aria-pressed="false">Applied</button></nav><div class="toolbar-end"><input id="query" aria-label="Search tracked vacancies" placeholder="Filter by company or role…"><button id="refresh" type="button" class="quiet">Refresh</button></div></div>
-      <div class="table-wrap"><table><caption class="sr-only">Tracked vacancies. Edit a field and leave it to save; check Applied to record your submission.</caption><thead><tr><th>Applied</th><th>Company</th><th>Role</th><th>Work</th><th>Advertised pay</th><th>Asking pay</th><th>Application</th><th>Notes & details</th></tr></thead><tbody id="rows"></tbody></table><div id="empty" hidden><span class="empty-icon" aria-hidden="true">↗</span><h3>A fresh start.</h3><p>No tracked opportunities yet. Complete your search config, then find your first jobs.</p></div></div>
-      <p class="footnote">Edits save automatically. Checking Applied records your submission; it does not send an application. Fit reflects the last source assessment.</p>
+      <div class="toolbar"><nav aria-label="Filter vacancies"><button type="button" class="filter active" data-filter="all" aria-pressed="true">All</button><button type="button" class="filter" data-filter="not" aria-pressed="false">Not applied</button><button type="button" class="filter" data-filter="applied" aria-pressed="false">Applied</button></nav><div class="toolbar-end"><label class="inspection-toggle"><input id="show-inspected" type="checkbox"> Show all inspected</label><button id="add-vacancy" type="button" class="secondary">Add vacancy</button><input id="query" aria-label="Search tracked vacancies" placeholder="Filter by company or role…"><button id="refresh" type="button" class="quiet">Refresh</button></div></div>
+      <div class="table-wrap"><table><caption class="sr-only">Tracked vacancies. Edit a field and leave it to save; choose Application status to record your progress.</caption><thead><tr><th>Company</th><th>Role</th><th>Work</th><th>Advertised pay</th><th>Asking pay</th><th>Application</th><th>Notes & details</th></tr></thead><tbody id="rows"></tbody></table><div id="empty" hidden><span class="empty-icon" aria-hidden="true">↗</span><h3>A fresh start.</h3><p>No tracked opportunities yet. Complete your search config, then find your first jobs.</p></div></div>
+      <p class="footnote">Edits save automatically. Application status records your progress; it does not send an application. Fit reflects the last source assessment.</p>
       <details id="unlinked" hidden><summary>Other application records</summary><p>These records have not been linked to a tracked vacancy. Bring them into the table to edit them. Their original application details are preserved; posting activity and fit stay unverified.</p><button id="adopt" type="button" class="secondary">Add existing applications to this table</button><div id="unlinked-rows"></div></details>
     </section>
   </main>
+  <dialog id="vacancy-dialog" aria-labelledby="vacancy-heading">
+    <div class="setup-heading"><h2 id="vacancy-heading">Add vacancy</h2><button id="close-vacancy" type="button" class="quiet">Close</button></div>
+    <p>Add a job you found yourself. It will be saved as Not assessed.</p>
+    <p id="vacancy-error" role="alert" hidden></p>
+    <form id="vacancy-form">
+      <label for="vacancy-company">Company</label><input id="vacancy-company" name="company" required>
+      <label for="vacancy-title">Role</label><input id="vacancy-title" name="title" required>
+      <label for="vacancy-url">Vacancy URL</label><input id="vacancy-url" name="url" type="url" required>
+      <p class="footnote">Other details can be edited in the table. An already tracked URL opens its existing row.</p>
+      <button id="save-vacancy" type="submit">Add vacancy</button>
+    </form>
+  </dialog>
   <dialog id="setup-dialog" aria-labelledby="guided-heading">
     <div class="setup-heading"><h2 id="guided-heading">Guided setup</h2><button id="hide-setup" type="button" class="quiet">Close</button></div>
     <p id="guided-message" role="status"></p>

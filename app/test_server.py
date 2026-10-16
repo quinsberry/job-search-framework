@@ -136,6 +136,32 @@ class HTTPTests(unittest.TestCase):
             self.assertIn('Inspection limit reached', data['job']['message'])
             self.assertEqual(self.request('/api/find', {'workspace': self.workspace, 'count': 10})[0], 202)
 
+    def test_manual_add_duplicate_remove_and_application_preservation_routes(self):
+        values = {'company': 'Manual company', 'title': 'Frontend Engineer', 'url': 'https://example.com/jobs/manual'}
+        self.assertEqual(self.request('/api/vacancies/add', {'workspace': self.workspace, 'values': values}, token=False)[0], 403)
+        self.assertEqual(self.request('/api/vacancies/add', {'workspace': self.workspace, 'values': {**values, 'url': ''}})[0], 400)
+        status, added = self.request('/api/vacancies/add', {'workspace': self.workspace, 'values': values})
+        self.assertEqual(status, 200)
+        self.assertTrue(added['created'])
+        self.assertEqual(added['row']['fit'], 'unassessed')
+        _, duplicate = self.request('/api/vacancies/add', {'workspace': self.workspace, 'values': {**values, 'company': 'Wrong'}})
+        self.assertFalse(duplicate['created'])
+        self.assertEqual(duplicate['row']['values']['company'], 'Manual company')
+        row = added['row']
+        _, applied = self.request('/api/edit', {'workspace': self.workspace, 'vacancy_id': row['vacancy_id'], 'revision': row['revision'], 'field': 'status', 'value': 'applied'})
+        self.assertTrue(applied['row']['applied'])
+        payload = {'workspace': self.workspace, 'vacancy_id': row['vacancy_id'], 'revision': row['revision']}
+        self.assertEqual(self.request('/api/vacancies/remove', payload)[0], 400)
+        payload['revision'] = applied['row']['revision']
+        self.server.jobs[str(Path(self.workspace).resolve())] = {'state': 'running'}
+        self.assertEqual(self.request('/api/vacancies/remove', payload)[0], 409)
+        self.server.jobs[str(Path(self.workspace).resolve())] = {'state': 'complete'}
+        before = (self.fixture.workspace / 'applications_table.csv').read_bytes()
+        self.assertEqual(self.request('/api/vacancies/remove', payload)[0], 200)
+        self.assertEqual((self.fixture.workspace / 'applications_table.csv').read_bytes(), before)
+        _, restored = self.request('/api/vacancies/add', {'workspace': self.workspace, 'values': values})
+        self.assertTrue(restored['row']['applied'])
+
     def test_missing_codex_blocks_search_without_side_effects(self):
         with patch('server.codex_bridge.status', return_value={'ready': False, 'message': 'Sign in first'}):
             status, response = self.request('/api/find', {'workspace': self.workspace, 'count': 2})

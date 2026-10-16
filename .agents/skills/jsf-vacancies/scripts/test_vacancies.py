@@ -32,6 +32,40 @@ class HistoryTests(unittest.TestCase):
         replayed = imported(vacancy(), c=reversed_config, history=saved['history'])
         self.assertEqual(saved['scope_id'], replayed['scope_id'])
 
+    def test_manual_creation_is_validated_pure_and_url_idempotent(self):
+        from jsf_vacancies import vacancies as owner
+        values = {'company': 'Acme', 'title': 'Frontend Engineer', 'url': vacancy()['url'], 'notes': 'Recruiter referral'}
+        original = empty_history()
+        saved = owner.add(original, values, '2026-10-10T12:00:00Z')
+        self.assertEqual(original, empty_history())
+        row = owner._summaries(saved['history'])[0]
+        self.assertTrue(row['manual'])
+        self.assertEqual(row['fit'], 'unassessed')
+        self.assertEqual(row['values']['notes'], 'Recruiter referral')
+        duplicate = owner.add(saved['history'], {**values, 'company': 'Do not replace', 'url': 'https://www.linkedin.com/jobs/view/1'}, '2026-10-11T12:00:00Z')
+        self.assertFalse(duplicate['created'])
+        self.assertEqual(duplicate['history'], saved['history'])
+        for bad in ({**values, 'url': 'javascript:alert(1)'}, {**values, 'company': ''}, {k:v for k,v in values.items() if k != 'url'}):
+            with self.assertRaises(ValidationError): owner.add(original, bad, '2026-10-10T12:00:00Z')
+
+    def test_remove_merged_vacancy_cleans_references_and_allows_same_snapshot_replay(self):
+        from jsf_vacancies import vacancies as owner
+        h = imported(vacancy(), vacancy('2'))['history']
+        a, b = vacancy(), vacancy('2')
+        a['application_url'] = b['application_url'] = 'https://ats.example/apply?jobId=1'
+        merged = imported(a, b, day=11, history=h)
+        record = next(iter(merged['history']['vacancies'].values()))
+        with self.assertRaises(ValidationError): owner.remove(merged['history'], record['id'], 'stale')
+        removed = owner.remove(merged['history'], record['id'], owner.digest(record))
+        self.assertFalse(removed['vacancies'])
+        self.assertFalse(removed['redirects'])
+        self.assertTrue(all(not scope['known'] and not scope['seen'] for scope in removed['scopes'].values()))
+        restored = owner.import_results(removed, result(a, b, day=11))
+        self.assertFalse(restored['replayed'])
+        self.assertEqual(len(restored['history']['vacancies']), 1)
+        self.assertEqual(owner.resolve(restored['history'], 'linkedin:2'), 'linkedin:1')
+        self.assertFalse(restored['history']['rediscovery'])
+
     def test_pure_replay_and_repeated_later_observation(self):
         h, r = empty_history(), result(vacancy())
         before = deepcopy((h, r))

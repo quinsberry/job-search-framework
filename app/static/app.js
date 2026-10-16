@@ -66,7 +66,6 @@ async function recheckSetup() {
 }
 function application(row) { return row.applications.find(a => a.application_id === selected.get(row.vacancy_id)) || (row.applications.length === 1 ? row.applications[0] : null); }
 function currentValue(row, field) {
-  if (field === 'applied') return row.applied_by_application?.[application(row)?.application_id] ?? row.applied;
   if (field === 'review') return row.review;
   if (field in row.values) return row.values[field];
   return application(row)?.[field === 'application_notes' ? 'notes' : field] || '';
@@ -76,13 +75,11 @@ function cell(row, field, label, options=null, multiline=false) {
   const input = node(options ? 'select' : multiline ? 'textarea' : 'input');
   input.setAttribute('aria-label', `${label} · ${row.values.company || row.vacancy_id}`);
   if (options) for (const option of options) { const o=node('option',option || (field==='status'?'Not recorded':'Unknown')); o.value=option; input.append(o); }
-  if (field === 'applied') input.type = 'checkbox';
-  else if (!options && !multiline) input.type = field === 'applied_at' ? 'date' : 'text';
+  if (!options && !multiline) input.type = field === 'applied_at' ? 'date' : 'text';
   const value = drafts.has(key) ? drafts.get(key) : currentValue(row,field);
-  if (field === 'applied') input.checked = value;
-  else input.value = value ?? '';
-  if (!options && field!=='applied') input.placeholder=field==='salary'?'Add asking pay':field==='notes'?'Add a note':'Unknown';
-  if (row.applications.length > 1 && !application(row) && ['applied','status','salary','applied_at','next_interview','next_interview_at','interview_stages','application_notes'].includes(field)) {
+  input.value = value ?? '';
+  if (!options) input.placeholder=field==='salary'?'Add asking pay':field==='notes'?'Add a note':'Unknown';
+  if (row.applications.length > 1 && !application(row) && ['status','salary','applied_at','next_interview','next_interview_at','interview_stages','application_notes'].includes(field)) {
     input.disabled=true; input.title='Choose an application in Details first';
   }
   const state=node('span','', 'save-status'); state.setAttribute('role','status');
@@ -106,8 +103,7 @@ function cell(row, field, label, options=null, multiline=false) {
       state.textContent='Saved'; updateCounts();
       // Reflect submission/status coupling without rebuilding focused input fields.
       const tr=wrap.closest('tr');
-      if (tr && ['applied','status'].includes(field)) {
-        tr.querySelectorAll('[data-row-applied]').forEach(el=>{el.checked=currentValue(row,'applied');});
+      if (tr && field==='status') {
         tr.querySelectorAll('[data-row-status]').forEach(el=>{el.value=currentValue(row,'status');});
       }
     } catch(e) { state.textContent='Failed: '+e.message; state.className='save-status failed'; retry.hidden=false; }
@@ -120,35 +116,36 @@ function cell(row, field, label, options=null, multiline=false) {
     queues.set(row.vacancy_id,next);
     next.finally(()=>{if(queues.get(row.vacancy_id)===next)queues.delete(row.vacancy_id);});
   }
-  input.addEventListener('change',()=>{drafts.set(key,field==='applied'?input.checked:input.value);enqueue();});
+  input.addEventListener('change',()=>{drafts.set(key,input.value);enqueue();});
   retry.addEventListener('click',()=>enqueue(true));
-  if (field==='applied') input.dataset.rowApplied='true';
   if (field==='status') input.dataset.rowStatus='true';
   if (drafts.has(key)) { state.textContent='Unsaved edit'; retry.hidden=false; }
   wrap.append(input,state,retry); return wrap;
 }
+function mainRows() { return data.rows.filter(r=>r.fit==='match'||r.manual||r.applications.length); }
+function fitLabel(fit) { return ({match:'Matches preferences',rejected:'Doesn’t match preferences',needs_clarification:'Needs review',unassessed:'Not assessed'})[fit]||'Not assessed'; }
 function updateCounts() {
   if(!data)return;
-  const applied=data.rows.filter(r=>r.applied).length;
-  $('total').textContent=data.rows.length;
-  $('summary').textContent=`${data.rows.length} tracked · ${applied} applied · ${data.rows.length-applied} with no recorded submission`;
+  const rows=$('show-inspected').checked?data.rows:mainRows();
+  const applied=rows.filter(r=>r.applied).length;
+  $('total').textContent=rows.length;
+  $('summary').textContent=`${rows.length} shown · ${applied} applied · ${data.rows.length} total inspected or added`;
 }
 function render() {
   $('rows').replaceChildren(); updateCounts();
   const query=$('query').value.toLowerCase();
-  const visible=data.rows.filter(r=>(filter==='all'||r.applied===(filter==='applied'))&&`${r.values.company} ${r.values.title}`.toLowerCase().includes(query));
+  const rows=$('show-inspected').checked?data.rows:mainRows();
+  const visible=rows.filter(r=>(filter==='all'||r.applied===(filter==='applied'))&&`${r.values.company} ${r.values.title}`.toLowerCase().includes(query));
   $('empty').hidden=visible.length>0;
   $('empty').querySelector('h3').textContent=data.rows.length?'No matching opportunities.':'A fresh start.';
-  $('empty').querySelector('p').textContent=data.rows.length?'Try another filter or search term.':setup?.ready?'Ready to find your first opportunities.':'Complete the highlighted setup steps.';
+  $('empty').querySelector('p').textContent=data.rows.length?'No matches in this view. Use Show all inspected to review listings that failed or need review.':setup?.ready?'Ready to find your first opportunities.':'Complete the highlighted setup steps.';
   for(const row of visible){
     const tr=node('tr'); tr.dataset.id=row.vacancy_id;
     const add=content=>{const td=node('td');td.append(content);tr.append(td);return td;};
-    const appliedCell=add(cell(row,'applied','Applied'));
-    if(row.applications.length>1)appliedCell.append(node('small','Selected application'));
     add(cell(row,'company','Company'));
     const role=add(cell(row,'title','Role'));
     const link=node('a','Open vacancy ↗','role-link');link.href=row.values.url;link.target='_blank';link.rel='noopener noreferrer';role.append(link);
-    role.append(node('span',row.fit.replaceAll('_',' '),'fit '+row.fit));
+    role.append(node('span',fitLabel(row.fit),'fit '+row.fit));
     add(cell(row,'work_type','Work arrangement',['','remote','hybrid','onsite']));
     add(cell(row,'advertised_compensation','Advertised pay',null,true));
     add(cell(row,'salary','Asking pay',null,true));
@@ -157,17 +154,26 @@ function render() {
     const opened=expanded.has(row.vacancy_id);
     const toggle=node('button',opened?'Close details ↑':'Details ↓','details-toggle');toggle.type='button';toggle.setAttribute('aria-expanded',String(opened));controls.append(toggle);
     const detail=node('tr',undefined,'detail-row');detail.hidden=!opened;
-    const td=node('td');td.colSpan=8;const grid=node('div',undefined,'detail-grid');td.append(grid);detail.append(td);
+    const td=node('td');td.colSpan=7;const grid=node('div',undefined,'detail-grid');td.append(grid);detail.append(td);
     const field=(name,label,options=null,multiline=false)=>{const group=node('div');group.append(node('label',label),cell(row,name,label,options,multiline));grid.append(group);};
     if(row.applications.length>1){
       const group=node('div'),pick=node('select');pick.setAttribute('aria-label','Choose application');
       const blank=node('option','Choose an application…');blank.value='';pick.append(blank);
       for(const a of row.applications){const o=node('option',`${a.position} · ${a.status} · ${a.application_id.slice(0,8)}`);o.value=a.application_id;pick.append(o);}
-      pick.value=selected.get(row.vacancy_id)||'';pick.addEventListener('change',()=>{if(queues.has(row.vacancy_id)||[...drafts.keys()].some(k=>k.startsWith(row.vacancy_id+':'))){error('Save or retry this row before choosing another application.');pick.value=selected.get(row.vacancy_id)||'';return;}selected.set(row.vacancy_id,pick.value);render();});group.append(node('label','Choose a candidacy; the Applied checkbox edits that record.'),pick);grid.append(group);
+      pick.value=selected.get(row.vacancy_id)||'';pick.addEventListener('change',()=>{if(queues.has(row.vacancy_id)||[...drafts.keys()].some(k=>k.startsWith(row.vacancy_id+':'))){error('Save or retry this row before choosing another application.');pick.value=selected.get(row.vacancy_id)||'';return;}selected.set(row.vacancy_id,pick.value);render();});group.append(node('label','Choose a candidacy; Application status edits that record.'),pick);grid.append(group);
     }
     field('url','Vacancy URL');field('location','Location');field('review','Review choice',['unreviewed','shortlisted','dismissed']);
     field('applied_at','Applied date (blank = unknown)');field('next_interview','Next interview');field('next_interview_at','Interview date/time (include timezone offset)');
     field('interview_stages','Interview stages (separate with ;)');field('application_notes','Application notes',null,true);field('description','Description correction',null,true);
+    const remove=node('button','Remove vacancy','quiet remove-vacancy');remove.type='button';
+    remove.disabled=data.job?.state==='running';remove.title=remove.disabled?'Wait for the search to finish before removing a vacancy.':'';
+    remove.addEventListener('click',async()=>{
+      if(pending||drafts.size){error('Finish or retry unsaved edits before removing a vacancy.');return;}
+      if(!confirm('Remove this vacancy and its saved search history? It can return in a future search. Application records will be kept.'))return;
+      remove.disabled=true;
+      try {await api('/api/vacancies/remove',{workspace,vacancy_id:row.vacancy_id,revision:row.revision});selected.delete(row.vacancy_id);expanded.delete(row.vacancy_id);await refresh(true);}
+      catch(e){remove.disabled=false;error(e.message);}
+    });grid.append(remove);
     const evidence=node('details',undefined,'wide');evidence.append(node('summary','Source evidence & fit checks · read-only'));
     evidence.append(node('pre',JSON.stringify({availability:row.availability,corrected_fields:row.corrected_fields,source:row.original,checks:row.checks},null,2)));grid.append(evidence);
     toggle.addEventListener('click',()=>{detail.hidden=!detail.hidden;if(detail.hidden)expanded.delete(row.vacancy_id);else expanded.add(row.vacancy_id);toggle.textContent=detail.hidden?'Details ↓':'Close details ↑';toggle.setAttribute('aria-expanded',String(!detail.hidden));});
@@ -182,6 +188,7 @@ async function refresh(initial=false){
     if(initial||(!pending&&!drafts.size&&!document.activeElement?.closest('#rows'))){data=incoming;render();}
     $('board').hidden=false;
     if(data)data.job=incoming.job;
+    document.querySelectorAll('.remove-vacancy').forEach(button=>{button.disabled=incoming.job?.state==='running';button.title=button.disabled?'Wait for the search to finish before removing a vacancy.':'';});
     if(!countEdited&&incoming.config?.criteria)$('count').value=incoming.config.criteria.target_count;
     $('workspace-message').textContent='Changes save in '+incoming.workspace;
     renderSetup();
@@ -223,6 +230,25 @@ $('find-form').addEventListener('submit',async e=>{e.preventDefault();error();tr
 $('recheck').addEventListener('click',async()=>{error();await recheckSetup();if(workspace&&setup?.checks.find(c=>c.key==='workspace')?.state==='ready')await refresh();});
 $('refresh').addEventListener('click',()=>{if(pending||drafts.size){error('Your unsaved edits are still visible. Save or retry them before refreshing.');return;}recheckSetup().then(()=>refresh(true));});
 $('adopt').addEventListener('click',async()=>{if(pending||drafts.size){error('Finish unsaved edits before importing applications.');return;}try{await api('/api/adopt-applications',{workspace});await refresh(true);}catch(e){error(e.message);}});
+$('show-inspected').addEventListener('change',()=>{if(pending||drafts.size){$('show-inspected').checked=!$('show-inspected').checked;error('Finish unsaved edits before changing this view.');return;}render();});
+$('add-vacancy').addEventListener('click',()=>{
+  if(pending||drafts.size){error('Finish unsaved edits before adding a vacancy.');return;}
+  $('vacancy-error').hidden=true;$('vacancy-dialog').showModal();$('vacancy-company').focus();
+});
+$('close-vacancy').addEventListener('click',()=>$('vacancy-dialog').close());
+$('vacancy-form').addEventListener('submit',async e=>{
+  e.preventDefault();$('save-vacancy').disabled=true;$('vacancy-error').hidden=true;
+  try {
+    const result=await api('/api/vacancies/add',{workspace,values:{company:$('vacancy-company').value,title:$('vacancy-title').value,url:$('vacancy-url').value}});
+    $('vacancy-dialog').close();$('vacancy-form').reset();filter='all';$('query').value='';
+    document.querySelectorAll('[data-filter]').forEach(b=>{b.classList.toggle('active',b.dataset.filter==='all');b.setAttribute('aria-pressed',String(b.dataset.filter==='all'));});
+    expanded.add(result.row.vacancy_id);if(!result.created)$('show-inspected').checked=true;
+    await refresh(true);
+    [...$('rows').children].find(tr=>tr.dataset.id===result.row.vacancy_id)?.scrollIntoView({block:'nearest'});
+    $('job').hidden=false;$('job').textContent=result.created?'Vacancy added. Edit its details in the table.':'This URL is already tracked. Opened the existing vacancy.';
+  }catch(e){$('vacancy-error').hidden=false;$('vacancy-error').textContent=e.message;}
+  finally{$('save-vacancy').disabled=false;}
+});
 $('query').addEventListener('input',render);
 document.querySelectorAll('[data-filter]').forEach(button=>button.addEventListener('click',()=>{filter=button.dataset.filter;document.querySelectorAll('[data-filter]').forEach(b=>{b.classList.toggle('active',b===button);b.setAttribute('aria-pressed',String(b===button));});render();}));
 window.addEventListener('beforeunload',e=>{if(pending||drafts.size){e.preventDefault();e.returnValue='';}});

@@ -67,6 +67,32 @@ class EvaluationTests(unittest.TestCase):
         self.assertEqual((len(r["matches"]), len(r["needs_clarification"]), len(r["rejected"])), (1, 1, 1))
         self.assertEqual(r["coverage"]["shortfall"], 1)
 
+    def test_seniority_words_do_not_block_role_but_pay_level_and_office_remain_required(self):
+        for requested, actual in [('Senior Frontend Engineer', 'frontend engineer'), ('Frontend Engineer', 'senior frontend engineer')]:
+            with self.subTest(requested=requested):
+                c, v = config(), vacancy()
+                c['titles'] = [requested]
+                v['facts']['role_titles'] = obs([actual], 'Senior frontend engineer')
+                self.assertEqual(len(evaluate(c, snapshot(v))['matches']), 1)
+                junior = deepcopy(v)
+                junior['description'] += ' Junior responsibilities.'
+                junior['facts']['seniority'] = obs('junior', 'Junior responsibilities')
+                self.assertEqual(len(evaluate(c, snapshot(junior))['rejected']), 1)
+                low_pay = deepcopy(v)
+                low_pay['facts']['compensation'][0]['high'] = 24000
+                self.assertEqual(len(evaluate(c, snapshot(low_pay))['rejected']), 1)
+                wrong_role = deepcopy(v)
+                wrong_role['facts']['role_titles'] = obs(['frontend engineering manager'], 'Senior frontend engineer')
+                self.assertEqual(len(evaluate(c, snapshot(wrong_role))['rejected']), 1)
+                c['office_locations'] = ['warsaw, poland']
+                hybrid = deepcopy(v)
+                hybrid['description'] += ' Hybrid in Gdansk, Poland.'
+                hybrid['facts']['work_arrangements'] = obs(['hybrid'], 'Hybrid in Gdansk, Poland')
+                hybrid['facts']['office_locations'] = obs(['gdansk, poland'], 'Gdansk, Poland')
+                self.assertEqual(len(evaluate(c, snapshot(hybrid))['rejected']), 1)
+                hybrid['facts']['office_locations'] = obs(['warsaw, poland'], 'Warsaw office')
+                self.assertEqual(len(evaluate(c, snapshot(hybrid))['matches']), 1)
+
     def test_empty_evidence_is_unknown_not_pass(self):
         v = vacancy()
         v["facts"]["technical"]["react"]["evidence"] = []

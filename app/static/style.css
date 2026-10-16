@@ -234,17 +234,12 @@ tbody>tr:last-child>td{
   border-bottom:0}
 th:first-child,td:first-child{
   padding-left:20px;
-  width:80px}
-th:nth-child(2){
-  width:15%}
-th:nth-child(3){
-  width:19%}
-th:nth-child(4){
-  width:10%}
-th:nth-child(5){
-  width:16%}
-th:nth-child(6){
-  width:15%}
+  width:14%}
+th:nth-child(2){width:23%}
+th:nth-child(3){width:10%}
+th:nth-child(4){width:16%}
+th:nth-child(5){width:12%}
+th:nth-child(6){width:12%}
 .cell input,.cell select,.cell textarea{
   width:100%;
   min-width:80px;
@@ -479,3 +474,10 @@ textarea.guided-review {display:block;width:100%;height:50vh;resize:vertical;bor
 @media (prefers-reduced-motion:reduce) {.spinner {animation:none;border-style:dotted}}
 #guided-fields>label {display:block;margin:16px 0 6px}
 #guided-fields>select,#guided-cv {width:100%;max-width:100%}
+
+.inspection-toggle {display:flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap}
+.inspection-toggle input {width:auto;min-width:0;accent-color:var(--green)}
+#vacancy-form {display:grid;gap:10px}
+#vacancy-form input {width:100%}
+#vacancy-error {color:var(--danger)}
+.remove-vacancy {color:var(--danger);justify-self:start;align-self:start}

@@ -249,6 +249,41 @@ class WorkflowTests(unittest.TestCase):
                 self.assertEqual(result['coverage']['stopping_reason'], 'target_met' if qualifying else 'discovery_budget')
                 self.assertTrue(all('of 10' in message and '12' in message for message in messages), messages)
 
+    def test_removed_vacancy_is_rediscovered_with_application_status_preserved(self):
+        self.seed(vacancy())
+        self.edit('status', 'applied')
+        before = (self.workspace / 'applications_table.csv').read_bytes()
+        row = self.row()
+        workflow.remove_row(self.workspace, row['vacancy_id'], row['revision'])
+        self.assertFalse(workflow.table(self.workspace)['rows'])
+        self.assertEqual((self.workspace / 'applications_table.csv').read_bytes(), before)
+        class Adapter:
+            page_size = 10
+            def __init__(self, delay=0): pass
+            def queries(self, c): return [{}]
+            def page(self, q, offset): return [vacancy()] if offset == 0 else []
+            def detail(self, v): return {**v, 'facts': {}}
+        result = workflow.find_jobs(self.workspace, 1, interpreter=lambda c, records, expertise: [vacancy()['facts'] for r in records], adapters={'linkedin': Adapter}, delay=0)
+        self.assertEqual(result['found'], 1)
+        self.assertTrue(self.row()['applied'])
+        self.assertEqual((self.workspace / 'applications_table.csv').read_bytes(), before)
+
+    def test_manual_recreation_relinks_old_application_without_duplicate_or_overwrite(self):
+        self.seed(vacancy())
+        self.edit('status', 'interviewing')
+        old = self.row()
+        self.edit('notes', 'Changed elsewhere')
+        with self.assertRaises(ValueError): workflow.remove_row(self.workspace, old['vacancy_id'], old['revision'])
+        row = self.row()
+        workflow.remove_row(self.workspace, row['vacancy_id'], row['revision'])
+        created = workflow.add_row(self.workspace, {'company': 'Referral', 'title': 'Engineer', 'url': vacancy()['url']})
+        self.assertTrue(created['created'])
+        self.assertTrue(created['row']['applied'])
+        self.assertEqual(created['row']['applications'][0]['status'], 'interviewing')
+        again = workflow.add_row(self.workspace, {'company': 'Wrong', 'title': 'Wrong', 'url': vacancy()['url']})
+        self.assertFalse(again['created'])
+        self.assertEqual(again['row']['values']['company'], 'Referral')
+
     def test_budget_shortfall_and_invalid_ai_evidence(self):
         c = config(); c.update(target_count=1, discovery_budget=1)
         self.write_config(c)

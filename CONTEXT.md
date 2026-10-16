@@ -54,6 +54,12 @@ The recorded observations of a hiring opening across searches. It distinguishes 
 **Tracked vacancy**:
 A hiring opening retained for later review, including inspected listings and openings brought in from an existing application. Being tracked does not establish fit or submission.
 
+**Manually added vacancy**:
+A hiring opening the candidate adds directly to their tracker, with company, role and vacancy URL. Adding it does not establish search fit or application submission.
+
+**Removed vacancy**:
+A hiring opening the candidate removes from their tracker and saved search history. It may be rediscovered and added by a later search. Removing it preserves application records; those records can be linked again when the vacancy returns.
+
 **Submission mark**:
 The candidate's explicit indication that an application was submitted. Correcting this mark to not applied is distinct from withdrawing an application that was submitted. A submission can have an unknown date.
 

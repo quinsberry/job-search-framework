@@ -244,6 +244,16 @@ def option(v, key, accepted):
     return "pass" if set(values) & set(accepted) else "fail"
 
 
+def role_scope(v, accepted):
+    value = observation(v, 'role_titles')
+    if value is None:
+        return 'unknown'
+    values = strings(value if isinstance(value, list) else [value], 'facts.role_titles')
+    def role_name(title):
+        return re.sub(r'^(?:(?:junior|jr\.?|middle|mid|senior|sr\.?|staff|lead|principal)\s+)+', '', text(title))
+    return 'pass' if {role_name(x) for x in values} & {role_name(x) for x in accepted} else 'fail'
+
+
 def boolean(v, key, group):
     value = observation(v, key, group)
     if value is not None and type(value) is not bool:
@@ -323,7 +333,7 @@ def assess(v, c, observed_at):
         check("activity", "pass", "Posting is confirmed active")
     elif v.get("active") is not True:
         warnings.append("Activity is unconfirmed")
-    check("role_scope", option(v, "role_titles", c["titles"]), "Match described role scope, not just the advertised title")
+    check("role_scope", role_scope(v, c["titles"]), "Match described role scope, not just the advertised title")
     if c["seniorities"] is not None:
         check("seniority", option(v, "seniority", c["seniorities"]), "Use described responsibilities and level")
     arrangements = observation(v, "work_arrangements")

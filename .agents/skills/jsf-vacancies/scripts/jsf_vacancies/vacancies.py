@@ -52,10 +52,11 @@ def resolve(history, identifier):
 
 
 def validate(history):
-    require(isinstance(history, dict) and set(history) == {"schema_version", "vacancies", "redirects", "scopes", "imports"}, "invalid history schema")
+    require(isinstance(history, dict) and {"schema_version", "vacancies", "redirects", "scopes", "imports"} <= set(history) and not set(history) - {"schema_version", "vacancies", "redirects", "scopes", "imports", "rediscovery"}, "invalid history schema")
     require(type(history["schema_version"]) is int and history["schema_version"] == 1, "history schema_version must be 1")
     require(all(isinstance(history[k], dict) for k in ("vacancies", "redirects", "scopes")) and isinstance(history["imports"], list), "invalid history collections")
     require(all(isinstance(x, str) for x in history["imports"]), "invalid import IDs")
+    require(isinstance(history.get('rediscovery', {}), dict) and all(isinstance(k, str) and isinstance(v, list) and all(isinstance(a, str) for a in v) for k, v in history.get('rediscovery', {}).items()), 'invalid rediscovery identities')
     aliases = set()
     for identifier, record in history["vacancies"].items():
         require(isinstance(record, dict) and record.get("id") == identifier, "invalid vacancy ID")
@@ -71,6 +72,7 @@ def validate(history):
                 require(first <= last, "history timestamps are reversed")
                 require(isinstance(item.get("posting" if key == "observations" else "assessment"), dict), "invalid history payload")
         require(bool(record["observations"]), "vacancy has no observations")
+        require(type(record.get('manual', False)) is bool, 'invalid manual origin')
         review = record.get("review")
         require(isinstance(review, dict) and isinstance(review.get("state"), str) and review["state"] in STATES, "invalid review state")
         require(isinstance(record.get("review_conflicts"), list), "invalid review conflicts")
@@ -124,7 +126,7 @@ def view(record):
     if availability == "available" and known.get("active", {}).get("value") is False:
         availability = "uncertain"  # A newer accessible page does not explicitly prove reopening.
     assessment = record["assessments"].get(record.get("latest_assessment"))
-    return {"vacancy_id": record["id"], "aliases": record["aliases"], "known": known,
+    return {"vacancy_id": record["id"], "revision": digest(record), "aliases": record["aliases"], "known": known,
             "first_seen": min(o["first_seen"] for o in observations), "last_seen": latest,
             "availability": availability, "field_conflicts": conflicts,
             "corrections": record.get('overrides', {}),
@@ -170,7 +172,7 @@ def _summaries(history):
         aliases = sorted(set(record['aliases']) | {'url:' + canonical_url(values['url'])})
         result.append({'vacancy_id': identifier, 'values': values, 'aliases': aliases,
                        'previous_ids': [key for key in history['redirects'] if resolve(history, key) == identifier],
-                       'revision': digest(record), 'fit': assessment.get('status', 'unassessed'),
+                       'revision': digest(record), 'manual': record.get('manual', False), 'fit': assessment.get('status', 'unassessed'),
                        'checks': assessment.get('checks', []), 'review': observed['review']['state'],
                        'availability': observed['availability'], 'original': observed['known'],
                        'corrected_fields': sorted(record.get('overrides', {}))})
@@ -184,8 +186,73 @@ def query(workspace):
 
 def known_identities(workspace):
     history = load(workspace)
-    identities = set().union(*(set(r['aliases']) for r in history['vacancies'].values())) if history['vacancies'] else set()
-    return {'schema_version': 1, 'identities': sorted(identities)}
+    identities = set().union(*(set(r['aliases']) for r in _summaries(history))) if history['vacancies'] else set()
+    rediscovery = set().union(*(set(v) | {k} for k, v in history.get('rediscovery', {}).items())) if history.get('rediscovery') else set()
+    rediscovery.update('apply:' + key[4:] for key in list(rediscovery) if key.startswith('url:'))
+    return {'schema_version': 1, 'identities': sorted(identities), 'rediscovery_identities': sorted(rediscovery)}
+
+
+def restore_identity(history, record, keys):
+    for old, aliases in list(history.get('rediscovery', {}).items()):
+        if set(aliases) & keys:
+            if old != record['id'] and old not in history['vacancies']:
+                history['redirects'][old] = record['id']
+            del history['rediscovery'][old]
+
+
+def add(existing, values, at):
+    """Create an explicit unassessed user entry, or select its existing URL."""
+    history = deepcopy(validate(existing))
+    require(isinstance(values, dict) and not set(values) - EDITABLE, 'invalid vacancy fields')
+    require(all(isinstance(v, str) for v in values.values()), 'vacancy fields must be text')
+    for field in ('company', 'title', 'url'):
+        require(bool(values.get(field, '').strip()), f'{field} is required')
+    url = canonical_url(values['url'])
+    for row in _summaries(history):
+        if {'url:' + url, 'apply:' + url} & set(row['aliases']):
+            return {'schema_version': 1, 'history': history, 'vacancy_id': row['vacancy_id'], 'created': False}
+    posting = {'source': 'manual', 'url': url, 'company': values['company'].strip(), 'title': values['title'].strip(),
+               'description': None, 'fetch_status': 'unverified', 'origin': 'manual'}
+    identifier, keys = identities(posting)
+    record = {'id': identifier, 'aliases': sorted(keys), 'manual': True, 'observations': {}, 'assessments': {},
+              'review': {'state': 'unreviewed', 'at': None, 'note': ''}, 'review_conflicts': []}
+    history['vacancies'][identifier] = record
+    at = timestamp(at, 'creation time').isoformat(timespec='microseconds')
+    add_entry(record['observations'], digest(posting), {'posting': posting}, at)
+    restore_identity(history, record, keys)
+    optional = {k: v for k, v in values.items() if k not in {'company', 'title', 'url'}}
+    if optional:
+        history = correct(history, identifier, optional, at)
+    return {'schema_version': 1, 'history': validate(history), 'vacancy_id': identifier, 'created': True}
+
+
+def remove(existing, identifier, expected_revision):
+    history = deepcopy(validate(existing))
+    identifier = resolve(history, identifier)
+    require(identifier in history['vacancies'], 'unknown vacancy')
+    require(digest(history['vacancies'][identifier]) == expected_revision, 'Vacancy changed elsewhere; reload before removing it.')
+    old_ids = {identifier} | {key for key in history['redirects'] if resolve(history, key) == identifier}
+    aliases = next(r['aliases'] for r in _summaries(history) if r['vacancy_id'] == identifier)
+    for old in old_ids:
+        history.setdefault('rediscovery', {})[old] = sorted(set(aliases) | old_ids)
+    for scope in history['scopes'].values():
+        for field in ('known', 'seen'):
+            scope[field] = [key for key in scope[field] if resolve(history, key) != identifier]
+    history['redirects'] = {k: v for k, v in history['redirects'].items() if k not in old_ids}
+    del history['vacancies'][identifier]
+    history['imports'] = []  # A replay must be able to restore a deliberately removed vacancy.
+    return validate(history)
+
+
+def create(workspace, values, at):
+    result = add(load(workspace), values, at)
+    if result['created']:
+        save(workspace, result['history'])
+    return {key: value for key, value in result.items() if key != 'history'}
+
+
+def delete(workspace, identifier, expected_revision):
+    save(workspace, remove(load(workspace), identifier, expected_revision))
 
 
 def edit(workspace, identifier, field, value, at):
@@ -259,6 +326,7 @@ def merge_records(history, identifiers):
     for old in sorted(set(identifiers) - {survivor}):
         other = history["vacancies"].pop(old)
         target["aliases"] = sorted(set(target["aliases"]) | set(other["aliases"]))
+        target['manual'] = target.get('manual', False) or other.get('manual', False)
         for field, correction in other.get('overrides', {}).items():
             current = target.setdefault('overrides', {}).get(field)
             if current is None or correction['at'] > current['at']:
@@ -343,6 +411,7 @@ def import_results(existing, result):
         else:
             record = merge_records(history, matching)
         record["aliases"] = sorted(set(record["aliases"]) | group["keys"])
+        restore_identity(history, record, group["keys"])
         for vacancy in group["members"]:
             posting = {k: deepcopy(v) for k, v in vacancy.items() if k != "facts"}
             posting["url"] = canonical_url(posting["url"])
@@ -457,7 +526,13 @@ def main():
     correcting.add_argument('--vacancy-id', required=True)
     correcting.add_argument('--changes', required=True, help='JSON file containing user correction fields')
     correcting.add_argument('--at', required=True)
-    for command in (importing, listing, reviewing, correcting):
+    adding = sub.add_parser('add')
+    adding.add_argument('--changes', required=True, help='JSON company, title, url and optional vacancy fields')
+    adding.add_argument('--at', required=True)
+    removing = sub.add_parser('remove')
+    removing.add_argument('--vacancy-id', required=True)
+    removing.add_argument('--revision', required=True, help='Opaque row revision from query')
+    for command in (importing, listing, reviewing, correcting, adding, removing):
         command.add_argument("--workspace", required=True)
     args = parser.parse_args()
     try:
@@ -467,6 +542,11 @@ def main():
             result = import_results(history, read(args.results))
             if not args.dry_run and not result["replayed"]:
                 save(args.workspace, result["history"])
+        elif args.command == 'add':
+            result = create(args.workspace, read(args.changes), args.at)
+        elif args.command == 'remove':
+            delete(args.workspace, args.vacancy_id, args.revision)
+            result = {'schema_version': 1, 'removed': args.vacancy_id}
         elif args.command == "review":
             updated = review(history, args.vacancy_id, args.state, args.at, args.note)
             if updated != history:

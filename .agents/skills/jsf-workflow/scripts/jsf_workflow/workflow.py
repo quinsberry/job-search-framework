@@ -55,6 +55,25 @@ def adopt_applications(workspace):
         return table(workspace)
 
 
+def add_row(workspace, values):
+    workspace = workspace_path(str(workspace))
+    with LOCK:
+        result = vacancies.create(workspace, values, now())
+        row = next(r for r in table(workspace)['rows'] if r['vacancy_id'] == result['vacancy_id'])
+        return {'schema_version': 1, 'created': result['created'], 'row': row}
+
+
+def remove_row(workspace, identifier, expected_revision):
+    workspace = workspace_path(str(workspace))
+    with LOCK:
+        row = next((r for r in table(workspace)['rows'] if r['vacancy_id'] == identifier), None)
+        if row is None or row['revision'] != expected_revision:
+            raise ValueError('This row changed elsewhere. Reload before removing it.')
+        vacancy = next(r for r in vacancies.query(workspace)['vacancies'] if r['vacancy_id'] == identifier)
+        vacancies.delete(workspace, identifier, vacancy['revision'])
+        return {'schema_version': 1, 'removed': identifier}
+
+
 def edit_row(workspace, identifier, field, value, expected_revision, application_id=None, confirm=False):
     workspace = workspace_path(str(workspace))
     with LOCK:
@@ -97,7 +116,8 @@ def find_jobs(workspace, count, progress=lambda message: None, interpreter=codex
     c = evaluate.criteria(c)
     expertise = candidate.expertise(workspace)
     with LOCK:
-        known = set(vacancies.known_identities(workspace)['identities']) | set(tracking.known_identities(workspace)['identities'])
+        identities = vacancies.known_identities(workspace)
+        known = set(identities['identities']) | (set(tracking.known_identities(workspace)['identities']) - set(identities['rediscovery_identities']))
     snapshot = None
     qualified, result = [], None
     def report_progress(stage):

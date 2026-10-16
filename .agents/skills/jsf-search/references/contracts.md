@@ -91,7 +91,7 @@ Supported observations:
 
 | Fact | Value |
 | --- | --- |
-| `role_titles` | List of canonical roles supported by described scope |
+| `role_titles` | List of configured canonical roles supported by described scope. Map supported equivalents onto requested names; never map another profession based on a technology keyword alone. |
 | `seniority` | Canonical level, or list when several levels are explicitly offered |
 | `work_arrangements` | List of remote/hybrid/onsite |
 | `eligible_countries` | Canonical country list; `["*"]` only for explicit worldwide eligibility |
@@ -137,3 +137,5 @@ Preference ranking is lexicographic in the user's ordering: satisfying the first
 `coverage` reports source errors, unique inspected count, qualifying count, returned count, clarification/rejection counts, skipped duplicates, shortfall and stopping reason. An acquisition batch ending is a checkpoint, not final search exhaustion. Continue while `stopping_reason` is `batch_complete` and the target remains unmet.
 
 No source failure erases earlier results. `failed` means acquisition errors left no usable descriptions; `partial` means the target was not reached; `target_met` means enough qualifying openings were found. Input errors are validation failures rather than a search outcome.
+
+Role-scope comparison ignores recognized leading seniority words (junior/jr, middle/mid, senior/sr, staff, lead, principal) on either side, then compares the remaining canonical role names exactly. This is not substring matching. Seniority, compensation, technical and office restrictions remain separate mandatory checks. A generic Frontend Engineer can satisfy Senior Frontend Engineer role scope; explicit junior responsibilities still fail middle/senior filters, and unknown required evidence stays clarification. Compensation must meet its configured criterion independently. Office eligibility uses configured office_locations; do not infer acceptable commuting cities from residence.

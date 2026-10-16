@@ -31,6 +31,7 @@ For a live search, use `scripts/search.py acquire` to retrieve a small batch. Li
 
 Use the returned raw descriptions to populate evidence-backed `facts` for the relevant criteria. This is the interpretation stage, outside the pure evaluator:
 
+- Map supported role scope onto the configured canonical title names; seniority wording alone must not block an otherwise valid role. Check explicit seniority and compensation separately. Never accept a different profession just because its title contains a requested keyword.
 - Assess role scope and seniority from responsibilities; titles and LinkedIn seniority labels are supporting signals. Canonicalize equivalent terms (React.js/React, mid-level/middle) using the user's criteria. Ambiguity or contradictions remain unknown.
 - Interpret technical criteria in context. A required skill or actual use can establish fit; an optional keyword mention alone does not prove mandatory fit. Distinguish “mainly Java” from “Java appears somewhere.” Confirmed non-fit can be `false`; absence of evidence is `null` or an omitted observation.
 - Record country eligibility, acceptable arrangements and relevant office/authorization facts from evidence. Search filters and a posting's geographic label do not themselves prove remote-country eligibility or sponsorship. Use `eligible_countries: ["*"]` only with explicit worldwide eligibility evidence.
