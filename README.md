@@ -7,10 +7,10 @@ Local-first vacancy discovery and application tracking, built around modular Pyt
 See [the app's manual run guide](app/README.md) for first-time setup, workspace selection, stopping/restarting and port options.
 
 ```sh
-rtk proxy python3 -m venv .venv
-rtk proxy .venv/bin/python3 -m pip install -r .agents/skills/jsf-profile/scripts/requirements.txt
-rtk proxy codex login
-rtk proxy .venv/bin/python3 app/server.py
+python3 -m venv .venv
+.venv/bin/python3 -m pip install -r .agents/skills/jsf-profile/scripts/requirements.txt
+codex login
+.venv/bin/python3 app/server.py
 ```
 
 Open **http://127.0.0.1:8765** and enter your job-search workspace folder. Alternatively, pass `--workspace /absolute/path` at startup. Choose ChatGPT when signing into Codex; this app doesn't use API-key billing. Codex must be installed separately. It uses the official CLI's non-interactive structured-output mode: [official documentation](https://learn.chatgpt.com/docs/non-interactive-mode).
@@ -36,6 +36,6 @@ The app runs locally and makes external requests to LinkedIn and Codex when sear
 ## Checks
 
 ```sh
-rtk proxy .venv/bin/python3 .agents/skills/jsf-workflow/scripts/test_workflow.py
-rtk proxy .venv/bin/python3 app/test_server.py
+.venv/bin/python3 .agents/skills/jsf-workflow/scripts/test_workflow.py
+.venv/bin/python3 app/test_server.py
 ```

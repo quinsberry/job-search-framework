@@ -1,20 +1,20 @@
 # Run the local app manually
 
-Run these commands from the **repository root**, not the `app/` directory. This repository uses `rtk` to run shell commands.
+Run these commands from the **repository root**, not the `app/` directory. The commands below use standard tools; `rtk` is not required to run the app.
 
 ## First-time setup
 
-You need Python 3 and `rtk`. Create a Python environment and install the dependencies:
+You need Python 3. Create a Python environment and install the dependencies:
 
 ```sh
-rtk proxy python3 -m venv .venv
-rtk proxy .venv/bin/python3 -m pip install -r .agents/skills/jsf-profile/scripts/requirements.txt
+python3 -m venv .venv
+.venv/bin/python3 -m pip install -r .agents/skills/jsf-profile/scripts/requirements.txt
 ```
 
 CV interpretation and job discovery also need the Codex CLI installed and signed in with your ChatGPT account:
 
 ```sh
-rtk proxy codex login
+codex login
 ```
 
 Manual editing of an existing profile and search preferences works without Codex. The app uses the CLI's login; you do not enter credentials or an API key in the browser.
@@ -22,7 +22,7 @@ Manual editing of an existing profile and search preferences works without Codex
 ## Start the app
 
 ```sh
-rtk proxy .venv/bin/python3 app/server.py
+.venv/bin/python3 app/server.py
 ```
 
 Keep that terminal running, then open **http://127.0.0.1:8765** in your browser. There is no frontend build or separate frontend server.
@@ -30,7 +30,7 @@ Keep that terminal running, then open **http://127.0.0.1:8765** in your browser.
 To open an existing workspace immediately:
 
 ```sh
-rtk proxy .venv/bin/python3 app/server.py --workspace "/absolute/path/to/job-search-workspace"
+.venv/bin/python3 app/server.py --workspace "/absolute/path/to/job-search-workspace"
 ```
 
 The workspace must be an existing folder. In the UI, use **Select workspace** to choose one, or enter its path and click **Open workspace**. **Browse…** lets you choose another folder. The native picker opens on the computer running the app; if unavailable, enter the path manually.
@@ -57,7 +57,7 @@ Press **Ctrl+C** in the server terminal to stop. Run the startup command again t
 If port 8765 is already occupied, use another port:
 
 ```sh
-rtk proxy .venv/bin/python3 app/server.py --port 8766
+.venv/bin/python3 app/server.py --port 8766
 ```
 
 Then open **http://127.0.0.1:8766**. Run one app process per workspace.
