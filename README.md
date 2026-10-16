@@ -40,6 +40,8 @@ The app runs locally and makes external requests to LinkedIn and Codex when sear
 .venv/bin/python3 app/test_server.py
 ```
 
-Use **Add vacancy** for jobs you find yourself: company, role and URL are required. Other fields can be edited afterward. Existing URLs open their saved row. **Details → Remove vacancy** forgets that vacancy's search history and allows it to return in a future search, while retaining application records. Removal becomes available when the current search finishes.
+Use **Add vacancy** for jobs you find yourself: company, role and URL are required. Other fields can be edited afterward. Existing URLs open their saved row. **Details → Remove vacancy**, or select rows and use **Remove selected**, forgets that vacancy's search history and allows it to return in a future search, while retaining application records. Removal becomes available when the current search finishes.
 
 The main table shows matches, manual entries and jobs with application records. Enable **Show all inspected** to review other listings. **Doesn’t match preferences** is a search-fit result, separate from an employer rejecting an application. Title seniority words do not block role scope by themselves; explicit seniority, pay, technical and configured office-location checks still apply. Existing assessments remain historical until a fresh assessment is saved.
+
+Select individual vacancies with their row checkboxes, or use **Select all visible** in the header. The toolbar shows the selected count. Filters and workspace changes clear selection. Removal uses an in-app confirmation listing the vacancies, shows **Removing…**, then confirms how many were removed. A failed batch keeps every row and the selection; use **Refresh selection** to review changed rows before retrying. These checkboxes select rows for actions; application submission is still controlled by Application status.

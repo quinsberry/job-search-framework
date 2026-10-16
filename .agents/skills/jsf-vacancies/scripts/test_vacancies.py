@@ -66,6 +66,21 @@ class HistoryTests(unittest.TestCase):
         self.assertEqual(owner.resolve(restored['history'], 'linkedin:2'), 'linkedin:1')
         self.assertFalse(restored['history']['rediscovery'])
 
+    def test_bulk_remove_validates_entire_batch_and_cleans_history_for_replay(self):
+        from jsf_vacancies import vacancies as owner
+        original = imported(vacancy(), vacancy('2'), vacancy('3'))['history']
+        selections = [{'vacancy_id': key, 'revision': owner.digest(original['vacancies'][key])} for key in ('linkedin:1', 'linkedin:2')]
+        before = deepcopy(original)
+        for invalid in ([], [selections[0], selections[0]], [selections[0], {'vacancy_id': 'missing', 'revision': 'stale'}], [selections[0], {**selections[1], 'revision': 'stale'}]):
+            with self.assertRaises(ValidationError): owner.remove_many(original, invalid)
+            self.assertEqual(original, before)
+        removed = owner.remove_many(original, selections)
+        self.assertEqual(set(removed['vacancies']), {'linkedin:3'})
+        self.assertEqual(original, before)
+        owner.validate(removed)
+        restored = imported(vacancy(), vacancy('2'), vacancy('3'), history=removed)['history']
+        self.assertEqual(set(restored['vacancies']), set(original['vacancies']))
+
     def test_pure_replay_and_repeated_later_observation(self):
         h, r = empty_history(), result(vacancy())
         before = deepcopy((h, r))

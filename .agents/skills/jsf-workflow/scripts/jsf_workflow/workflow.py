@@ -63,15 +63,33 @@ def add_row(workspace, values):
         return {'schema_version': 1, 'created': result['created'], 'row': row}
 
 
-def remove_row(workspace, identifier, expected_revision):
+def remove_rows(workspace, selections):
     workspace = workspace_path(str(workspace))
+    if not isinstance(selections, list) or not selections:
+        raise ValueError('Select at least one vacancy to remove.')
     with LOCK:
-        row = next((r for r in table(workspace)['rows'] if r['vacancy_id'] == identifier), None)
-        if row is None or row['revision'] != expected_revision:
-            raise ValueError('This row changed elsewhere. Reload before removing it.')
-        vacancy = next(r for r in vacancies.query(workspace)['vacancies'] if r['vacancy_id'] == identifier)
-        vacancies.delete(workspace, identifier, vacancy['revision'])
-        return {'schema_version': 1, 'removed': identifier}
+        rows = {r['vacancy_id']: r for r in table(workspace)['rows']}
+        selected_ids, changed = set(), []
+        for selection in selections:
+            if not isinstance(selection, dict) or set(selection) != {'vacancy_id', 'revision'} or any(not isinstance(v, str) or not v for v in selection.values()):
+                raise ValueError('Invalid removal selection.')
+            identifier = selection['vacancy_id']
+            if identifier in selected_ids:
+                raise ValueError('Duplicate removal selection.')
+            selected_ids.add(identifier)
+            row = rows.get(identifier)
+            if row is None or row['revision'] != selection['revision']:
+                changed.append(f"{row['values'].get('company', '')} — {row['values'].get('title', identifier)}" if row else identifier)
+        if changed:
+            raise ValueError('Nothing removed. These vacancies changed or are no longer available: ' + '; '.join(changed) + '. Refresh the table and review the selection before retrying.')
+        owner_rows = {r['vacancy_id']: r for r in vacancies.query(workspace)['vacancies']}
+        vacancies.delete_many(workspace, [{'vacancy_id': s['vacancy_id'], 'revision': owner_rows[s['vacancy_id']]['revision']} for s in selections])
+        return {'schema_version': 1, 'removed': [s['vacancy_id'] for s in selections]}
+
+
+def remove_row(workspace, identifier, expected_revision):
+    remove_rows(workspace, [{'vacancy_id': identifier, 'revision': expected_revision}])
+    return {'schema_version': 1, 'removed': identifier}
 
 
 def edit_row(workspace, identifier, field, value, expected_revision, application_id=None, confirm=False):

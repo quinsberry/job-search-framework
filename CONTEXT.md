@@ -60,6 +60,9 @@ A hiring opening the candidate adds directly to their tracker, with company, rol
 **Removed vacancy**:
 A hiring opening the candidate removes from their tracker and saved search history. It may be rediscovered and added by a later search. Removing it preserves application records; those records can be linked again when the vacancy returns.
 
+**Vacancy selection**:
+The candidate's temporary choice of visible tracker rows for an action such as removal. It does not change application status, submission or vacancy review choice. Changing the table's filters or workspace clears the selection.
+
 **Submission mark**:
 The candidate's explicit indication that an application was submitted. Correcting this mark to not applied is distinct from withdrawing an application that was submitted. A submission can have an unknown date.
 

@@ -162,6 +162,31 @@ class HTTPTests(unittest.TestCase):
         _, restored = self.request('/api/vacancies/add', {'workspace': self.workspace, 'values': values})
         self.assertTrue(restored['row']['applied'])
 
+    def test_bulk_remove_endpoint_is_atomic_on_stale_rows_and_write_failure(self):
+        from urllib.parse import quote
+        self.fixture.seed(fixtures.vacancy('2'))
+        _, data = self.request('/api/workspace?path=' + quote(self.workspace))
+        selections = [{'vacancy_id': r['vacancy_id'], 'revision': r['revision']} for r in data['rows']]
+        payload = {'workspace': self.workspace, 'selections': selections}
+        history_path = self.fixture.workspace / 'vacancies/history.json'
+        before = history_path.read_bytes()
+        stale = {**payload, 'selections': [selections[0], {**selections[1], 'revision': 'stale'}]}
+        self.assertEqual(self.request('/api/vacancies/remove-many', stale)[0], 400)
+        self.assertEqual(history_path.read_bytes(), before)
+        self.assertEqual(self.request('/api/vacancies/remove-many', payload, token=False)[0], 403)
+        self.server.jobs[str(Path(self.workspace).resolve())] = {'state': 'running'}
+        self.assertEqual(self.request('/api/vacancies/remove-many', payload)[0], 409)
+        self.server.jobs[str(Path(self.workspace).resolve())] = {'state': 'complete'}
+        with patch('server.workflow.vacancies.os.replace', side_effect=OSError('Disk unavailable')):
+            self.assertEqual(self.request('/api/vacancies/remove-many', payload)[0], 400)
+        self.assertEqual(history_path.read_bytes(), before)
+        status, result = self.request('/api/vacancies/remove-many', payload)
+        self.assertEqual(status, 200)
+        self.assertEqual(len(result['removed']), 2)
+        self.assertFalse(self.fixture.workspace.joinpath('applications_table.csv').exists())
+        _, data = self.request('/api/workspace?path=' + quote(self.workspace))
+        self.assertFalse(data['rows'])
+
     def test_missing_codex_blocks_search_without_side_effects(self):
         with patch('server.codex_bridge.status', return_value={'ready': False, 'message': 'Sign in first'}):
             status, response = self.request('/api/find', {'workspace': self.workspace, 'count': 2})

@@ -121,11 +121,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {'row': row})
             if self.path == '/api/vacancies/add':
                 return self.send(200, workflow.add_row(workspace, data['values']))
-            if self.path == '/api/vacancies/remove':
+            if self.path in {'/api/vacancies/remove', '/api/vacancies/remove-many'}:
                 with self.server.job_lock:
                     if self.server.jobs.get(str(workspace), {}).get('state') == 'running':
                         return self.send(409, {'error': 'Wait for the current search to finish before removing a vacancy.'})
-                    return self.send(200, workflow.remove_row(workspace, data['vacancy_id'], data['revision']))
+                    result = workflow.remove_rows(workspace, data['selections']) if self.path.endswith('remove-many') else workflow.remove_row(workspace, data['vacancy_id'], data['revision'])
+                    return self.send(200, result)
             if self.path == '/api/adopt-applications':
                 return self.send(200, workflow.adopt_applications(workspace))
             if self.path == '/api/find':

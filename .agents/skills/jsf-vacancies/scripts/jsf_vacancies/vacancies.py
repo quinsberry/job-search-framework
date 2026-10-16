@@ -226,22 +226,36 @@ def add(existing, values, at):
     return {'schema_version': 1, 'history': validate(history), 'vacancy_id': identifier, 'created': True}
 
 
-def remove(existing, identifier, expected_revision):
+def remove_many(existing, selections):
+    """Validate every selected revision before proposing one atomic removal."""
     history = deepcopy(validate(existing))
-    identifier = resolve(history, identifier)
-    require(identifier in history['vacancies'], 'unknown vacancy')
-    require(digest(history['vacancies'][identifier]) == expected_revision, 'Vacancy changed elsewhere; reload before removing it.')
-    old_ids = {identifier} | {key for key in history['redirects'] if resolve(history, key) == identifier}
-    aliases = next(r['aliases'] for r in _summaries(history) if r['vacancy_id'] == identifier)
-    for old in old_ids:
-        history.setdefault('rediscovery', {})[old] = sorted(set(aliases) | old_ids)
+    require(isinstance(selections, list) and bool(selections), 'Select at least one vacancy to remove.')
+    identifiers = set()
+    for selection in selections:
+        require(isinstance(selection, dict) and set(selection) == {'vacancy_id', 'revision'} and all(isinstance(v, str) and v for v in selection.values()), 'invalid removal selection')
+        identifier = resolve(history, selection['vacancy_id'])
+        require(identifier not in identifiers, 'Duplicate removal selection.')
+        require(identifier in history['vacancies'], f"Vacancy {identifier} no longer exists; refresh before removing it.")
+        require(digest(history['vacancies'][identifier]) == selection['revision'], f"Vacancy {identifier} changed elsewhere; refresh before removing it.")
+        identifiers.add(identifier)
+    summaries = {r['vacancy_id']: r for r in _summaries(history)}
+    old_targets = {key: resolve(history, key) for key in history['redirects']}
+    for identifier in identifiers:
+        old_ids = {identifier} | {key for key, target in old_targets.items() if target == identifier}
+        for old in old_ids:
+            history.setdefault('rediscovery', {})[old] = sorted(set(summaries[identifier]['aliases']) | old_ids)
     for scope in history['scopes'].values():
         for field in ('known', 'seen'):
-            scope[field] = [key for key in scope[field] if resolve(history, key) != identifier]
-    history['redirects'] = {k: v for k, v in history['redirects'].items() if k not in old_ids}
-    del history['vacancies'][identifier]
-    history['imports'] = []  # A replay must be able to restore a deliberately removed vacancy.
+            scope[field] = [key for key in scope[field] if resolve(history, key) not in identifiers]
+    history['redirects'] = {key: value for key, value in history['redirects'].items() if old_targets[key] not in identifiers}
+    for identifier in identifiers:
+        del history['vacancies'][identifier]
+    history['imports'] = []  # A replay must be able to restore deliberately removed vacancies.
     return validate(history)
+
+
+def remove(existing, identifier, expected_revision):
+    return remove_many(existing, [{'vacancy_id': identifier, 'revision': expected_revision}])
 
 
 def create(workspace, values, at):
@@ -251,8 +265,12 @@ def create(workspace, values, at):
     return {key: value for key, value in result.items() if key != 'history'}
 
 
+def delete_many(workspace, selections):
+    save(workspace, remove_many(load(workspace), selections))
+
+
 def delete(workspace, identifier, expected_revision):
-    save(workspace, remove(load(workspace), identifier, expected_revision))
+    delete_many(workspace, [{'vacancy_id': identifier, 'revision': expected_revision}])
 
 
 def edit(workspace, identifier, field, value, at):
@@ -532,7 +550,9 @@ def main():
     removing = sub.add_parser('remove')
     removing.add_argument('--vacancy-id', required=True)
     removing.add_argument('--revision', required=True, help='Opaque row revision from query')
-    for command in (importing, listing, reviewing, correcting, adding, removing):
+    removing_many = sub.add_parser('remove-many')
+    removing_many.add_argument('--selections', required=True, help='JSON list of vacancy_id/revision pairs')
+    for command in (importing, listing, reviewing, correcting, adding, removing, removing_many):
         command.add_argument("--workspace", required=True)
     args = parser.parse_args()
     try:
@@ -544,6 +564,10 @@ def main():
                 save(args.workspace, result["history"])
         elif args.command == 'add':
             result = create(args.workspace, read(args.changes), args.at)
+        elif args.command == 'remove-many':
+            selections = read(args.selections)
+            delete_many(args.workspace, selections)
+            result = {'schema_version': 1, 'removed': [s['vacancy_id'] for s in selections]}
         elif args.command == 'remove':
             delete(args.workspace, args.vacancy_id, args.revision)
             result = {'schema_version': 1, 'removed': args.vacancy_id}

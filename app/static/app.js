@@ -2,6 +2,8 @@ const $ = id => document.getElementById(id);
 const token = document.querySelector('meta[name="jsf-token"]').content;
 let workspace = '', data = null, filter = 'all', setup = null, setupChecking = false, trackerError = '', countEdited = false, pending = 0, poll = null;
 const drafts = new Map(), queues = new Map(), selected = new Map(), expanded = new Set();
+const selectedVacancies = new Set();
+let removal = null, removalBusy = false;
 const statuses = ['ready','applied','screening','interviewing','offer','rejected','withdraw','closed'];
 const node = (tag, text, cls) => { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; if (cls) n.className = cls; return n; };
 function error(message='') { $('error').hidden = !message; $('error').textContent = message; }
@@ -51,7 +53,7 @@ function renderSetup() {
   if(trackerError)reason='Could not load tracked jobs: '+trackerError;
   else if(running)reason='A search is already running. You can search again when it finishes.';
   $('search-reason').textContent=reason;
-  $('find').disabled=setupChecking||!setup?.ready||!!trackerError||running;
+  $('find').disabled=setupChecking||!setup?.ready||!!trackerError||running||removalBusy;
   $('find').title=reason;$('find').setAttribute('aria-describedby','search-reason');
   const connected=setup?.checks.find(c=>c.key==='workspace')?.state==='ready';
   document.querySelector('.local').textContent=connected?'✓ Workspace opened':'○ No workspace opened';
@@ -122,6 +124,71 @@ function cell(row, field, label, options=null, multiline=false) {
   if (drafts.has(key)) { state.textContent='Unsaved edit'; retry.hidden=false; }
   wrap.append(input,state,retry); return wrap;
 }
+function tableNotice(message='', failed=false) {
+  $('table-notice').hidden=!message;$('table-notice').textContent=message;$('table-notice').classList.toggle('failed',failed);
+}
+function visibleRows() {
+  const query=$('query').value.toLowerCase();
+  return ($('show-inspected').checked?data.rows:mainRows()).filter(r=>(filter==='all'||r.applied===(filter==='applied'))&&`${r.values.company} ${r.values.title}`.toLowerCase().includes(query));
+}
+function renderSelection() {
+  if(!data)return;
+  const visible=visibleRows(), ids=new Set(visible.map(r=>r.vacancy_id));
+  for(const id of selectedVacancies)if(!ids.has(id))selectedVacancies.delete(id);
+  const count=selectedVacancies.size, running=data.job?.state==='running';
+  $('selection-actions').hidden=!count;$('selection-count').textContent=`${count} selected`;
+  $('remove-selected').disabled=removalBusy||running;
+  $('selection-reason').textContent=running?'Removal is available after the search finishes.':'';
+  $('clear-selection').disabled=removalBusy;
+  $('select-visible').disabled=removalBusy||!visible.length;
+  $('select-visible').checked=!!visible.length&&count===visible.length;
+  $('select-visible').indeterminate=count>0&&count<visible.length;
+  document.querySelectorAll('[data-vacancy-selection]').forEach(input=>{input.checked=selectedVacancies.has(input.dataset.vacancySelection);input.disabled=removalBusy;});
+  document.querySelectorAll('.remove-vacancy').forEach(button=>{button.disabled=removalBusy||running;button.title=running?'Removal is available after the search finishes.':'';});
+}
+function openRemoval(ids) {
+  if(pending||drafts.size){tableNotice('Finish or retry unsaved edits before removing vacancies.',true);return;}
+  if(data.job?.state==='running'){tableNotice('Removal is available after the search finishes.',true);return;}
+  const rows=ids.map(id=>data.rows.find(r=>r.vacancy_id===id)).filter(Boolean);
+  if(!rows.length){removal=null;if($('removal-dialog').open)$('removal-dialog').close();tableNotice('The selected vacancies are no longer in the table. Nothing was removed.');return false;}
+  removal={workspace,rows:rows.map(r=>({vacancy_id:r.vacancy_id,revision:r.revision}))};
+  $('removal-heading').textContent=`Remove ${rows.length} ${rows.length===1?'vacancy':'vacancies'}?`;
+  $('removal-list').replaceChildren(...rows.map(r=>node('li',`${r.values.company} — ${r.values.title}`)));
+  $('removal-error').hidden=true;$('removal-progress').hidden=true;$('refresh-removal').hidden=true;
+  $('confirm-removal').textContent=`Remove ${rows.length===1?'vacancy':rows.length+' vacancies'}`;
+  if(!$('removal-dialog').open)$('removal-dialog').showModal();
+  $('cancel-removal').focus();return true;
+}
+function cancelRemoval() {
+  if(removalBusy)return;
+  removal=null;$('removal-dialog').close();tableNotice('Removal cancelled. No vacancies were removed.');
+}
+async function confirmRemoval(e) {
+  e.preventDefault();if(removalBusy||!removal)return;
+  const request=removal;
+  removalBusy=true;pending++;renderSelection();renderSetup();
+  $('confirm-removal').disabled=true;$('confirm-removal').textContent='Removing…';
+  $('cancel-removal').disabled=true;$('refresh-removal').disabled=true;
+  $('removal-error').hidden=true;$('removal-progress').hidden=false;$('removal-progress').textContent='Removing…';
+  tableNotice('Removing…');
+  try {
+    const result=await api('/api/vacancies/remove-many',{workspace:request.workspace,selections:request.rows});
+    const removed=new Set(result.removed);
+    data.rows=data.rows.filter(r=>!removed.has(r.vacancy_id));
+    for(const id of removed){selectedVacancies.delete(id);selected.delete(id);expanded.delete(id);}
+    removal=null;$('removal-dialog').close();render();
+    tableNotice(`Removed ${removed.size} ${removed.size===1?'vacancy':'vacancies'}. Application records were kept.`);
+    await refresh(true);
+  }catch(e){
+    $('removal-error').hidden=false;$('removal-error').textContent=e.message;$('removal-error').focus();
+    $('removal-progress').hidden=true;$('refresh-removal').hidden=false;
+    tableNotice('Removal failed. '+e.message,true);
+  }finally{
+    removalBusy=false;pending--;$('confirm-removal').disabled=false;
+    $('confirm-removal').textContent='Retry removal';$('cancel-removal').disabled=false;$('refresh-removal').disabled=false;
+    renderSelection();renderSetup();
+  }
+}
 function mainRows() { return data.rows.filter(r=>r.fit==='match'||r.manual||r.applications.length); }
 function fitLabel(fit) { return ({match:'Matches preferences',rejected:'Doesn’t match preferences',needs_clarification:'Needs review',unassessed:'Not assessed'})[fit]||'Not assessed'; }
 function updateCounts() {
@@ -133,15 +200,17 @@ function updateCounts() {
 }
 function render() {
   $('rows').replaceChildren(); updateCounts();
-  const query=$('query').value.toLowerCase();
-  const rows=$('show-inspected').checked?data.rows:mainRows();
-  const visible=rows.filter(r=>(filter==='all'||r.applied===(filter==='applied'))&&`${r.values.company} ${r.values.title}`.toLowerCase().includes(query));
+  const visible=visibleRows();
   $('empty').hidden=visible.length>0;
   $('empty').querySelector('h3').textContent=data.rows.length?'No matching opportunities.':'A fresh start.';
   $('empty').querySelector('p').textContent=data.rows.length?'No matches in this view. Use Show all inspected to review listings that failed or need review.':setup?.ready?'Ready to find your first opportunities.':'Complete the highlighted setup steps.';
   for(const row of visible){
     const tr=node('tr'); tr.dataset.id=row.vacancy_id;
     const add=content=>{const td=node('td');td.append(content);tr.append(td);return td;};
+    const selection=node('input');selection.type='checkbox';selection.dataset.vacancySelection=row.vacancy_id;
+    selection.setAttribute('aria-label',`Select vacancy · ${row.values.company} · ${row.values.title}`);
+    selection.addEventListener('change',()=>{if(selection.checked)selectedVacancies.add(row.vacancy_id);else selectedVacancies.delete(row.vacancy_id);renderSelection();});
+    add(selection).className='selection-cell';
     add(cell(row,'company','Company'));
     const role=add(cell(row,'title','Role'));
     const link=node('a','Open vacancy ↗','role-link');link.href=row.values.url;link.target='_blank';link.rel='noopener noreferrer';role.append(link);
@@ -154,7 +223,7 @@ function render() {
     const opened=expanded.has(row.vacancy_id);
     const toggle=node('button',opened?'Close details ↑':'Details ↓','details-toggle');toggle.type='button';toggle.setAttribute('aria-expanded',String(opened));controls.append(toggle);
     const detail=node('tr',undefined,'detail-row');detail.hidden=!opened;
-    const td=node('td');td.colSpan=7;const grid=node('div',undefined,'detail-grid');td.append(grid);detail.append(td);
+    const td=node('td');td.colSpan=8;const grid=node('div',undefined,'detail-grid');td.append(grid);detail.append(td);
     const field=(name,label,options=null,multiline=false)=>{const group=node('div');group.append(node('label',label),cell(row,name,label,options,multiline));grid.append(group);};
     if(row.applications.length>1){
       const group=node('div'),pick=node('select');pick.setAttribute('aria-label','Choose application');
@@ -167,18 +236,13 @@ function render() {
     field('interview_stages','Interview stages (separate with ;)');field('application_notes','Application notes',null,true);field('description','Description correction',null,true);
     const remove=node('button','Remove vacancy','quiet remove-vacancy');remove.type='button';
     remove.disabled=data.job?.state==='running';remove.title=remove.disabled?'Wait for the search to finish before removing a vacancy.':'';
-    remove.addEventListener('click',async()=>{
-      if(pending||drafts.size){error('Finish or retry unsaved edits before removing a vacancy.');return;}
-      if(!confirm('Remove this vacancy and its saved search history? It can return in a future search. Application records will be kept.'))return;
-      remove.disabled=true;
-      try {await api('/api/vacancies/remove',{workspace,vacancy_id:row.vacancy_id,revision:row.revision});selected.delete(row.vacancy_id);expanded.delete(row.vacancy_id);await refresh(true);}
-      catch(e){remove.disabled=false;error(e.message);}
-    });grid.append(remove);
+    remove.addEventListener('click',()=>openRemoval([row.vacancy_id]));grid.append(remove);
     const evidence=node('details',undefined,'wide');evidence.append(node('summary','Source evidence & fit checks · read-only'));
     evidence.append(node('pre',JSON.stringify({availability:row.availability,corrected_fields:row.corrected_fields,source:row.original,checks:row.checks},null,2)));grid.append(evidence);
     toggle.addEventListener('click',()=>{detail.hidden=!detail.hidden;if(detail.hidden)expanded.delete(row.vacancy_id);else expanded.add(row.vacancy_id);toggle.textContent=detail.hidden?'Details ↓':'Close details ↑';toggle.setAttribute('aria-expanded',String(!detail.hidden));});
     $('rows').append(tr,detail);
   }
+  renderSelection();
 }
 async function refresh(initial=false){
   if(!workspace)return;
@@ -188,7 +252,7 @@ async function refresh(initial=false){
     if(initial||(!pending&&!drafts.size&&!document.activeElement?.closest('#rows'))){data=incoming;render();}
     $('board').hidden=false;
     if(data)data.job=incoming.job;
-    document.querySelectorAll('.remove-vacancy').forEach(button=>{button.disabled=incoming.job?.state==='running';button.title=button.disabled?'Wait for the search to finish before removing a vacancy.':'';});
+    renderSelection();
     if(!countEdited&&incoming.config?.criteria)$('count').value=incoming.config.criteria.target_count;
     $('workspace-message').textContent='Changes save in '+incoming.workspace;
     renderSetup();
@@ -196,7 +260,8 @@ async function refresh(initial=false){
     $('unlinked').hidden=!incoming.unlinked_applications.length;
     $('unlinked-rows').replaceChildren(...incoming.unlinked_applications.map(a=>node('div',`${a.company} · ${a.position} · ${a.status} · ${a.vacancy_link}`)));
     clearTimeout(poll);if(incoming.job?.state==='running')poll=setTimeout(()=>refresh(),2000);
-  }catch(e){trackerError=e.message;renderSetup();error(e.message);}
+    return true;
+  }catch(e){trackerError=e.message;renderSetup();error(e.message);return false;}
 }
 function workspaceActionLabel() {
   const hasPath=!!$('workspace').value.trim();
@@ -215,6 +280,7 @@ async function openWorkspace() {
   if(pending||drafts.size){error('Finish or retry unsaved edits before switching workspaces.');return;}
   error();
   try {if(!$('workspace').value.trim()&&!await selectWorkspace())return;}catch(e){error(e.message);return;}
+  selectedVacancies.clear();tableNotice();
   clearTimeout(poll);$('board').hidden=true;data=null;countEdited=false;workspace=$('workspace').value.trim();
   const url=new URL(location.href);url.searchParams.set('workspace',workspace);history.replaceState(null,'',url);
   trackerError='';setup=null;await recheckSetup();if(setup?.checks.find(c=>c.key==='workspace')?.state==='ready')await refresh(true);
@@ -230,7 +296,7 @@ $('find-form').addEventListener('submit',async e=>{e.preventDefault();error();tr
 $('recheck').addEventListener('click',async()=>{error();await recheckSetup();if(workspace&&setup?.checks.find(c=>c.key==='workspace')?.state==='ready')await refresh();});
 $('refresh').addEventListener('click',()=>{if(pending||drafts.size){error('Your unsaved edits are still visible. Save or retry them before refreshing.');return;}recheckSetup().then(()=>refresh(true));});
 $('adopt').addEventListener('click',async()=>{if(pending||drafts.size){error('Finish unsaved edits before importing applications.');return;}try{await api('/api/adopt-applications',{workspace});await refresh(true);}catch(e){error(e.message);}});
-$('show-inspected').addEventListener('change',()=>{if(pending||drafts.size){$('show-inspected').checked=!$('show-inspected').checked;error('Finish unsaved edits before changing this view.');return;}render();});
+$('show-inspected').addEventListener('change',()=>{if(pending||drafts.size){$('show-inspected').checked=!$('show-inspected').checked;error('Finish unsaved edits before changing this view.');return;}selectedVacancies.clear();render();});
 $('add-vacancy').addEventListener('click',()=>{
   if(pending||drafts.size){error('Finish unsaved edits before adding a vacancy.');return;}
   $('vacancy-error').hidden=true;$('vacancy-dialog').showModal();$('vacancy-company').focus();
@@ -240,7 +306,7 @@ $('vacancy-form').addEventListener('submit',async e=>{
   e.preventDefault();$('save-vacancy').disabled=true;$('vacancy-error').hidden=true;
   try {
     const result=await api('/api/vacancies/add',{workspace,values:{company:$('vacancy-company').value,title:$('vacancy-title').value,url:$('vacancy-url').value}});
-    $('vacancy-dialog').close();$('vacancy-form').reset();filter='all';$('query').value='';
+    $('vacancy-dialog').close();$('vacancy-form').reset();selectedVacancies.clear();filter='all';$('query').value='';
     document.querySelectorAll('[data-filter]').forEach(b=>{b.classList.toggle('active',b.dataset.filter==='all');b.setAttribute('aria-pressed',String(b.dataset.filter==='all'));});
     expanded.add(result.row.vacancy_id);if(!result.created)$('show-inspected').checked=true;
     await refresh(true);
@@ -249,7 +315,26 @@ $('vacancy-form').addEventListener('submit',async e=>{
   }catch(e){$('vacancy-error').hidden=false;$('vacancy-error').textContent=e.message;}
   finally{$('save-vacancy').disabled=false;}
 });
-$('query').addEventListener('input',render);
-document.querySelectorAll('[data-filter]').forEach(button=>button.addEventListener('click',()=>{filter=button.dataset.filter;document.querySelectorAll('[data-filter]').forEach(b=>{b.classList.toggle('active',b===button);b.setAttribute('aria-pressed',String(b===button));});render();}));
+$('query').addEventListener('input',()=>{selectedVacancies.clear();render();});
+$('select-visible').addEventListener('change',()=>{for(const row of visibleRows()){if($('select-visible').checked)selectedVacancies.add(row.vacancy_id);else selectedVacancies.delete(row.vacancy_id);}renderSelection();});
+$('clear-selection').addEventListener('click',()=>{selectedVacancies.clear();renderSelection();});
+$('remove-selected').addEventListener('click',()=>openRemoval([...selectedVacancies]));
+$('removal-form').addEventListener('submit',confirmRemoval);
+$('cancel-removal').addEventListener('click',cancelRemoval);
+$('removal-dialog').addEventListener('cancel',e=>{e.preventDefault();cancelRemoval();});
+$('refresh-removal').addEventListener('click',async()=>{
+  if(removalBusy||!removal)return;
+  const ids=removal.rows.map(r=>r.vacancy_id);
+  removalBusy=true;$('confirm-removal').disabled=true;$('refresh-removal').disabled=true;$('cancel-removal').disabled=true;
+  $('removal-progress').hidden=false;$('removal-progress').textContent='Refreshing selection…';
+  try {
+    if(await refresh(true)){if(openRemoval(ids))tableNotice('Selection refreshed. Review the vacancies before retrying.');}
+    else {$('removal-error').hidden=false;$('removal-error').textContent='Could not refresh. Your selection is kept. Retry when connected.';}
+  }finally{
+    removalBusy=false;$('confirm-removal').disabled=false;$('refresh-removal').disabled=false;$('cancel-removal').disabled=false;
+    $('removal-progress').hidden=true;renderSelection();renderSetup();
+  }
+});
+document.querySelectorAll('[data-filter]').forEach(button=>button.addEventListener('click',()=>{selectedVacancies.clear();filter=button.dataset.filter;document.querySelectorAll('[data-filter]').forEach(b=>{b.classList.toggle('active',b===button);b.setAttribute('aria-pressed',String(b===button));});render();}));
 window.addEventListener('beforeunload',e=>{if(pending||drafts.size){e.preventDefault();e.returnValue='';}});
 (async()=>{try{const session=await api('/api/session');workspace=new URL(location.href).searchParams.get('workspace')||session.workspace||'';$('workspace').value=workspace;workspaceActionLabel();await recheckSetup();if(workspace)await refresh(true);}catch(e){error(e.message);}})();

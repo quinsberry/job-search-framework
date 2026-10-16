@@ -284,6 +284,25 @@ class WorkflowTests(unittest.TestCase):
         self.assertFalse(again['created'])
         self.assertEqual(again['row']['values']['company'], 'Referral')
 
+    def test_bulk_remove_checks_application_revisions_and_preserves_all_applications(self):
+        self.seed(vacancy(), vacancy('2'), vacancy('3'))
+        rows = workflow.table(self.workspace)['rows'][:2]
+        selections = [{'vacancy_id': r['vacancy_id'], 'revision': r['revision']} for r in rows]
+        workflow.edit_row(self.workspace, rows[1]['vacancy_id'], 'status', 'interviewing', rows[1]['revision'])
+        history_path = self.workspace / 'vacancies/history.json'
+        before = history_path.read_bytes()
+        with self.assertRaisesRegex(ValueError, 'Nothing removed'):
+            workflow.remove_rows(self.workspace, selections)
+        self.assertEqual(history_path.read_bytes(), before)
+        self.assertEqual(len(workflow.table(self.workspace)['rows']), 3)
+        rows = workflow.table(self.workspace)['rows'][:2]
+        selections = [{'vacancy_id': r['vacancy_id'], 'revision': r['revision']} for r in rows]
+        applications_before = (self.workspace / 'applications_table.csv').read_bytes()
+        removed = workflow.remove_rows(self.workspace, selections)
+        self.assertEqual(len(removed['removed']), 2)
+        self.assertEqual([r['vacancy_id'] for r in workflow.table(self.workspace)['rows']], ['linkedin:3'])
+        self.assertEqual((self.workspace / 'applications_table.csv').read_bytes(), applications_before)
+
     def test_budget_shortfall_and_invalid_ai_evidence(self):
         c = config(); c.update(target_count=1, discovery_budget=1)
         self.write_config(c)
