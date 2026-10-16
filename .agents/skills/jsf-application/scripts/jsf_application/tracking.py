@@ -3,12 +3,10 @@
 from datetime import datetime, timezone
 from pathlib import Path
 import shutil
-import sys
 from uuid import uuid4
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'jsf-search' / 'scripts'))
-from applications import COLUMNS, BUSINESS, STATUSES, read_table, validate_record, write_table
-from evaluate import canonical_url
+from .applications import COLUMNS, BUSINESS, STATUSES, read_table, validate_record, write_table
+from .search_contract import canonical_url
 
 
 class ConfirmationRequired(ValueError):
@@ -35,6 +33,21 @@ def matches(rows, vacancy_id, aliases, old_ids=()):
             if 'url:' + url in aliases or 'apply:' + url in aliases:
                 result.append(row)
     return result
+
+
+def records(workspace):
+    """Read current candidacy records without exposing CSV layout to callers."""
+    return read_table(Path(workspace) / 'applications_table.csv')[1]
+
+
+def known_identities(workspace):
+    result = set()
+    for row in records(workspace):
+        url = canonical_url(row['vacancy_link'])
+        result.update({'url:' + url, 'apply:' + url})
+        if row.get('vacancy_id'):
+            result.add(row['vacancy_id'])
+    return {'schema_version': 1, 'identities': sorted(result)}
 
 
 def edit(workspace, vacancy_id, aliases, details, changes, application_id=None, confirm=False, old_ids=()):

@@ -5,6 +5,8 @@ description: Find new jobs using an existing workspace profile/config, open the 
 
 # Local job-search workflow
 
+The CLI remains `scripts/workflow.py`. Python callers use `jsf_workflow` under `scripts/`; its explicit dependencies are sibling `jsf-search`, `jsf-profile`, `jsf-vacancies` and `jsf-application`. It resolves these namespaced packages itself. Compose the owners' query/edit interfaces instead of reading observation/redirect storage layouts. Specialist entrypoints must also work without this coordinator being initialized.
+
 Require an explicit workspace; ask only if it is missing. This repository's local app combines the existing specialists. Use Python 3 in an environment with `jsf-profile/scripts/requirements.txt` installed. The local CLI integration requires `codex` on PATH signed in using ChatGPT; API-key authentication is deliberately not used. Run `codex login` in the user's terminal when needed. Never read, copy or expose their credentials.
 
 Paths below use the repository root (three parents above this skill directory):
@@ -17,7 +19,7 @@ rtk proxy <python3> .agents/skills/jsf-workflow/scripts/workflow.py find --works
 
 Open the server's printed loopback URL in the harness browser preview or an ordinary browser. The user can select a workspace, edit fields, check/uncheck Applied, and filter their cumulative table without further AI turns. Profile/config setup still belongs to `jsf-profile`; report missing required choices rather than inventing them. A supported partial profile is usable.
 
-The app's profile and preferences buttons run guided setup through the profile owner's Python helpers. `scripts/setup_sessions.py` persists one unfinished draft per workspace, structured questions/answers, and review state. The user can close/resume, revise, retry interrupted interpretation, or cancel. Only the final Save applies owner plans; completing setup never starts a search. Details are in [references/guided-setup.md](references/guided-setup.md).
+The app's profile and preferences buttons run guided setup through the profile owner's Python helpers. `scripts/jsf_workflow/setup_sessions.py` persists one unfinished draft per workspace, structured questions/answers, and review state. The user can close/resume, revise, retry interrupted interpretation, or cancel. Only the final Save applies owner plans; completing setup never starts a search. Details are in [references/guided-setup.md](references/guided-setup.md).
 
 `find` exports current YAML for each run. N means N newly discovered qualifying jobs, excluding all existing history identities and application records, including ready/unsubmitted ones. It continues acquisition past already-known matches, until N new matches or the configured discovery/source limit. A requested count changes only that run. An automatic discovery budget follows N × 10; an explicitly configured smaller budget is never silently increased. A request larger than that budget runs within it and reports a shortfall.
 

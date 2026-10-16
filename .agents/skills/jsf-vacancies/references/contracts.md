@@ -1,8 +1,19 @@
 # Vacancy contracts
 
+## Python owner interface
+
+Import `from jsf_vacancies import vacancies` after adding this skill's `scripts` directory to the Python path. The owner resolves its declared sibling `jsf-search`; no workflow initialization is needed. Original CLI commands remain at `scripts/vacancies.py`.
+
+- `query(workspace)` is read-only and returns `{schema_version: 1, vacancies: [...]}`. Each entry contains `vacancy_id`, display `values`, identity `aliases`, redirected `previous_ids`, opaque `revision`, `fit`, `checks`, `review`, `availability`, `original` source facts, and `corrected_fields`. Values combine known source facts with explicit corrections; consumers must not reconstruct them from history containers. An absent history returns an empty list.
+- `known_identities(workspace)` is read-only and returns `{schema_version: 1, identities: [...]}` with sorted source identity aliases for cross-run exclusion. Display URL corrections do not invent new source identities.
+- `edit(workspace, identifier, field, value, at)` persists a review choice or display correction through the owner. Use an explicit timezone-aware timestamp. Unknown IDs, invalid values, older decisions, and corrections colliding with another displayed URL are rejected. It returns no payload; query again for current values/revision.
+- `adopt(workspace, applications, at)` persists explicit application imports using `register_application`; an empty list writes nothing. It returns no payload. Existing source facts and assessments remain intact.
+
+These helpers raise validation/read/write errors to callers. Canonical writes retain the atomic, single-writer and idempotency rules below. Existing pure `import_results`, `correct`, and `register_application` contracts remain available for owner-managed transformations.
+
 ## Inputs and operations
 
-Python 3, standard library only. The sibling `jsf-search/scripts/evaluate.py` supplies criteria validation, timestamp parsing and stable identities. Keep the two skills together.
+Python 3, standard library only. The sibling `jsf-search/scripts/jsf_search/evaluate.py` supplies criteria validation, timestamp parsing and stable identities. Keep the two skills together.
 
 - `import`: a `jsf-search` result with `schema_version: 1`, normalized `criteria`, and the complete `snapshot` (`schema_version: 1`, timezone-aware `observed_at`, and raw `vacancies`). Consume its uncapped `assessments`, including evidence and checks. Older results can supply `matches`, `needs_clarification` and `rejected`; raw records without an assessment are retained as `unassessed`, never given an invented fit verdict. Coverage is retained as supplied. Assessment aliases must reference the snapshot. Import trusts search's evidence validation and does not reassess fit.
 - `list`: workspace and optional `--state`. Read-only; an empty workspace returns an empty list.

@@ -5,6 +5,8 @@ description: Use when the user asks to find jobs, vacancies, job openings or sof
 
 # JSF Search
 
+The standalone `scripts/search.py` CLI is independently usable with its JSON criteria/snapshot inputs. Python callers use the `jsf_search` package under `scripts/`. Its public criteria/identity validators are exported from `jsf_search`; live acquisition and snapshot evaluation live in `jsf_search.search` and `jsf_search.evaluate`. No sibling skill is required for these operations.
+
 Discover and assess vacancies only. Deduplicate within this search, including confirmed appearances across sources. Do not read previous runs, maintain search history, track applications, estimate market salaries, apply, or contact anyone. All helpers and future adapters use Python 3.
 
 For a plain-language vacancy-search request, use this skill without requiring `$jsf-search`. Extract criteria already supplied in the request and conversation, then ask only for missing required choices before searching. A vague request such as “find me a job” starts criteria collection; it does not authorize invented criteria or applying to jobs.

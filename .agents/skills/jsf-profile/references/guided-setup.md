@@ -1,6 +1,6 @@
 # Guided setup contracts
 
-`scripts/guided_setup.py` exposes Python 3 operations used by `jsf-workflow`'s local dialog. Install the skill's requirements; `ruamel.yaml` preserves comments/quotes while changing user-selected preferences. Existing configurations are first validated with the strict YAML owner loader. Invalid root documents are reported rather than silently replaced.
+`scripts/jsf_profile/guided_setup.py` exposes Python 3 operations used by `jsf-workflow`'s local dialog. Install the skill's requirements; `ruamel.yaml` preserves comments/quotes while changing user-selected preferences. Existing configurations are first validated with the strict YAML owner loader. Invalid root documents are reported rather than silently replaced.
 
 ## Search preferences
 
@@ -13,6 +13,10 @@
 All form-accessible fields are defined in `GROUPS`. Existing source selection and preference ranking are preserved; new configurations use the documented LinkedIn/default preference behavior. Advanced dated FX input is optional, uses EUR/PLN/USD and is validated through the existing search contract.
 
 ## Profile interpretation
+
+Python callers import `from jsf_profile import guided_setup`. `profile_context(workspace)` returns an opaque `profile` snapshot plus `cv_sources` (`id`/`name` entries); pass the snapshot back to owner helpers rather than interpreting its source registry. `select_cv(profile, source_id)` validates and copies a registered CV, rejecting unknown/non-CV IDs. `profile_review(proposal)` returns readable draft Markdown. These are read-only. `source_directory_in_use(workspace, directory)` checks source protection before draft cleanup and conservatively protects existing directories if the active profile cannot be read.
+
+`save_profile(workspace, proposal)` applies the reviewed plan through the owner, rejects stale plans, and can finish README/receipt writes after a partially completed save. It returns the normal persistence result; validation and I/O errors propagate. No workflow initialization is required by these helpers.
 
 `profile_prompt(existing, sources, transcript)` builds a bounded interpretation request with the existing profile contract. Source snapshots come from `profile.extract` or an existing canonical source. `user_source(answers)` builds a source from explicit answers only; question wording cannot become factual evidence. Skipped answers contribute no asserted facts.
 

@@ -9,9 +9,9 @@ import subprocess
 import unittest
 from unittest.mock import patch
 
-import setup_sessions as sessions
-import guided_setup as owner
-from modules import candidate, search_config
+from jsf_workflow import setup_sessions as sessions
+from jsf_profile import guided_setup as owner
+from jsf_workflow.modules import candidate, search_config
 import test_workflow as fixtures
 
 
@@ -107,7 +107,7 @@ class SetupTests(unittest.TestCase):
         before = (self.workspace / 'candidate/profile.yaml').read_bytes()
         session = sessions.start(self.workspace, 'profile')
         source = session['existing_sources'][0]['id']
-        with patch('setup_sessions.codex_bridge.guided_profile', side_effect=self.completed_profile):
+        with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile', side_effect=self.completed_profile):
             self.call('choose_source', session, source_id=source)
             review = self.wait()
         self.assertEqual(review['state'], 'review')
@@ -131,7 +131,7 @@ class SetupTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             self.workspace=Path(root)
             session=sessions.start(self.workspace,'profile')
-            with patch('setup_sessions.codex_bridge.guided_profile',side_effect=interpret):
+            with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile',side_effect=interpret):
                 self.call('choose_source',session,upload=dict(name='CV.md',data=base64.b64encode(raw).decode()))
                 questions=self.wait()
                 self.assertEqual(questions['state'],'questions')
@@ -150,12 +150,12 @@ class SetupTests(unittest.TestCase):
             return dict(message='Review',questions=[],changes_json=json.dumps(dict(schema_version=1,sources=[],records=[dict(id='identity',section='identity',facts={'full_name':dict(value='Invented',evidence=[dict(source_id='0'*64,page=1,quote='Invented')])})])))
         before=(self.workspace/'candidate/profile.yaml').read_bytes()
         session=sessions.start(self.workspace,'profile')
-        with patch('setup_sessions.codex_bridge.guided_profile',side_effect=bad):
+        with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile',side_effect=bad):
             self.call('choose_source',session,source_id=session['existing_sources'][0]['id'])
             failed=self.wait()
         self.assertEqual(failed['state'],'failed')
         self.assertEqual((self.workspace/'candidate/profile.yaml').read_bytes(),before)
-        with patch('setup_sessions.codex_bridge.guided_profile',side_effect=self.completed_profile):
+        with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile',side_effect=self.completed_profile):
             self.call('retry',failed)
             self.assertEqual(self.wait()['state'],'review')
 
@@ -165,7 +165,7 @@ class SetupTests(unittest.TestCase):
             started.set();release.wait(2)
             return self.completed_profile(prompt)
         session=sessions.start(self.workspace,'profile')
-        with patch('setup_sessions.codex_bridge.guided_profile',side_effect=slow):
+        with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile',side_effect=slow):
             processing=self.call('choose_source',session,upload={'name':'CV.md','data':base64.b64encode(b'Ada Example').decode()})
             self.assertTrue(started.wait(1))
             cancelled=self.call('cancel',processing)
@@ -216,14 +216,14 @@ class SetupTests(unittest.TestCase):
 
     def test_cancelling_after_interrupted_save_keeps_referenced_source(self):
         session=sessions.start(self.workspace,'profile')
-        with patch('setup_sessions.codex_bridge.guided_profile',side_effect=self.completed_profile):
+        with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile',side_effect=self.completed_profile):
             self.call('choose_source',session,upload={'name':'Updated.md','data':base64.b64encode(b'Ada Example. Updated CV.').decode()})
             review=self.wait()
         real_write=candidate.atomic_write
         def fail_summary(path,content):
             if path.name=='README.md':raise OSError('Disk unavailable')
             return real_write(path,content)
-        with patch('setup_sessions.candidate.atomic_write',side_effect=fail_summary):
+        with patch('jsf_workflow.setup_sessions.candidate.atomic_write',side_effect=fail_summary):
             with self.assertRaises(OSError):self.call('save',review)
         self.call('cancel',review)
         source=next(s for s in candidate.load(self.workspace)['sources'].values() if s['name']=='Updated.md')
@@ -239,7 +239,7 @@ class SetupTests(unittest.TestCase):
         def invoke():
             try:sessions.codex_bridge.guided_profile('Fictional CV',event)
             except ValueError as exc:errors.append(str(exc))
-        with patch('codex_bridge.status',return_value={'ready':True}),patch('codex_bridge.subprocess.Popen',side_effect=sleeping_process):
+        with patch('jsf_workflow.codex_bridge.status',return_value={'ready':True}),patch('jsf_workflow.codex_bridge.subprocess.Popen',side_effect=sleeping_process):
             worker=threading.Thread(target=invoke)
             worker.start();self.assertTrue(started.wait(1));event.set();worker.join(5)
         self.assertFalse(worker.is_alive())
@@ -249,7 +249,7 @@ class SetupTests(unittest.TestCase):
     def test_direct_markdown_edits_are_reviewed_grounded_and_saved_explicitly(self):
         session=sessions.start(self.workspace,'profile')
         before=(self.workspace/'candidate/profile.yaml').read_bytes()
-        with patch('setup_sessions.codex_bridge.guided_profile',side_effect=self.completed_profile):
+        with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile',side_effect=self.completed_profile):
             self.call('choose_source',session,source_id=session['existing_sources'][0]['id'])
             review=self.wait()
         edited=review['review']+'\n- **Location:** Krakow, Poland\n'
@@ -261,7 +261,7 @@ class SetupTests(unittest.TestCase):
             self.assertNotIn('Ada Example',source['pages'][0]['text'])
             fact=dict(value='Krakow, Poland',correction=True,evidence=[dict(source_id=source['id'],page=1,quote='Krakow, Poland')])
             return dict(message='Review edited facts.',questions=[],changes_json=json.dumps(dict(schema_version=1,sources=[],records=[dict(id='identity',section='identity',facts={'location':fact})])))
-        with patch('setup_sessions.codex_bridge.guided_profile',side_effect=interpret):
+        with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile',side_effect=interpret):
             self.call('markdown',review,edited)
             updated=self.wait()
         self.assertEqual(updated['state'],'review',updated['message'])
@@ -274,23 +274,23 @@ class SetupTests(unittest.TestCase):
 
     def test_markdown_failures_retain_editable_text_and_unchanged_text_is_noop(self):
         session=sessions.start(self.workspace,'profile')
-        with patch('setup_sessions.codex_bridge.guided_profile',side_effect=self.completed_profile):
+        with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile',side_effect=self.completed_profile):
             self.call('choose_source',session,source_id=session['existing_sources'][0]['id'])
             review=self.wait()
         self.assertEqual(self.call('markdown',review,review['review']),review)
         text=review['review']+'\nMy current residence is Krakow.'
-        with patch('setup_sessions.codex_bridge.guided_profile',side_effect=ValueError('Connection lost')):
+        with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile',side_effect=ValueError('Connection lost')):
             self.call('markdown',review,text)
             failed=self.wait()
         self.assertEqual(failed['edited_markdown'],text)
         self.assertEqual(failed['state'],'failed')
-        with patch('setup_sessions.codex_bridge.guided_profile',side_effect=self.completed_profile):
+        with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile',side_effect=self.completed_profile):
             self.call('markdown',failed,text+' Poland.')
             self.assertEqual(self.wait()['state'],'review')
 
     def test_existing_revision_question_resumes_as_an_editable_review(self):
         session=sessions.start(self.workspace,'profile')
-        with patch('setup_sessions.codex_bridge.guided_profile',side_effect=self.completed_profile):
+        with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile',side_effect=self.completed_profile):
             self.call('choose_source',session,source_id=session['existing_sources'][0]['id'])
             review=self.wait()
         legacy=sessions.read(self.workspace)

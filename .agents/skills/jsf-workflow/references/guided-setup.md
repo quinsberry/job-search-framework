@@ -4,7 +4,7 @@ The first guided workflows are `profile` and `config`, both owned by `jsf-profil
 
 ## Sessions
 
-`scripts/setup_sessions.py` composes profile owner operations. `workflow/setup-draft.json` stores a version-1 draft with a random session ID/revision, kind, state, submitted answers, source snapshots, transcript and proposal. It is nonauthoritative and must never be consumed as a candidate export. Public responses omit private proposals/base snapshots and include only display state/questions/review/source choices. Completion replaces the draft with a small receipt; cancellation discards draft content.
+`scripts/jsf_workflow/setup_sessions.py` composes profile owner operations. `workflow/setup-draft.json` stores a version-1 draft with a random session ID/revision, kind, state, submitted answers, source snapshots, transcript and proposal. It is nonauthoritative and must never be consumed as a candidate export. Public responses omit private proposals/base snapshots and include only display state/questions/review/source choices. Completion replaces the draft with a small receipt; cancellation discards draft content.
 
 States are `source`, `questions`, `processing`, `review`, `failed`, `complete`, `cancelled`. At most one nonterminal session exists per workspace. All mutations require the session ID and current revision; stale tabs cannot submit over another tab's answers. Background AI results are accepted only while their original session revision remains current. Cancel terminates its Codex turn and prevents late results being stored. A server restart changes orphaned processing to a retryable failure without losing submitted answers. Unsubmitted form edits are not persisted.
 

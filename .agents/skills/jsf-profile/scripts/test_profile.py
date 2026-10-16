@@ -6,7 +6,7 @@ import sys
 import tempfile
 import unittest
 
-from profile import ValidationError, apply_plan, digest, encoded, extract, load, plan, render, summary
+from jsf_profile.profile import ValidationError, apply_plan, digest, encoded, extract, load, plan, render, summary
 
 
 def observation(source, value, quote, correction=False, page=1):

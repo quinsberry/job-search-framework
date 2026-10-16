@@ -9,11 +9,9 @@ import threading
 from urllib.parse import parse_qs, urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / '.agents/skills/jsf-workflow/scripts'))
-import workflow
-import codex_bridge
+from jsf_workflow import workflow, codex_bridge, setup_sessions
+from jsf_workflow.modules import search_config, tracking
 import readiness
-import setup_sessions
-from modules import search_config, tracking
 
 
 STATIC = Path(__file__).with_name('static')

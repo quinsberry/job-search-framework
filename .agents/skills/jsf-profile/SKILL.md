@@ -5,11 +5,13 @@ description: Use when the user asks to import a PDF or Markdown CV, set up their
 
 # JSF Profile
 
+Direct CLI entrypoints remain in `scripts/profile.py`; Python callers add this skill's `scripts/` directory to their import path and use `jsf_profile.profile`, `jsf_profile.search_config` or `jsf_profile.guided_setup`. Config validation requires sibling `jsf-search`, resolved by this skill itself. Profile extraction/planning/export do not require the workflow or UI.
+
 Own CV-based setup: the candidate's professional facts and their editable search configuration. Input is a PDF/Markdown CV, optional explicit corrections/additions, and an explicit workspace. Persist `candidate/profile.yaml`, generated `candidate/README.md`, and `search-config.yml`. Export validated JSON from current YAML on demand; never maintain a saved `profile.json`. Ask for the source or workspace only if missing. Existing workspace configuration can be validated/exported without a CV. No external research is required.
 
 Use Python 3 helpers for extraction, validation, merge planning, revision checks, persistence and rendering. Interpret the extracted evidence separately; do not invent skills, seniority, achievements, dates, proficiency, or quantified impact. Search goals, preferred contracts and compensation minima belong in `search-config.yml`, separate from professional facts in `candidate/profile.yaml`. Evidence establishes what the source says; it does not independently verify employment claims.
 
-The local app can guide both workflows in a dialog. `scripts/guided_setup.py` owns preference questions, comment-preserving config plans/apply, profile interpretation prompts, and answer evidence. The coordinator owns resumable drafts; it does not replace this skill's validators or writers. Read [references/guided-setup.md](references/guided-setup.md) when using these Python operations. A draft requires explicit final Save before active profile/configuration files change.
+The local app can guide both workflows in a dialog. `scripts/jsf_profile/guided_setup.py` owns preference questions, comment-preserving config plans/apply, profile interpretation prompts, and answer evidence. The coordinator owns resumable drafts; it does not replace this skill's validators or writers. Read [references/guided-setup.md](references/guided-setup.md) when using these Python operations. A draft requires explicit final Save before active profile/configuration files change.
 
 ## Workflow
 

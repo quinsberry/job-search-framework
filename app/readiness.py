@@ -1,7 +1,6 @@
 """Read-only setup checks composed from the owning skills' validators."""
-import codex_bridge
-import workflow
-from modules import candidate, search_config
+from jsf_workflow import codex_bridge, workflow
+from jsf_workflow.modules import candidate, search_config
 
 
 def inspect(value):

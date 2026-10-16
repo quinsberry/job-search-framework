@@ -7,7 +7,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urljoin, urlsplit
 from urllib.request import Request, urlopen
 
-from evaluate import ValidationError, canonical_url
+from .evaluate import ValidationError, canonical_url
 
 
 class Node:

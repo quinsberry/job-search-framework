@@ -5,6 +5,8 @@ description: Save job-search results, remember vacancies across searches, show p
 
 # Vacancy history
 
+The CLI remains `scripts/vacancies.py`; Python consumers use `jsf_vacancies.vacancies` under this skill's `scripts/`. Its declared `jsf-search` dependency is resolved locally without workflow initialization. Use the versioned `query`/`known_identities` interface for display and matching data, and `edit`/`adopt` for coordinated mutations; consumers should not interpret the history storage containers themselves.
+
 Use `scripts/vacancies.py` with Python 3 and an explicitly selected workspace. It owns only `<workspace>/vacancies/history.json`. It requires the sibling `jsf-search` skill for its existing criteria and identity contract.
 
 Choose the operation from the user's request:

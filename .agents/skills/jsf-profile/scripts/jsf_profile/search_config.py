@@ -3,9 +3,8 @@
 from copy import deepcopy
 import json
 from pathlib import Path
-import sys
 
-from profile import ValidationError, atomic_write, encoded, load, read_yaml, require, string, summary
+from .profile import ValidationError, atomic_write, encoded, load, read_yaml, require, string, summary
 
 
 FILL = "__FILL_ME__"
@@ -82,8 +81,7 @@ def validate_document(data):
     errors = []
     normalized = None
     if not missing:
-        sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'jsf-search' / 'scripts'))
-        from evaluate import criteria, ValidationError as SearchError
+        from .search_contract import criteria, ValidationError as SearchError
         try:
             normalized = criteria(c)
         except SearchError as exc:
@@ -109,9 +107,9 @@ def initialize(workspace, country=None, city=None):
         return {**inspect_config(workspace), 'created': False}
     profile = load(workspace)  # Invalid existing YAML must not be bypassed.
     if profile is not None:
-        from profile import protect_sources
+        from .profile import protect_sources
         protect_sources(workspace, profile['sources'].values())
-    content = (Path(__file__).resolve().parents[1] / 'references' / 'search-template.yml').read_text(encoding='utf-8')
+    content = (Path(__file__).resolve().parents[2] / 'references' / 'search-template.yml').read_text(encoding='utf-8')
     for field, value in (('country', country), ('city', city)):
         if value is not None:
             string(value, field)

@@ -5,6 +5,8 @@ description: Research a defensible salary range to tell a recruiter for a softwa
 
 # JSF Salary
 
+Invoke this skill directly with vacancy details and residence; no workflow or workspace initialization is required. The original `scripts/convert_fx.py` CLI remains stable. Python integrations use `jsf_salary.convert_fx` from this skill's `scripts` directory; there are no sibling-skill runtime dependencies. Live research and exchange-rate access remain external inputs.
+
 Help the job seeker state an ambitious, defensible **fixed-cash asking range** for a specific vacancy. Never present a salary as guaranteed or claim a precise probability of acceptance.
 
 ## Inputs

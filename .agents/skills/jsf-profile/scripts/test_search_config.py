@@ -7,8 +7,8 @@ import tempfile
 import unittest
 
 import yaml
-from profile import apply_plan, plan, load, ValidationError
-from search_config import FILL, initialize, inspect_config, export, REQUIRED
+from jsf_profile.profile import apply_plan, plan, load, ValidationError
+from jsf_profile.search_config import FILL, initialize, inspect_config, export, REQUIRED
 from test_profile import change, extract, observation, record
 
 

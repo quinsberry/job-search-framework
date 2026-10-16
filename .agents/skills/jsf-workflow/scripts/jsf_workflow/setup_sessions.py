@@ -8,10 +8,10 @@ import shutil
 import threading
 import uuid
 
-import codex_bridge
-import workflow
-from modules import candidate
-import guided_setup as owner
+from . import codex_bridge
+from . import workflow
+from .modules import candidate
+from jsf_profile import guided_setup as owner
 
 
 ACTIVE = {}
@@ -74,9 +74,9 @@ def start(workspace, kind):
         session = dict(schema_version=1, id=uuid.uuid4().hex, kind=kind, state='questions', stage=0,
                        message='', questions=[], review='', answers={}, transcript=[], sources=[])
         if kind == 'profile':
-            existing = candidate.load(workspace)
-            session['base_profile'] = existing
-            session['existing_sources'] = [{'id': key, 'name': source['name']} for key, source in (existing or {}).get('sources', {}).items() if source['kind'] == 'cv']
+            context = owner.profile_context(workspace)
+            session['base_profile'] = context['profile']
+            session['existing_sources'] = context['cv_sources']
             session.update(state='source', message='Choose a PDF or Markdown CV, or reuse an imported CV. Your active profile will stay unchanged until Save.')
         else:
             session['original'] = owner.config_snapshot(workspace)
@@ -121,8 +121,7 @@ def process_profile(workspace, snapshot, event):
             for q in questions:
                 q['required'] = False
         candidate.require(questions or proposal['outcome'] != 'needs_clarification', 'No supported CV facts were found. Choose a readable CV or supply clarifying answers.')
-        preview = '\n'.join(line for line in candidate.render(proposal['profile']).splitlines()
-                            if not line.startswith('Generated from candidate/profile.yaml.'))
+        preview = owner.profile_review(proposal)
         snapshot.update(state='questions' if questions else 'review', message=response['message'], questions=questions,
                         proposal=proposal, review=preview)
         snapshot.pop('edited_markdown', None)
@@ -158,9 +157,7 @@ def choose_source(workspace, identifier, revision, source_id=None, upload=None):
             candidate.require(extracted['outcome'] != 'needs_clarification', 'No readable text was found. Choose a text PDF or Markdown CV; OCR is not available.')
             source = extracted['source']
         else:
-            registry = (session['base_profile'] or {}).get('sources', {})
-            candidate.require(isinstance(source_id, str) and source_id in registry and registry[source_id]['kind'] == 'cv', 'Choose an imported CV or upload a new one')
-            source = registry[source_id]
+            source = owner.select_cv(session['base_profile'], source_id)
         session['sources'] = [source]
         session['transcript'] = []
         return launch(workspace, session)
@@ -253,10 +250,7 @@ def save(workspace, identifier, revision):
             return public(session)
         candidate.require(session['state'] == 'review', 'Review the completed draft before saving')
         if session['kind'] == 'profile':
-            if candidate.load(workspace) == session['proposal']['profile']:
-                candidate.persist(workspace, session['proposal']['profile'])
-            else:
-                candidate.apply_plan(workspace, session['proposal'])
+            owner.save_profile(workspace, session['proposal'])
         else:
             owner.save_config(workspace, session['proposal'])
         # Keep a receipt, not a second authoritative profile/configuration.
@@ -270,7 +264,7 @@ def rebase(workspace, identifier, revision):
         session = require_current(workspace, identifier, revision)
         candidate.require(session['state'] == 'review', 'Only a review draft can be refreshed')
         if session['kind'] == 'profile':
-            session['base_profile'] = candidate.load(workspace)
+            session['base_profile'] = owner.profile_context(workspace)['profile']
             return launch(workspace, session)
         session['original'] = owner.config_snapshot(workspace)
         session.update(stage=0, state='questions', questions=owner.config_questions(session['original'], session['answers'], 0),
@@ -286,11 +280,7 @@ def cancel(workspace, identifier, revision):
         if event:
             event.set()
         directory = Path(workspace) / 'workflow' / 'setup-inputs' / identifier
-        try:
-            profile = candidate.load(workspace)
-            referenced = any(source.get('path') and Path(source['path']).resolve().parent == directory.resolve() for source in (profile or {}).get('sources', {}).values())
-        except (ValueError, OSError):
-            referenced = directory.exists()
+        referenced = owner.source_directory_in_use(workspace, directory)
         if not referenced:
             shutil.rmtree(directory, ignore_errors=True)
         receipt = dict(schema_version=1, id=identifier, kind=session['kind'], state='cancelled',

@@ -6,10 +6,10 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-import workflow
-from modules import candidate, evaluate, vacancies, tracking, applications
+from jsf_workflow import workflow
+from jsf_workflow.modules import candidate, evaluate, vacancies, tracking, applications
 from test_search import config, vacancy, snapshot
-import codex_bridge
+from jsf_workflow import codex_bridge
 import yaml
 
 
@@ -233,7 +233,7 @@ class WorkflowTests(unittest.TestCase):
         with patch.dict('os.environ', {'OPENAI_API_KEY': 'test', 'CODEX_API_KEY': 'test'}):
             self.assertNotIn('OPENAI_API_KEY', codex_bridge.environment())
             self.assertNotIn('CODEX_API_KEY', codex_bridge.environment())
-        with patch('codex_bridge.shutil.which', return_value=None):
+        with patch('jsf_workflow.codex_bridge.shutil.which', return_value=None):
             self.assertFalse(codex_bridge.status()['ready'])
 
 

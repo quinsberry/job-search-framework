@@ -1,7 +1,7 @@
 import unittest
 from decimal import Decimal
 
-from convert_fx import convert, parse_rates
+from jsf_salary.convert_fx import convert, parse_rates
 
 
 class ConvertFxTest(unittest.TestCase):

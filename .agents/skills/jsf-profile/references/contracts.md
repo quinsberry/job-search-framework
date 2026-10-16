@@ -1,5 +1,9 @@
 # Profile contracts
 
+## Python read interface
+
+Import `from jsf_profile import profile` after adding this skill's `scripts` directory to the Python path. `profile.export(workspace)` validates current YAML and returns the same versioned summary as CLI `export`; a missing profile is an error. `profile.expertise(workspace)` returns the current validated skills, experience, projects and languages records as professional context, without deriving mandatory search filters. Both are read-only; no JSON cache is created. Validation and I/O errors propagate to callers. Search preferences use `jsf_profile.search_config.export(workspace)` and require the declared sibling `jsf-search`.
+
 ## Source extraction
 
 `extract --source CV.pdf|CV.md [--kind cv|user]` returns JSON:

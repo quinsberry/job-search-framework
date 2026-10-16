@@ -4,6 +4,9 @@ The framework helps a job seeker assess vacancies and prepare compensation expec
 
 ## Language
 
+**Independent skill**:
+A skill that can complete its defined responsibility when invoked directly with valid inputs and declared prerequisites. It does not require the lifecycle coordinator to run first.
+
 **Candidate profile**:
 The candidate's source-backed professional facts, including experience, skills, projects, education and languages. It is distinct from search preferences, compensation expectations and vacancy-specific application materials.
 _Avoid_: tailored CV, search criteria

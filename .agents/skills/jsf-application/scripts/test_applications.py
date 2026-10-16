@@ -7,7 +7,7 @@ import subprocess
 import sys
 import tempfile
 
-from applications import COLUMNS
+from jsf_application.applications import COLUMNS
 
 
 def check():

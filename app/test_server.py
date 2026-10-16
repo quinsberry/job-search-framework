@@ -67,7 +67,7 @@ class HTTPTests(unittest.TestCase):
         self.assertEqual(self.fixture.row(), before)
 
     def test_explicit_application_import_route_preserves_the_tracker(self):
-        from modules import applications
+        from jsf_workflow.modules import applications
         path = self.fixture.workspace / 'applications_table.csv'
         record = dict.fromkeys(applications.COLUMNS, '')
         record.update(application_id='old', company='Existing Company', position='Engineer', work_type='remote', status='applied', vacancy_link=fixtures.vacancy('2')['url'])
@@ -191,7 +191,7 @@ class HTTPTests(unittest.TestCase):
         self.assertEqual(self.request('/setup.js')[0], 200)
 
     def test_profile_warning_explains_missing_proficiency_without_blocking_search(self):
-        from modules import candidate
+        from jsf_workflow.modules import candidate
         profile = candidate.load(self.fixture.workspace)
         source = next(iter(profile['sources'].values()))
         proposal = candidate.plan(profile, {'schema_version': 1, 'sources': [], 'records': [

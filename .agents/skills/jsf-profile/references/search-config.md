@@ -28,7 +28,7 @@ FX has date, source, base and rates. A wholly unfinished object is omitted. If a
 
 ## Python operations
 
-All operations use `scripts/profile.py`, the existing Python environment with PyYAML/pypdf, and the sibling `jsf-search` criteria validator. The internal `scripts/search_config.py` module contains config mechanics without duplicating search rules.
+All operations use `scripts/profile.py`, the existing Python environment with PyYAML/pypdf, and the sibling `jsf-search` criteria validator. The internal `scripts/jsf_profile/search_config.py` module contains config mechanics without duplicating search rules.
 
 - `init-search --workspace ... [--country ...] [--city ...]`: create the template once. CV roles/technologies are inserted as quoted comment examples from undisputed profile facts. Existing config bytes and comments are never rewritten. Invalid existing profile/config is reported rather than replaced. Without a readable profile, template creation is allowed but readiness is partial.
 - `validate-search --workspace ...`: read-only JSON result `{schema_version, outcome, path, missing_fields, defaults, errors, profile_status, criteria}`. `outcome` is ready/partial; `criteria` is normalized when complete and valid, otherwise null. Partial professional facts are allowed; missing/empty profile blocks ready status. A valid but unfinished draft returns exit 0 with partial status; malformed files return exit 2.

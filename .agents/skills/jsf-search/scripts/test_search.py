@@ -6,9 +6,9 @@ import sys
 import tempfile
 import unittest
 
-from evaluate import ValidationError, canonical_url, criteria, evaluate, report
-from linkedin import LinkedIn, cards, details
-from search import acquire, encoded
+from jsf_search.evaluate import ValidationError, canonical_url, criteria, evaluate, report
+from jsf_search.linkedin import LinkedIn, cards, details
+from jsf_search.search import acquire, encoded
 
 
 DESCRIPTION = ("Senior frontend engineer builds React and TypeScript. Next.js preferred. "

@@ -6,8 +6,8 @@ import sys
 import tempfile
 import unittest
 
-from vacancies import empty_history, import_results, review, view, ValidationError
-from evaluate import evaluate
+from jsf_vacancies.vacancies import empty_history, import_results, review, view, ValidationError
+from jsf_search.evaluate import evaluate
 from test_search import config, vacancy, snapshot
 
 
