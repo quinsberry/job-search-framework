@@ -22,6 +22,16 @@ def imported(*records, day=10, c=None, history=None):
 
 
 class HistoryTests(unittest.TestCase):
+    def test_search_with_multiple_compensation_options_imports_results(self):
+        c = config()
+        c['compensation'].append({**c['compensation'][0], 'contract': 'uop', 'basis': 'gross', 'currency': 'EUR', 'minimum': 5000})
+        saved = imported(vacancy(), c=c)
+        self.assertIn('linkedin:1', saved['history']['vacancies'])
+        reversed_config = deepcopy(c)
+        reversed_config['compensation'].reverse()
+        replayed = imported(vacancy(), c=reversed_config, history=saved['history'])
+        self.assertEqual(saved['scope_id'], replayed['scope_id'])
+
     def test_pure_replay_and_repeated_later_observation(self):
         h, r = empty_history(), result(vacancy())
         before = deepcopy((h, r))

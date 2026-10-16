@@ -209,6 +209,23 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(len(workflow.table(self.workspace)['rows']), 4)
         self.assertEqual((self.workspace / 'search-config.yml').read_bytes(), before)
 
+    def test_find_jobs_saves_results_with_b2b_and_uop_preferences(self):
+        c = config()
+        c['compensation'].append({'contract': 'uop', 'minimum': 18000, 'currency': 'PLN', 'period': 'month', 'basis': 'gross'})
+        self.write_config(c)
+        before = (self.workspace / 'search-config.yml').read_bytes()
+        class Adapter:
+            page_size = 10
+            def __init__(self, delay=0): pass
+            def queries(self, c): return [{}]
+            def page(self, q, offset): return [vacancy()] if offset == 0 else []
+            def detail(self, v): return {**v, 'facts': {}}
+        result = workflow.find_jobs(self.workspace, 1, interpreter=lambda c, records, expertise: [vacancy()['facts'] for r in records], adapters={'linkedin': Adapter}, delay=0)
+        self.assertEqual(result['found'], 1)
+        self.assertEqual(result['vacancy_ids'], ['linkedin:1'])
+        self.assertEqual(self.row()['fit'], 'match')
+        self.assertEqual((self.workspace / 'search-config.yml').read_bytes(), before)
+
     def test_budget_shortfall_and_invalid_ai_evidence(self):
         c = config(); c.update(target_count=1, discovery_budget=1)
         self.write_config(c)

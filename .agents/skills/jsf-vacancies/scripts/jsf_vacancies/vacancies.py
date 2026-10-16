@@ -239,7 +239,9 @@ def scope_key(c):
     def unordered(value):
         if isinstance(value, dict):
             return {k: unordered(v) for k, v in value.items()}
-        return sorted(value) if isinstance(value, list) else value
+        if isinstance(value, list):
+            return sorted((unordered(item) for item in value), key=lambda item: encoded(item) if isinstance(item, dict) else item)
+        return value
     return digest(unordered(filters))
 
 
