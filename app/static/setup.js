@@ -1,30 +1,32 @@
-let guided=null, guidedPoll=null, guidedWorkspace='', guidedBusy=false;
+let guided=null, guidedPoll=null, guidedWorkspace='', guidedBusy=false, guidedKind='', guidedSessions=[];
 let guidedGetters=new Map();
 const markdownEdits=new Map();
 const terminalSetup=s=>!s||['complete','cancelled'].includes(s.state);
 function guidedError(message='') { $('guided-error').hidden=!message;$('guided-error').textContent=message; }
 function showGuided() { if(!$('setup-dialog').open)$('setup-dialog').showModal(); }
 function updateGuidedBanner() {
-  $('setup-progress').hidden=terminalSetup(guided);
-  $('setup-progress-text').textContent=guided?.state==='processing'?'Setup is running.':guided?.state==='review'?'Your setup draft is ready to review.':'Unfinished setup — continue when ready.';
+  const sessions=[...guidedSessions.filter(s=>s&&s.kind!==guided?.kind),guided].filter(s=>!terminalSetup(s));
+  $('setup-progress').hidden=!sessions.length;
+  $('setup-progress-text').textContent='Unfinished drafts: '+sessions.map(s=>s.kind==='profile'?'candidate profile':'search preferences').join(', ')+'. Open the matching setup point to continue.';
 }
-async function loadGuided() {
+
+async function loadGuided(kind=guidedKind) {
   clearTimeout(guidedPoll);
-  if(!workspace){guided=null;updateGuidedBanner();return;}
+  if(!workspace){guided=null;guidedSessions=[];updateGuidedBanner();return;}
   const requestedWorkspace=workspace;
   try {
-    const result=await api('/api/setup?path='+encodeURIComponent(requestedWorkspace));
+    const result=await api('/api/setup?path='+encodeURIComponent(requestedWorkspace)+(kind?'&kind='+encodeURIComponent(kind):''));
     if(workspace!==requestedWorkspace)return;
     const changed=guided?.revision!==result.session?.revision||guidedWorkspace!==workspace;
-    guided=result.session;guidedWorkspace=workspace;updateGuidedBanner();
+    guided=result.session;guidedSessions=result.sessions||[];guidedWorkspace=workspace;updateGuidedBanner();
     if(changed&&$('setup-dialog').open)renderGuided();
-    if(guided?.state==='processing')guidedPoll=setTimeout(loadGuided,1200);
+    if(guided?.state==='processing')guidedPoll=setTimeout(()=>loadGuided(),1200);
   }catch(e){error(e.message);}
 }
 async function startGuided(kind) {
   if(guidedBusy)return;
   try {
-    await loadGuided();
+    guidedKind=kind;await loadGuided(kind);
     if(!terminalSetup(guided)){showGuided();renderGuided();return;}
     guidedBusy=true;
     guided=(await api('/api/setup/start',{workspace,kind})).session;guidedWorkspace=workspace;
@@ -33,7 +35,7 @@ async function startGuided(kind) {
 }
 async function guidedAction(action,extra={}) {
   if(guidedBusy)return;
-  if(markdownEdits.has(guided.id)&&!['markdown','cancel'].includes(action)){guidedError('Review your Markdown changes before continuing.');return;}
+  if(markdownEdits.has(guided.id)&&!['markdown','cancel','save'].includes(action)){guidedError('Save your profile edits before continuing.');return;}
   guidedBusy=true;guidedError();
   $('setup-dialog').setAttribute('aria-busy','true');
   $('setup-dialog').querySelectorAll('button').forEach(b=>b.disabled=true);
@@ -42,9 +44,9 @@ async function guidedAction(action,extra={}) {
   try {
     guided=(await api('/api/setup/'+action,{workspace:guidedWorkspace,id:guided.id,revision:guided.revision,...extra})).session;
     if(workspace!==target){await loadGuided();return;}
-    if(['markdown','cancel'].includes(action))markdownEdits.delete(draftId);
+    if(['markdown','cancel','save'].includes(action))markdownEdits.delete(draftId);
     updateGuidedBanner();renderGuided();
-    if(guided.state==='processing')guidedPoll=setTimeout(loadGuided,800);
+    if(guided.state==='processing')guidedPoll=setTimeout(()=>loadGuided(),800);
     if(guided.state==='complete') {
       $('setup-dialog').close();await recheckSetup();if(workspace)await refresh();
     }
@@ -107,12 +109,13 @@ function questionControl(q,wrap) {
 function renderGuided() {
   if(!guided)return;
   guidedError();guidedGetters=new Map();$('guided-fields').replaceChildren();
-  $('guided-heading').textContent=guided.kind==='profile'?'Set up your profile':'Set search preferences';
+  $('guided-heading').textContent=guided.kind==='profile'?'Candidate profile':'Search preferences';
   $('guided-message').textContent=guided.message;
   $('guided-form').hidden=!['source','questions'].includes(guided.state);
   $('guided-back').hidden=!(guided.kind==='config'&&guided.state==='questions'&&guided.stage>0);
   $('guided-save').hidden=guided.state!=='review';$('guided-save').textContent=guided.kind==='profile'?'Save profile':'Save preferences';
   $('guided-edit').hidden=guided.state!=='review'||guided.kind==='profile';$('guided-rebase').hidden=guided.state!=='review';
+  $('guided-import').hidden=!(guided.kind==='profile'&&guided.state==='review');
   $('guided-retry').hidden=guided.state!=='failed';$('guided-cancel').hidden=terminalSetup(guided);
   if(guided.state==='source'||guided.state==='failed'&&guided.kind==='profile'&&!guided.edited_markdown) {
     $('guided-form').hidden=false;
@@ -130,9 +133,9 @@ function renderGuided() {
       const draft=markdownEdits.get(guided.id);
       editor.value=draft?.revision===guided.revision?draft.text:guided.state==='failed'?guided.edited_markdown:guided.review;
       if(draft&&draft.revision!==guided.revision)markdownEdits.delete(guided.id);
-      const updated=()=>{const changed=editor.value!==(guided.state==='failed'?guided.edited_markdown:guided.review);$('guided-save').textContent=guided.state==='failed'||editor.value!==guided.review?'Review changes':'Save profile';if(changed)markdownEdits.set(guided.id,{revision:guided.revision,text:editor.value});else markdownEdits.delete(guided.id);};
+      const updated=()=>{const changed=editor.value!==guided.review;$('guided-save').textContent='Save profile';if(changed)markdownEdits.set(guided.id,{revision:guided.revision,text:editor.value});else markdownEdits.delete(guided.id);};
       editor.addEventListener('input',updated);updated();
-      $('guided-fields').append(node('label','Edit your profile draft directly'),editor,node('p','Review changes validates your edits and refreshes the preview. Save profile then applies the reviewed facts.','question-help'));
+      $('guided-fields').append(node('label','Edit your profile draft directly'),editor,node('p','Save validates and applies your edits without AI. Keep the section headings, record IDs and field labels. Use Unknown to clear a fact.','question-help'));
       $('guided-save').hidden=false;
     }else $('guided-fields').append(node('pre',guided.review,'guided-review'));
     $('guided-form').hidden=false;$('guided-next').hidden=true;
@@ -143,8 +146,9 @@ function renderGuided() {
 }
 $('guided-form').addEventListener('submit',async e=>{e.preventDefault();try{if(guidedGetters.has('source'))await guidedAction('source',await guidedGetters.get('source')());else{const answers=Object.fromEntries([...guidedGetters].map(([id,get])=>[id,get()]));await guidedAction('answer',{answers});}}catch(e){guidedError(e.message);}});
 for(const action of ['retry','edit','rebase','back'])$('guided-'+action).addEventListener('click',()=>guidedAction(action));
-$('guided-save').addEventListener('click',()=>{const editor=$('profile-draft');if(guided.kind==='profile'&&editor&&(guided.state==='failed'||editor.value!==guided.review))guidedAction('markdown',{text:editor.value});else guidedAction('save');});
+$('guided-save').addEventListener('click',()=>{const editor=$('profile-draft');guidedAction('save',guided.kind==='profile'&&editor?{text:editor.value}:{});});
+$('guided-import').addEventListener('click',()=>guidedAction('import_cv'));
 window.addEventListener('beforeunload',e=>{if(markdownEdits.size){e.preventDefault();e.returnValue='';}});
 $('guided-cancel').addEventListener('click',()=>{if(confirm('Discard this setup draft? Your active profile, preferences and tracked jobs will stay unchanged.'))guidedAction('cancel');});
 $('hide-setup').addEventListener('click',()=>$('setup-dialog').close());
-$('continue-setup').addEventListener('click',async()=>{await loadGuided();renderGuided();showGuided();});
+$('continue-setup').addEventListener('click',async()=>{await loadGuided();const next=!terminalSetup(guided)?guided:guidedSessions.find(s=>!terminalSetup(s));if(next)await startGuided(next.kind);});

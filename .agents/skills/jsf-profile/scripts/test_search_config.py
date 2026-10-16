@@ -117,7 +117,7 @@ class SearchConfigTests(unittest.TestCase):
             self.assertEqual(self.path.read_text(), text)
 
     def test_existing_invalid_profile_is_not_bypassed(self):
-        (self.workspace / 'candidate/profile.yaml').write_text('broken YAML profile')
+        (self.workspace / 'candidate/profile.md').write_text('broken YAML profile')
         with self.assertRaises(ValidationError):
             initialize(self.workspace)
         self.assertFalse(self.path.exists())

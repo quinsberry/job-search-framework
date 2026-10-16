@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / '.agents/skills/jsf
 from jsf_workflow import workflow, codex_bridge, setup_sessions
 from jsf_workflow.modules import search_config, tracking
 import readiness
+import folders
 
 
 STATIC = Path(__file__).with_name('static')
@@ -63,7 +64,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, readiness.inspect(parse_qs(url.query).get('path', [''])[0]))
             if url.path == '/api/setup':
                 workspace = workflow.workspace_path(parse_qs(url.query).get('path', [''])[0])
-                return self.send(200, {'session': setup_sessions.current(workspace)})
+                kind = parse_qs(url.query).get('kind', [None])[0]
+                return self.send(200, {'session': setup_sessions.current(workspace, kind),
+                                      'sessions': [setup_sessions.current(workspace, k) for k in ('profile', 'config')]})
             if url.path == '/api/workspace':
                 workspace = workflow.workspace_path(parse_qs(url.query).get('path', [''])[0])
                 data = workflow.table(workspace)
@@ -89,6 +92,8 @@ class Handler(BaseHTTPRequestHandler):
             if size < 1 or size > limit or self.headers.get_content_type() != 'application/json':
                 return self.send(400, {'error': 'Request too large or invalid JSON content type'})
             data = json.loads(self.rfile.read(size))
+            if self.path == '/api/select-workspace':
+                return self.send(200, {'workspace': folders.select()})
             workspace = workflow.workspace_path(data['workspace'])
             if self.path == '/api/setup/start':
                 return self.send(200, {'session': setup_sessions.start(workspace, data['kind'])})
@@ -101,7 +106,9 @@ class Handler(BaseHTTPRequestHandler):
                     session = setup_sessions.answer(*args, data['answers'])
                 elif action == 'markdown':
                     session = setup_sessions.markdown(*args, data['text'])
-                elif action in {'retry', 'edit', 'rebase', 'back', 'save', 'cancel'}:
+                elif action == 'save':
+                    session = setup_sessions.save(*args, text=data.get('text'))
+                elif action in {'retry', 'edit', 'rebase', 'back', 'cancel', 'import_cv'}:
                     session = getattr(setup_sessions, action)(*args)
                 else:
                     return self.send(404, {'error': 'Unknown setup action'})

@@ -10,11 +10,11 @@
   <header class="masthead"><a class="brand" href="/" aria-label="Job Search Framework home"><span class="mark">j.</span> job search framework</a><span class="local"><i></i> Local workspace</span></header>
   <main>
     <section class="intro"><div><p class="eyebrow">A LITTLE STRUCTURE. MORE POSSIBILITY.</p><h1>Your next chapter.</h1><p class="subtitle">Find the right opportunities. Keep your progress in one place.</p></div><span id="connection" class="connection">Checking Codex…</span></section>
-    <form id="workspace-form" class="workspace"><label for="workspace">Workspace folder</label><div class="workspace-controls"><input id="workspace" name="workspace" placeholder="/Users/you/job-search" autocomplete="off" required><button type="submit" class="secondary">Open workspace <span aria-hidden="true">↗</span></button></div><p id="workspace-message">Choose the folder containing your profile and search configuration.</p></form>
+    <form id="workspace-form" class="workspace"><label for="workspace">Workspace folder</label><div class="workspace-controls"><input id="workspace" name="workspace" placeholder="/Users/you/job-search" autocomplete="off"><button id="browse-workspace" type="button" class="quiet" hidden>Browse…</button><button id="open-workspace" type="submit" class="secondary">Select workspace</button></div><p id="workspace-message">Choose the folder containing your profile and search configuration.</p></form>
     <div id="error" role="alert" hidden></div>
     <section class="setup" aria-labelledby="setup-heading">
       <div class="setup-heading"><h2 id="setup-heading">Search setup</h2><button id="recheck" type="button" class="secondary">Recheck setup</button></div>
-      <ul id="setup-checks" aria-live="polite"><li>Checking setup…</li></ul>
+      <ol id="setup-checks" aria-live="polite"><li>Checking setup…</li></ol>
       <p id="search-reason" role="status">Checking search requirements…</p>
       <div id="setup-progress" hidden><span id="setup-progress-text"></span> <button id="continue-setup" type="button" class="secondary">Continue setup</button></div>
     </section>
@@ -32,7 +32,7 @@
     <p id="guided-message" role="status"></p>
     <p id="guided-error" role="alert" hidden></p>
     <form id="guided-form"><div id="guided-fields"></div><div class="guided-actions"><button id="guided-back" type="button" class="secondary" hidden>Back</button><button id="guided-next" type="submit">Continue</button></div></form>
-    <div class="guided-actions"><button id="guided-edit" type="button" class="secondary" hidden>Revise draft</button><button id="guided-rebase" type="button" class="secondary" hidden>Review against current files</button><button id="guided-save" type="button" hidden>Save</button><button id="guided-retry" type="button" hidden>Retry</button><button id="guided-cancel" type="button" class="quiet">Cancel setup</button></div>
+    <div class="guided-actions"><button id="guided-import" type="button" class="secondary" hidden>Import another CV</button><button id="guided-edit" type="button" class="secondary" hidden>Revise draft</button><button id="guided-rebase" type="button" class="secondary" hidden>Review against current files</button><button id="guided-save" type="button" hidden>Save</button><button id="guided-retry" type="button" hidden>Retry</button><button id="guided-cancel" type="button" class="quiet">Cancel setup</button></div>
     <p class="footnote">Submitted answers are saved as a draft. Your active profile and preferences change only after Save. Closing this dialog lets you continue later.</p>
   </dialog>
   <footer><span>Built around your next move.</span><span>Files stay local · AI and source requests go online</span></footer>

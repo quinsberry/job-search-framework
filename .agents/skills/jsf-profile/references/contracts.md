@@ -2,7 +2,7 @@
 
 ## Python read interface
 
-Import `from jsf_profile import profile` after adding this skill's `scripts` directory to the Python path. `profile.export(workspace)` validates current YAML and returns the same versioned summary as CLI `export`; a missing profile is an error. `profile.expertise(workspace)` returns the current validated skills, experience, projects and languages records as professional context, without deriving mandatory search filters. Both are read-only; no JSON cache is created. Validation and I/O errors propagate to callers. Search preferences use `jsf_profile.search_config.export(workspace)` and require the declared sibling `jsf-search`.
+Import `from jsf_profile import profile` after adding this skill's `scripts` directory to the Python path. `profile.export(workspace)` validates the current Markdown profile and supporting evidence and returns the same versioned summary as CLI `export`; a missing profile is an error. `profile.expertise(workspace)` returns the current validated skills, experience, projects and languages records as professional context, without deriving mandatory search filters. Both are read-only; no JSON cache is created. Validation and I/O errors propagate to callers. Search preferences use `jsf_profile.search_config.export(workspace)` and require the declared sibling `jsf-search`.
 
 ## Source extraction
 
@@ -25,9 +25,9 @@ Import `from jsf_profile import profile` after adding this skill's `scripts` dir
 
 Source identity hashes kind plus original bytes; imports have no timestamps. PDF pages retain physical page numbers. Markdown is one logical page. `user` sources are Markdown records of explicit user statements, not inferred corrections. Preserve returned source objects; quotes are verified against their page text. Renaming an identical file retains identity; the first recorded name remains.
 
-Extraction also supplies an absolute `path` for collision protection. Source CVs must not occupy generated artifact paths such as `candidate/README.md`. Canonical exports preserve the first recorded source path; replay does not need that file to exist.
+Extraction also supplies an absolute `path` for collision protection. Source CVs must not occupy profile artifact paths such as `candidate/profile.md`. Canonical exports preserve the first recorded source path; replay does not need that file to exist.
 
-Outcomes: `ready` means usable text without reported extraction issues; `partial` means some text is usable but extraction issues remain; `needs_clarification` means no usable text. This is not a claim about the completeness of interpreted facts. Dependencies are [pypdf](https://pypdf.readthedocs.io/en/stable/user/extract-text.html) for text-layer extraction and [PyYAML](https://pyyaml.org/wiki/PyYAMLDocumentation) for safely loading/dumping YAML. Scanned PDFs need readable text supplied separately; OCR is outside this version.
+Outcomes: `ready` means usable text without reported extraction issues; `partial` means some text is usable but extraction issues remain; `needs_clarification` means no usable text. This is not a claim about the completeness of interpreted facts. Dependencies are [pypdf](https://pypdf.readthedocs.io/en/stable/user/extract-text.html) for text-layer extraction and [PyYAML](https://pyyaml.org/wiki/PyYAMLDocumentation) for safely loading search YAML and legacy profiles. Scanned PDFs need readable text supplied separately; OCR is outside this version.
 
 ## Changes input
 
@@ -93,17 +93,36 @@ Different scalar values create conflicts. The original accepted value remains, w
 
 ## Canonical profile and execution result
 
-`candidate/profile.yaml` contains:
+`candidate/profile.md` is the only authoritative professional profile. It contains readable facts in fixed sections, stable record IDs and supported field labels. It has one `<!-- jsf-profile:1 evidence:<digest> -->` marker pointing to immutable `candidate/evidence/<digest>.json`. Keep that marker and record IDs. Supporting JSON contains source snapshots, evidence, correction flags, value fingerprints, unresolved issues and historical conflicts; it contains no second set of current fact values.
 
-```yaml
-schema_version: 1
-sources: {}       # source ID -> extracted source snapshot (immutable history)
-records: []       # accepted facts, using the record contract
-issues: []        # unresolved free-text extraction ambiguities
-conflicts: []     # conflicting proposals; never overwrite accepted facts implicitly
+```markdown
+# Candidate profile
+
+<!-- jsf-profile:1 evidence:<digest supplied by the owner> -->
+
+## Identity
+
+### Alex Example <!-- id: identity -->
+
+- **Full Name:** Alex Example
+- **Location:** Unknown
+
+## Experience
+
+### Frontend Engineer — Acme <!-- id: acme-frontend -->
+
+- **Company:** Acme
+- **Role:** Frontend Engineer
+- **Technologies:**
+  - React
+  - TypeScript
 ```
 
-Sources are embedded so exports can validate quotes without access to the original CV. The supplied CV remains unchanged. Keep source snapshots, record IDs and correction provenance intact when editing YAML. Prefer explicit corrections through the skill for factual changes; regenerate views after valid canonical edits.
+Section names and field labels correspond to the contract above, using title case and spaces. Record headings can have a readable title with `<!-- id: stable-slug -->`, or just `### stable-slug`. Heading titles are display text; fields hold facts. Lists use indented bullets. Scalars occupy one line; `<br>` represents a newline, while literal markup characters use HTML entities. `Unknown` clears a fact; use `&#85;nknown` for the literal string “Unknown”. Unsupported structures, duplicate IDs/fields and empty lists are errors rather than silently dropped text. Removing a previously accepted field/record clears its claims to null while retaining history.
+
+`profile.edit_plan(existing, text, base_revision)` parses manual Markdown changes deterministically. Only changed claims receive explicit user-statement evidence and `user_corrected`; unchanged facts retain their original evidence. It returns the normal plan result and writes nothing. Direct external Markdown edits are interpreted the same way on export, without writes. Both paths need no Codex. The UI Save validates and applies through this owner; failed validation leaves saved files unchanged.
+
+`profile.sources(workspace)` returns reusable extracted sources from the active profile and owner registry. `profile.import_source(workspace, file)` validates and keeps a content-addressed original and snapshot in `candidate/sources/`, without changing active profile facts. Uploaded sources remain reusable after cancelling a setup draft. Existing source snapshots remain usable without the original external CV file. Source imports are explicit writes; extraction/export remain read-only.
 
 `plan` returns an execution result plus `base_revision`. It writes nothing. The execution result is:
 
@@ -117,8 +136,8 @@ Sources are embedded so exports can validate quotes without access to the origin
 
 `partial` is a usable nonempty profile with unknowns/conflicts/issues. `ready` means none of these are currently reported, not that every optional fact is known. Downstream consumers must inspect the facts and conflicts relevant to their task. A retained value under dispute is not an undisputed fact.
 
-`apply` reads current canonical YAML, verifies the plan's base revision and proposed revision, checks preservation, then writes profile YAML and README. Repeat imports and view rendering are deterministic; applying a stale plan is a validation error, so re-plan rather than force it. New profile creation with zero supported facts is rejected without creating candidate artifacts.
+`apply` reads the current profile, verifies base/proposed revisions and preservation, writes immutable supporting evidence, then atomically replaces `profile.md`. Failed publication leaves the previous profile authoritative; retry can finish interrupted cleanup. Stale plans fail, and new profiles with no supported facts are rejected.
 
-There is no saved `candidate/profile.json`. `export` validates current YAML and emits the execution result to stdout without writes, so manual YAML edits cannot leave an authoritative JSON cache behind. Consumers must export afresh. `candidate/README.md` is a generated readable presentation, including provenance, unknown fields and conflict flags; regenerate it with `render` after valid manual edits. `apply` and `render` remove the legacy JSON cache, but read-only export does not. Neither export nor rendering reads the clock or reinterprets the CV.
+Legacy `candidate/profile.yaml` remains readable only when `profile.md` is absent. Opening/exporting never migrates it. The first successful profile save backs up legacy YAML, generated README and JSON cache under `candidate/backups/<content-digest>/`, publishes Markdown, then removes old active artifacts. Facts, unknowns, sources and conflicts are retained. Once Markdown exists it is authoritative, even if cleanup was interrupted. Backups are historical and never loaded as the current profile.
 
-Each artifact is written atomically, but the replacements are not a filesystem-wide transaction. Canonical YAML is written before README. On a write failure, use canonical YAML as the authority and regenerate README before treating them as consistent. Original CV files and unrelated workspace files are never modified.
+`export` emits the versioned result without writes or a saved JSON cache. The original `render` CLI is retained as a read-only validation/summary alias; Python `profile.render(profile)` supplies editable Markdown. Rendering/parsing use no clock or AI. Run one writer per workspace. Original CV files and unrelated workspace files are never modified.

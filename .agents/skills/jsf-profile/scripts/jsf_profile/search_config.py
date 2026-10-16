@@ -69,7 +69,7 @@ def resolve(data):
 def validate_document(data):
     require(isinstance(data, dict) and set(data) == {'schema_version', 'profile_ref', 'criteria'}, 'invalid search config fields')
     require(type(data['schema_version']) is int and data['schema_version'] == 1, 'search config schema_version must be 1')
-    require(data['profile_ref'] == 'candidate/profile.yaml', 'profile_ref must be candidate/profile.yaml')
+    require(data['profile_ref'] in {'candidate/profile.md', 'candidate/profile.yaml'}, 'profile_ref must be candidate/profile.md')
     require(isinstance(data['criteria'], dict), 'config criteria must be an object')
     # Reject non-JSON/cyclic YAML before recursively inspecting placeholders.
     try:
@@ -96,7 +96,7 @@ def inspect_config(workspace):
     profile = load(workspace)
     profile_status = summary(profile)['outcome'] if profile is not None else 'missing'
     if profile_status in {'missing', 'needs_clarification'}:
-        result['errors'].append('candidate/profile.yaml needs supported CV facts; use jsf-profile intake')
+        result['errors'].append('candidate/profile.md needs supported professional facts; use jsf-profile')
         result['outcome'] = 'partial'
     return {**result, 'path': str(path.resolve()), 'profile_status': profile_status}
 

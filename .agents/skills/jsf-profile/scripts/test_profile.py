@@ -117,19 +117,20 @@ class ProfileTests(unittest.TestCase):
         self.assertIn({"record_id": "english", "field": "level"}, partial["unknowns"])
         self.assertIn("Level:** Unknown", render(partial["profile"]))
         apply_plan(self.workspace, plan(None, change(self.source, [record("english", "languages", name=observation(self.source, "English", "English"))])))
-        self.assertTrue((self.workspace / "candidate" / "README.md").exists())
+        self.assertTrue((self.workspace / "candidate" / "profile.md").exists())
 
     def test_round_trip_and_reimport_are_idempotent(self):
         apply_plan(self.workspace, plan(None, self.initial))
         existing = load(self.workspace)
-        files = {p.name: p.read_bytes() for p in (self.workspace / "candidate").iterdir()}
-        times = {p.name: p.stat().st_mtime_ns for p in (self.workspace / "candidate").iterdir()}
+        files = {str(p.relative_to(self.workspace / "candidate")): p.read_bytes() for p in (self.workspace / "candidate").rglob("*") if p.is_file()}
+        times = {p.name: p.stat().st_mtime_ns for p in (self.workspace / "candidate").rglob("*") if p.is_file()}
         replay = plan(existing, self.initial)
         self.assertEqual(replay["profile"], existing)
         apply_plan(self.workspace, replay)
-        self.assertEqual(files, {p.name: p.read_bytes() for p in (self.workspace / "candidate").iterdir()})
-        self.assertEqual(times, {p.name: p.stat().st_mtime_ns for p in (self.workspace / "candidate").iterdir()})
-        self.assertEqual(set(files), {"profile.yaml", "README.md"})
+        self.assertEqual(files, {str(p.relative_to(self.workspace / "candidate")): p.read_bytes() for p in (self.workspace / "candidate").rglob("*") if p.is_file()})
+        self.assertEqual(times, {p.name: p.stat().st_mtime_ns for p in (self.workspace / "candidate").rglob("*") if p.is_file()})
+        self.assertIn("profile.md", files)
+        self.assertFalse((self.workspace / "candidate/profile.yaml").exists())
 
     def test_multiple_evidence_entries_are_idempotent_on_first_reimport(self):
         fact = self.initial["records"][1]["facts"]["technologies"]
@@ -175,7 +176,7 @@ class ProfileTests(unittest.TestCase):
         self.assertEqual(result["outcome"], "partial")
         self.assertEqual(result["conflicts"][0]["existing"]["value"], "Frontend Engineer")
         self.assertEqual(len(plan(result["profile"], changes)["conflicts"]), 1)
-        self.assertIn("needs clarification (conflicting evidence)", render(result["profile"]))
+        self.assertEqual(summary(result["profile"])["outcome"], "partial")
 
     def test_explicit_correction_resolves_conflict_and_is_not_undone(self):
         existing = plan(None, self.initial)["profile"]
@@ -216,10 +217,10 @@ class ProfileTests(unittest.TestCase):
         old = load(self.workspace)
         stale = plan(old, change(self.source, [], issues=["Review dates"]))
         apply_plan(self.workspace, plan(old, change(self.source, [], issues=["Review language"])))
-        before = {p.name: p.read_bytes() for p in (self.workspace / "candidate").iterdir()}
+        before = {str(p.relative_to(self.workspace / "candidate")): p.read_bytes() for p in (self.workspace / "candidate").rglob("*") if p.is_file()}
         with self.assertRaisesRegex(ValidationError, "changed since planning"):
             apply_plan(self.workspace, stale)
-        self.assertEqual(before, {p.name: p.read_bytes() for p in (self.workspace / "candidate").iterdir()})
+        self.assertEqual(before, {str(p.relative_to(self.workspace / "candidate")): p.read_bytes() for p in (self.workspace / "candidate").rglob("*") if p.is_file()})
 
     def test_changed_plan_contents_and_removed_history_are_rejected(self):
         apply_plan(self.workspace, plan(None, self.initial))
@@ -248,26 +249,18 @@ class ProfileTests(unittest.TestCase):
         (directory / "profile.json").write_text("{}", encoding="utf-8")
         self.assertEqual(summary(load(self.workspace))["outcome"], "ready")
 
-    def test_export_reads_yaml_edits_and_render_removes_legacy_json(self):
-        import yaml
+    def test_export_reads_markdown_edits_without_writes(self):
         apply_plan(self.workspace, plan(None, self.initial))
-        directory = self.workspace / 'candidate'
-        path = directory / 'profile.yaml'
-        profile = load(self.workspace)
-        profile['issues'].append('User edited YAML')
-        path.write_text('# Keep this comment\n' + yaml.safe_dump(profile))
-        legacy = directory / 'profile.json'
-        legacy.write_text('{}')
+        path = self.workspace / 'candidate/profile.md'
+        path.write_text(path.read_text().replace('**Full Name:** Ada Example', '**Full Name:** Ada Updated'))
+        before = {str(p): p.read_bytes() for p in self.workspace.rglob('*') if p.is_file()}
         helper = str(Path(__file__).with_name('profile.py'))
-        before = path.read_bytes()
-        exported = subprocess.run([sys.executable, helper, 'export', '--workspace', str(self.workspace)], capture_output=True, text=True, check=True)
-        self.assertIn('User edited YAML', json.loads(exported.stdout)['issues'])
-        self.assertEqual(path.read_bytes(), before)
-        self.assertTrue(legacy.exists())  # Export remains read-only.
-        subprocess.run([sys.executable, helper, 'render', '--workspace', str(self.workspace)], capture_output=True, check=True)
-        self.assertFalse(legacy.exists())
-        self.assertEqual(path.read_bytes(), before)
-        self.assertIn('User edited YAML', (directory / 'README.md').read_text())
+        result = subprocess.run([sys.executable, helper, 'export', '--workspace', str(self.workspace)], capture_output=True, text=True, check=True)
+        profile = json.loads(result.stdout)['profile']
+        name = profile['records'][0]['facts']['full_name']
+        self.assertEqual(name['value'], 'Ada Updated')
+        self.assertTrue(name['user_corrected'])
+        self.assertEqual(before, {str(p): p.read_bytes() for p in self.workspace.rglob('*') if p.is_file()})
 
     def test_source_cannot_overlap_readme_output(self):
         path = self.workspace / "candidate" / "README.md"
@@ -303,10 +296,93 @@ class ProfileTests(unittest.TestCase):
         path.write_text(encoded(proposal), encoding="utf-8")
         applied = run("apply", "--plan", str(path), "--workspace", str(self.workspace))
         self.assertEqual(applied, run("export", "--workspace", str(self.workspace)))
-        before = {p.name: p.read_bytes() for p in (self.workspace / "candidate").iterdir()}
+        before = {str(p.relative_to(self.workspace / "candidate")): p.read_bytes() for p in (self.workspace / "candidate").rglob("*") if p.is_file()}
         self.assertEqual(applied, run("render", "--workspace", str(self.workspace)))
-        self.assertEqual(before, {p.name: p.read_bytes() for p in (self.workspace / "candidate").iterdir()})
+        self.assertEqual(before, {str(p.relative_to(self.workspace / "candidate")): p.read_bytes() for p in (self.workspace / "candidate").rglob("*") if p.is_file()})
         run("apply", "--plan", str(path), "--workspace", str(self.workspace), success=False)
+
+    def test_legacy_migrates_only_on_save_with_exact_backups(self):
+        import yaml
+        from jsf_profile import profile as owner
+        profile=plan(None,self.initial)['profile']
+        profile['issues']=['Keep unresolved issue']
+        directory=self.workspace/'candidate';directory.mkdir(parents=True)
+        old=yaml.safe_dump(profile,allow_unicode=True)
+        (directory/'profile.yaml').write_text(old)
+        (directory/'README.md').write_text('Previous generated view')
+        before={str(p):p.read_bytes() for p in directory.rglob('*') if p.is_file()}
+        self.assertEqual(load(self.workspace),profile)
+        self.assertEqual(before,{str(p):p.read_bytes() for p in directory.rglob('*') if p.is_file()})
+        owner.persist(self.workspace,profile)
+        self.assertEqual(load(self.workspace),profile)
+        self.assertFalse((directory/'profile.yaml').exists())
+        self.assertFalse((directory/'README.md').exists())
+        self.assertEqual(next((directory/'backups').rglob('profile.yaml')).read_text(),old)
+        self.assertEqual(next((directory/'backups').rglob('README.md')).read_text(),'Previous generated view')
+
+    def test_evidence_write_failure_preserves_legacy_authority_and_retry(self):
+        import yaml
+        from unittest.mock import patch
+        from jsf_profile import profile as owner
+        profile=plan(None,self.initial)['profile']
+        directory=self.workspace/'candidate';directory.mkdir(parents=True)
+        (directory/'profile.yaml').write_text(yaml.safe_dump(profile))
+        real=owner.atomic_write
+        def fail(file,text):
+            if file.name=='profile.md':raise OSError('Disk full')
+            return real(file,text)
+        with patch.object(owner,'atomic_write',side_effect=fail):
+            with self.assertRaises(OSError):owner.persist(self.workspace,profile)
+        self.assertEqual(load(self.workspace),profile)
+        self.assertFalse((directory/'profile.md').exists())
+        owner.persist(self.workspace,profile)
+        self.assertEqual(load(self.workspace),profile)
+
+    def test_manual_edits_preserve_other_evidence_and_clear_removed_claims(self):
+        from jsf_profile import profile as owner
+        original=plan(None,self.initial)['profile']
+        text=render(original).replace('**Full Name:** Ada Example','**Full Name:** Ada Updated')
+        text=text.replace('  - React\n','')
+        proposal=owner.edit_plan(original,text,digest(original))
+        name=proposal['profile']['records'][0]['facts']['full_name']
+        self.assertTrue(name['user_corrected'])
+        experience=next(r for r in proposal['profile']['records'] if r['section']=='experience')
+        old=next(r for r in original['records'] if r['section']=='experience')
+        self.assertEqual(experience['facts']['company'],old['facts']['company'])
+        self.assertEqual(experience['facts']['technologies']['value'],['TypeScript'])
+        self.assertTrue(experience['facts']['technologies']['user_corrected'])
+        cleared=owner.edit_plan(original,render(original).replace('- **Full Name:** Ada Example','- **Full Name:** Unknown'),digest(original))
+        self.assertIsNone(cleared['profile']['records'][0]['facts']['full_name']['value'])
+        self.assertTrue(cleared['profile']['records'][0]['facts']['full_name']['user_corrected'])
+
+    def test_support_has_provenance_without_duplicate_current_fact_values(self):
+        from jsf_profile.markdown_profile import support
+        profile=plan(None,self.initial)['profile']
+        metadata=support(profile)
+        fact=metadata['records']['identity']['facts']['full_name']
+        self.assertNotIn('value',fact)
+        self.assertIn('fingerprint',fact)
+        self.assertEqual(fact['evidence'],profile['records'][0]['facts']['full_name']['evidence'])
+
+    def test_markdown_round_trip_multiline_lists_special_text_and_unknown_literal(self):
+        from jsf_profile import profile as owner
+        existing=plan(None,self.initial)['profile']
+        text=render(existing).replace('- **Full Name:** Ada Example','- **Full Name:** &#85;nknown\n- **Summary:** A &amp; B &lt;br&gt;<br>Next line')
+        proposal=owner.edit_plan(existing,text,digest(existing))
+        owner.persist(self.workspace,proposal['profile'])
+        saved=load(self.workspace)
+        self.assertEqual(saved,proposal['profile'])
+        self.assertEqual(saved['records'][0]['facts']['full_name']['value'],'Unknown')
+        self.assertEqual(saved['records'][0]['facts']['summary']['value'],'A & B <br>\nNext line')
+
+    def test_invalid_manual_edits_do_not_write(self):
+        from jsf_profile import profile as owner
+        apply_plan(self.workspace,plan(None,self.initial))
+        original=load(self.workspace)
+        for text in [render(original)+'\nUnstructured prose',render(original).replace('**Full Name:**','**Unsupported Field:**'),render(original)+'\n## Identity\n### identity\n- **Full Name:** Duplicate']:
+            with self.assertRaises(ValidationError):owner.edit_plan(original,text,digest(original))
+        self.assertEqual(load(self.workspace),original)
+
 
 
 if __name__ == "__main__":

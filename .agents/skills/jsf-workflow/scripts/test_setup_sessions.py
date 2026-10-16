@@ -53,8 +53,9 @@ class SetupTests(unittest.TestCase):
         original.write_text('# Keep my comment\n' + original.read_text())
         before = original.read_bytes()
         session = sessions.start(self.workspace, 'config')
-        with self.assertRaisesRegex(ValueError, 'unfinished'):
-            sessions.start(self.workspace, 'profile')
+        profile_draft = sessions.start(self.workspace, 'profile')
+        self.assertEqual(profile_draft['kind'], 'profile')
+        self.assertEqual(sessions.current(self.workspace, 'config'), session)
         review = self.fill_config(session)
         self.assertEqual(review['state'], 'review')
         self.assertEqual(original.read_bytes(), before)
@@ -104,16 +105,16 @@ class SetupTests(unittest.TestCase):
         self.assertEqual((self.workspace / 'search-config.yml').read_bytes(), before)
 
     def test_profile_reuses_cv_reviews_and_only_saves_after_explicit_action(self):
-        before = (self.workspace / 'candidate/profile.yaml').read_bytes()
-        session = sessions.start(self.workspace, 'profile')
+        before = (self.workspace / 'candidate/profile.md').read_bytes()
+        session = self.call('import_cv', sessions.start(self.workspace, 'profile'))
         source = session['existing_sources'][0]['id']
         with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile', side_effect=self.completed_profile):
             self.call('choose_source', session, source_id=source)
             review = self.wait()
         self.assertEqual(review['state'], 'review')
-        self.assertEqual((self.workspace / 'candidate/profile.yaml').read_bytes(), before)
+        self.assertEqual((self.workspace / 'candidate/profile.md').read_bytes(), before)
         self.assertEqual(self.call('save', review)['state'], 'complete')
-        self.assertEqual((self.workspace / 'candidate/profile.yaml').read_bytes(), before)
+        self.assertEqual((self.workspace / 'candidate/profile.md').read_bytes(), before)
 
     def test_new_markdown_upload_and_user_answers_are_grounded(self):
         raw = b'Grace Example. TypeScript.'
@@ -139,7 +140,7 @@ class SetupTests(unittest.TestCase):
                 self.call('answer',questions,{'location':'Poland'})
                 review=self.wait()
             self.assertEqual(review['state'],'review',review['message'])
-            self.assertFalse((self.workspace/'candidate/profile.yaml').exists())
+            self.assertFalse((self.workspace/'candidate/profile.md').exists())
             self.call('save',review)
             profile=candidate.load(self.workspace)
             self.assertEqual(profile['records'][0]['facts']['location']['value'],'Poland')
@@ -148,13 +149,13 @@ class SetupTests(unittest.TestCase):
     def test_bad_evidence_fails_without_saving_and_can_retry(self):
         def bad(prompt,cancel=None):
             return dict(message='Review',questions=[],changes_json=json.dumps(dict(schema_version=1,sources=[],records=[dict(id='identity',section='identity',facts={'full_name':dict(value='Invented',evidence=[dict(source_id='0'*64,page=1,quote='Invented')])})])))
-        before=(self.workspace/'candidate/profile.yaml').read_bytes()
-        session=sessions.start(self.workspace,'profile')
+        before=(self.workspace/'candidate/profile.md').read_bytes()
+        session=self.call('import_cv', sessions.start(self.workspace,'profile'))
         with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile',side_effect=bad):
             self.call('choose_source',session,source_id=session['existing_sources'][0]['id'])
             failed=self.wait()
         self.assertEqual(failed['state'],'failed')
-        self.assertEqual((self.workspace/'candidate/profile.yaml').read_bytes(),before)
+        self.assertEqual((self.workspace/'candidate/profile.md').read_bytes(),before)
         with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile',side_effect=self.completed_profile):
             self.call('retry',failed)
             self.assertEqual(self.wait()['state'],'review')
@@ -164,7 +165,7 @@ class SetupTests(unittest.TestCase):
         def slow(prompt,cancel=None):
             started.set();release.wait(2)
             return self.completed_profile(prompt)
-        session=sessions.start(self.workspace,'profile')
+        session=self.call('import_cv', sessions.start(self.workspace,'profile'))
         with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile',side_effect=slow):
             processing=self.call('choose_source',session,upload={'name':'CV.md','data':base64.b64encode(b'Ada Example').decode()})
             self.assertTrue(started.wait(1))
@@ -177,7 +178,7 @@ class SetupTests(unittest.TestCase):
         self.assertNotIn('sources',sessions.read(self.workspace))
 
     def test_restart_marks_processing_as_retryable_without_losing_answers(self):
-        session=sessions.start(self.workspace,'profile')
+        session=self.call('import_cv', sessions.start(self.workspace,'profile'))
         stored=sessions.read(self.workspace)
         stored.update(state='processing',transcript=[{'questions':[],'answers':{}}])
         sessions.write(self.workspace,stored)
@@ -187,7 +188,7 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(sessions.read(self.workspace)['transcript'],stored['transcript'])
 
     def test_upload_rejects_traversal_unreadable_and_invalid_base64(self):
-        session=sessions.start(self.workspace,'profile')
+        session=self.call('import_cv', sessions.start(self.workspace,'profile'))
         for upload in [dict(name='../CV.md',data='YQ=='),dict(name='CV.md',data='not base64'),dict(name='CV.md',data=base64.b64encode(b' ').decode())]:
             with self.assertRaises(ValueError):self.call('choose_source',session,upload=upload)
         self.assertEqual(sessions.current(self.workspace)['state'],'source')
@@ -215,18 +216,18 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(search_config.export(self.workspace)['company_exclusions'],['example company'])
 
     def test_cancelling_after_interrupted_save_keeps_referenced_source(self):
-        session=sessions.start(self.workspace,'profile')
+        session=self.call('import_cv', sessions.start(self.workspace,'profile'))
         with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile',side_effect=self.completed_profile):
             self.call('choose_source',session,upload={'name':'Updated.md','data':base64.b64encode(b'Ada Example. Updated CV.').decode()})
             review=self.wait()
         real_write=candidate.atomic_write
         def fail_summary(path,content):
-            if path.name=='README.md':raise OSError('Disk unavailable')
+            if path.name=='profile.md':raise OSError('Disk unavailable')
             return real_write(path,content)
         with patch('jsf_workflow.setup_sessions.candidate.atomic_write',side_effect=fail_summary):
             with self.assertRaises(OSError):self.call('save',review)
         self.call('cancel',review)
-        source=next(s for s in candidate.load(self.workspace)['sources'].values() if s['name']=='Updated.md')
+        source=next(s for s in candidate.sources(self.workspace) if s['name']=='Updated.md')
         self.assertTrue(Path(source['path']).exists())
 
     def test_guided_codex_cancellation_terminates_the_subprocess(self):
@@ -246,50 +247,29 @@ class SetupTests(unittest.TestCase):
         self.assertIsNotNone(processes[0].poll())
         self.assertIn('cancelled',errors[0])
 
-    def test_direct_markdown_edits_are_reviewed_grounded_and_saved_explicitly(self):
-        session=sessions.start(self.workspace,'profile')
-        before=(self.workspace/'candidate/profile.yaml').read_bytes()
-        with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile',side_effect=self.completed_profile):
-            self.call('choose_source',session,source_id=session['existing_sources'][0]['id'])
-            review=self.wait()
-        edited=review['review']+'\n- **Location:** Krakow, Poland\n'
-        def interpret(prompt,cancel=None):
-            data=json.loads(prompt.split('\n\nDATA\n')[-1])
-            turn=data['conversation'][-1]['markdown_edit']
-            self.assertEqual(turn['after'],edited)
-            source=data['sources'][-1]
-            self.assertNotIn('Ada Example',source['pages'][0]['text'])
-            fact=dict(value='Krakow, Poland',correction=True,evidence=[dict(source_id=source['id'],page=1,quote='Krakow, Poland')])
-            return dict(message='Review edited facts.',questions=[],changes_json=json.dumps(dict(schema_version=1,sources=[],records=[dict(id='identity',section='identity',facts={'location':fact})])))
-        with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile',side_effect=interpret):
-            self.call('markdown',review,edited)
-            updated=self.wait()
-        self.assertEqual(updated['state'],'review',updated['message'])
-        self.assertEqual((self.workspace/'candidate/profile.yaml').read_bytes(),before)
-        self.assertIn('Krakow',updated['review'])
-        self.call('save',updated)
+    def test_saved_profile_opens_directly_and_manual_save_needs_no_codex(self):
+        before=(self.workspace/'candidate/profile.md').read_bytes()
+        with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile',side_effect=AssertionError('No AI for editing')):
+            review=sessions.start(self.workspace,'profile')
+            self.assertEqual(review['state'],'review')
+            edited=review['review'].replace('**Full Name:** Ada Example','**Full Name:** Ada Updated')
+            self.assertEqual((self.workspace/'candidate/profile.md').read_bytes(),before)
+            self.call('save',review,text=edited)
         identity=candidate.load(self.workspace)['records'][0]
-        self.assertEqual(identity['facts']['location']['value'],'Krakow, Poland')
-        self.assertTrue(identity['facts']['location']['user_corrected'])
+        self.assertEqual(identity['facts']['full_name']['value'],'Ada Updated')
+        self.assertTrue(identity['facts']['full_name']['user_corrected'])
 
-    def test_markdown_failures_retain_editable_text_and_unchanged_text_is_noop(self):
-        session=sessions.start(self.workspace,'profile')
-        with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile',side_effect=self.completed_profile):
-            self.call('choose_source',session,source_id=session['existing_sources'][0]['id'])
-            review=self.wait()
+    def test_invalid_markdown_preserves_draft_and_active_profile(self):
+        review=sessions.start(self.workspace,'profile')
+        before=(self.workspace/'candidate/profile.md').read_bytes()
         self.assertEqual(self.call('markdown',review,review['review']),review)
-        text=review['review']+'\nMy current residence is Krakow.'
-        with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile',side_effect=ValueError('Connection lost')):
-            self.call('markdown',review,text)
-            failed=self.wait()
-        self.assertEqual(failed['edited_markdown'],text)
-        self.assertEqual(failed['state'],'failed')
-        with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile',side_effect=self.completed_profile):
-            self.call('markdown',failed,text+' Poland.')
-            self.assertEqual(self.wait()['state'],'review')
+        with self.assertRaisesRegex(ValueError,'Profile line'):
+            self.call('save',review,text=review['review']+'\nUnsupported prose')
+        self.assertEqual(sessions.current(self.workspace,'profile'),review)
+        self.assertEqual((self.workspace/'candidate/profile.md').read_bytes(),before)
 
     def test_existing_revision_question_resumes_as_an_editable_review(self):
-        session=sessions.start(self.workspace,'profile')
+        session=self.call('import_cv', sessions.start(self.workspace,'profile'))
         with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile',side_effect=self.completed_profile):
             self.call('choose_source',session,source_id=session['existing_sources'][0]['id'])
             review=self.wait()
@@ -300,6 +280,31 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(resumed['state'],'review')
         self.assertEqual(resumed['review'],review['review'])
         self.assertEqual(self.call('edit',resumed)['state'],'review')
+
+    def test_cancelled_cv_upload_remains_reusable_without_changing_profile(self):
+        before=candidate.load(self.workspace)
+        session=self.call('import_cv',sessions.start(self.workspace,'profile'))
+        with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile',side_effect=self.completed_profile):
+            self.call('choose_source',session,upload=dict(name='Reusable.md',data=base64.b64encode(b'Reusable CV text').decode()))
+            review=self.wait()
+        self.call('cancel',review)
+        source=next(s for s in candidate.sources(self.workspace) if s['name']=='Reusable.md')
+        self.assertTrue(Path(source['path']).exists())
+        self.assertEqual(candidate.load(self.workspace),before)
+        reopened=self.call('import_cv',sessions.start(self.workspace,'profile'))
+        self.assertIn(source['id'],[s['id'] for s in reopened['existing_sources']])
+        self.assertEqual(owner.select_cv(None,source['id'],self.workspace),source)
+
+    def test_legacy_single_draft_is_routed_by_kind_and_resumed_safely(self):
+        session=sessions.start(self.workspace,'profile')
+        original=sessions.path(self.workspace,'profile')
+        original.rename(self.workspace/'workflow/setup-draft.json')
+        config=sessions.start(self.workspace,'config')
+        self.assertEqual(config['kind'],'config')
+        self.assertEqual(sessions.start(self.workspace,'profile')['id'],session['id'])
+        self.call('save',session)
+        self.assertEqual(sessions.current(self.workspace,'config')['id'],config['id'])
+
 
 
 if __name__ == '__main__':

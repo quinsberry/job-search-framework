@@ -329,38 +329,13 @@ def chronology(record):
 
 
 def render(profile):
-    result = summary(profile)
-    lines = ["# Candidate profile", "", f"Status: {result['outcome']}", "", "Generated from candidate/profile.yaml. Update the canonical profile through jsf-profile; this file is a readable view.", ""]
-    disputed = {(c["record_id"], c["field"]) for c in profile["conflicts"]}
-    for section, fields in FIELDS.items():
-        records = [r for r in profile["records"] if r["section"] == section]
-        if not records:
-            continue
-        lines.extend([f"## {section.replace('_', ' ').title()}", ""])
-        if section in {"experience", "education"}:
-            records.sort(key=chronology)
-        for record in records:
-            lines.extend([f"### {escaped(heading(record))}", ""])
-            for field in fields:
-                fact = record["facts"].get(field)
-                if fact is None and field not in EXPECTED[section]:
-                    continue
-                value = fact["value"] if fact else None
-                display = "Unknown" if value is None else "; ".join(escaped(x) for x in value) if isinstance(value, list) else escaped(value)
-                flag = " — needs clarification (conflicting evidence)" if (record["id"], field) in disputed else ""
-                lines.append(f"- **{field.replace('_', ' ').title()}:** {display}{flag}")
-                if fact:
-                    for evidence in fact["evidence"]:
-                        source = profile["sources"][evidence["source_id"]]
-                        lines.append(f"  - Source: {escaped(source['name'])}, page {evidence['page']}: “{escaped(evidence['quote'])}”")
-            lines.append("")
-    if result["conflicts"] or result["issues"]:
-        lines.extend(["## Needs clarification", ""])
-        for conflict in result["conflicts"]:
-            lines.append(f"- {conflict['record_id']}/{conflict['field']}: incoming value {escaped(str(conflict['incoming']['value']))}; existing value retained pending resolution.")
-        lines.extend(f"- {escaped(issue)}" for issue in result["issues"])
-        lines.append("")
-    return "\n".join(lines)
+    from .markdown_profile import render as readable
+    return readable(profile)
+
+
+def edit_plan(existing, text, base_revision):
+    from .markdown_profile import edit_plan as edited
+    return edited(existing, text, base_revision)
 
 
 def yaml_module():
@@ -399,13 +374,17 @@ def read_yaml(path):
 
 
 def load(workspace):
-    path = Path(workspace) / "candidate" / "profile.yaml"
+    directory = Path(workspace) / "candidate"
+    if (directory / 'profile.md').exists():
+        from .markdown_profile import load as readable
+        return readable(workspace)
+    path = directory / 'profile.yaml'
     return validate_profile(read_yaml(path)) if path.exists() else None
 
 
 def export(workspace):
     profile = load(workspace)
-    require(profile is not None, 'workspace has no candidate/profile.yaml')
+    require(profile is not None, 'workspace has no candidate/profile.md (or legacy profile.yaml)')
     return summary(profile)
 
 
@@ -413,6 +392,44 @@ def expertise(workspace):
     """Validated current professional context; no search preferences are inferred."""
     profile = export(workspace)['profile']
     return [record for record in profile['records'] if record['section'] in {'skills', 'experience', 'projects', 'languages'}]
+
+
+def sources(workspace):
+    """Reusable source snapshots, including imports not yet applied to the profile."""
+    profile = load(workspace)
+    registry = deepcopy((profile or {}).get('sources', {}))
+    for file in sorted((Path(workspace) / 'candidate' / 'sources').glob('*.json')):
+        source = read_json(file)
+        validate_source(source)
+        registry.setdefault(source['id'], source)
+    return list(registry.values())
+
+
+def import_source(workspace, file):
+    """Keep an owned original and extracted snapshot reusable after draft cancellation."""
+    source = extract(file)['source']
+    require(any(page['text'].strip() for page in source['pages']), 'No readable CV text found; OCR is not available')
+    directory = Path(workspace) / 'candidate' / 'sources'
+    directory.mkdir(parents=True, exist_ok=True)
+    target = directory / (source['id'] + '.' + source['format'])
+    raw = Path(file).read_bytes()
+    if target.exists():
+        require(target.read_bytes() == raw, 'Stored CV content changed; restore the imported source before retrying')
+    if not target.exists():
+        fd, temporary = tempfile.mkstemp(dir=directory)
+        try:
+            with os.fdopen(fd, 'wb') as output:
+                output.write(raw)
+            os.replace(temporary, target)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+    source['path'] = str(target.resolve())
+    snapshot = directory / (source['id'] + '.json')
+    if snapshot.exists():
+        return read_json(snapshot)
+    atomic_write(snapshot, encoded(source))
+    return source
 
 
 def atomic_write(path, content):
@@ -450,7 +467,7 @@ def ensure_preserved(current, proposed):
 
 
 def protect_sources(workspace, sources):
-    targets = {(Path(workspace) / "candidate" / name).resolve() for name in ("profile.yaml", "profile.json", "README.md")}
+    targets = {(Path(workspace) / "candidate" / name).resolve() for name in ("profile.md", "profile.yaml", "profile.json", "README.md")}
     targets.add((Path(workspace) / "search-config.yml").resolve())
     for source in sources:
         if source.get("path"):
@@ -461,14 +478,8 @@ def persist(workspace, profile, canonical=True):
     result = summary(profile)
     require(result["outcome"] != "needs_clarification", "no supported facts extracted; resolve the source before saving a profile")
     protect_sources(workspace, profile["sources"].values())
-    markdown = render(profile)
-    yaml_text = yaml_module().safe_dump(profile, allow_unicode=True, sort_keys=False) if canonical else None
-    directory = Path(workspace) / "candidate"
-    if canonical and load(workspace) != profile:
-        atomic_write(directory / "profile.yaml", yaml_text)
-    atomic_write(directory / "README.md", markdown)
-    # Remove the formerly generated cache only on an explicit write operation.
-    (directory / "profile.json").unlink(missing_ok=True)
+    from .markdown_profile import persist as readable
+    readable(workspace, profile)
     return result
 
 
@@ -476,7 +487,7 @@ def apply_plan(workspace, proposal):
     require(isinstance(proposal, dict) and "base_revision" in proposal and "profile" in proposal, "apply requires a plan result")
     current = load(workspace)
     actual_revision = digest(current) if current is not None else None
-    require(actual_revision == proposal["base_revision"], "profile changed since planning; re-plan against the current YAML")
+    require(actual_revision == proposal["base_revision"], "profile changed since planning; re-plan against the current profile")
     proposed = validate_profile(proposal["profile"])
     require(proposal.get("revision") == digest(proposed), "plan contents changed; regenerate the plan instead of editing its result")
     ensure_preserved(current, proposed)
@@ -526,8 +537,8 @@ def main():
                 result = export(args.workspace)
         else:
             profile = load(args.workspace)
-            require(profile is not None, "workspace has no candidate/profile.yaml")
-            result = summary(profile) if args.command == "export" else persist(args.workspace, profile, canonical=False)
+            require(profile is not None, "workspace has no candidate/profile.md (or legacy profile.yaml)")
+            result = summary(profile)
         sys.stdout.write(encoded(result))
         return 0
     except (ValidationError, OSError, ValueError, TypeError, RecursionError) as exc:

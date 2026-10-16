@@ -1,6 +1,6 @@
 # Editable search configuration
 
-`jsf-profile` owns `<workspace>/search-config.yml`. It has `schema_version: 1`, `profile_ref: candidate/profile.yaml`, and a `criteria` object using the existing [search contract](../../jsf-search/references/contracts.md). The profile reference holds skills/expertise, experience, projects and languages; the config does not copy that history. Both files are read afresh when exporting.
+`jsf-profile` owns `<workspace>/search-config.yml`. It has `schema_version: 1`, `profile_ref: candidate/profile.md`, and a `criteria` object using the existing [search contract](../../jsf-search/references/contracts.md). The profile reference holds skills/expertise, experience, projects and languages; the config does not copy that history. Both files are read afresh when exporting.
 
 The maintained [template](search-template.yml) includes every supported field, fill instructions and inactive examples. `__FILL_ME__` means unfinished. Explicit `null` means no restriction where search supports it; `[]` means no technical conditions/preferences/exclusions in supported lists. Do not use examples as actual user choices. Current residence can be populated from an unambiguous CV statement/user input; targeted roles, desired levels, compensation and work arrangements cannot be inferred from past work.
 

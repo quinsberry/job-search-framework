@@ -38,19 +38,18 @@ GROUP_TITLES = ['Roles and work arrangement', 'Location and eligibility', 'Compe
 
 def profile_context(workspace):
     profile = candidate.load(workspace)
-    sources = [{'id': key, 'name': source['name']} for key, source in (profile or {}).get('sources', {}).items() if source['kind'] == 'cv']
+    sources = [{'id': source['id'], 'name': source['name']} for source in candidate.sources(workspace) if source['kind'] == 'cv']
     return {'profile': profile, 'cv_sources': sources}
 
 
-def select_cv(profile, source_id):
-    sources = (profile or {}).get('sources', {})
+def select_cv(profile, source_id, workspace=None):
+    sources = {s['id']: s for s in candidate.sources(workspace)} if workspace is not None else (profile or {}).get('sources', {})
     candidate.require(isinstance(source_id, str) and source_id in sources and sources[source_id]['kind'] == 'cv', 'Choose an imported CV or upload a new one')
     return deepcopy(sources[source_id])
 
 
 def profile_review(proposal):
-    return '\n'.join(line for line in candidate.render(proposal['profile']).splitlines()
-                     if not line.startswith('Generated from candidate/profile.yaml.'))
+    return candidate.render(proposal['profile'])
 
 
 def save_profile(workspace, proposal):
@@ -130,6 +129,7 @@ def config_plan(original, answers):
     yaml = YAML()
     yaml.preserve_quotes = True
     document = yaml.load(original or template())
+    document['profile_ref'] = 'candidate/profile.md'
     for path, value in answers.items():
         candidate.require(path in {row[0] for group in GROUPS for row in group}, 'Unsupported search preference')
         parts = path.split('.')

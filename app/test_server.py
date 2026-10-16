@@ -136,10 +136,10 @@ class HTTPTests(unittest.TestCase):
 
     def test_readiness_allows_partial_profile_and_reads_current_config(self):
         import yaml
-        path = self.fixture.workspace / 'candidate/profile.yaml'
-        profile = yaml.safe_load(path.read_text())
+        from jsf_profile import profile as candidate
+        profile = candidate.load(self.fixture.workspace)
         profile['issues'].append('Some experience details are unknown')
-        path.write_text(yaml.safe_dump(profile))
+        candidate.persist(self.fixture.workspace, profile)
         result = self.readiness()
         self.assertTrue(result['ready'])
         self.assertEqual(next(c for c in result['checks'] if c['key'] == 'profile')['state'], 'warning')
@@ -155,10 +155,11 @@ class HTTPTests(unittest.TestCase):
 
     def test_readiness_missing_workspace_and_profile_are_explained(self):
         checks = self.readiness('')['checks']
-        self.assertEqual([c['state'] for c in checks[:3]], ['pending', 'pending', 'pending'])
+        self.assertEqual([c['key'] for c in checks], ['workspace','codex','profile','config'])
+        self.assertTrue(all(c['state']=='pending' for c in checks if c['key']!='codex'))
         self.assertEqual(self.readiness(self.workspace + '/absent')['checks'][0]['state'], 'blocked')
-        (self.fixture.workspace / 'candidate/profile.yaml').unlink()
-        check = self.readiness()['checks'][1]
+        (self.fixture.workspace / 'candidate/profile.md').unlink()
+        check = next(c for c in self.readiness()['checks'] if c['key']=='profile')
         self.assertEqual(check['state'], 'blocked')
         self.assertIn('missing', check['message'])
         self.assertIn('CV', check['request'])
@@ -170,7 +171,7 @@ class HTTPTests(unittest.TestCase):
             status, result = self.request('/api/readiness?path=' + self.workspace)
         self.assertEqual(status, 200)
         self.assertFalse(result['ready'])
-        self.assertEqual(result['checks'][-1]['message'], 'Sign in first')
+        self.assertEqual(next(c for c in result['checks'] if c['key']=='codex')['message'], 'Sign in first')
 
     def test_guided_preferences_require_token_and_keep_drafts_separate(self):
         payload = {'workspace': self.workspace, 'kind': 'config'}
@@ -205,6 +206,31 @@ class HTTPTests(unittest.TestCase):
         self.assertIn('1 missing detail', check['message'])
         self.assertIn('do not block searching', check['message'])
         self.assertEqual(check['details'], ['React: proficiency level not specified'])
+
+    def test_workspace_picker_requires_local_authorization_and_handles_cancel(self):
+        with patch('server.folders.select',return_value=self.workspace) as picker:
+            self.assertEqual(self.request('/api/select-workspace',{},token=False)[0],403)
+            self.assertEqual(self.request('/api/select-workspace',{},origin='https://foreign.example')[0],403)
+            picker.assert_not_called()
+            self.assertEqual(self.request('/api/select-workspace',{}),(200,{'workspace':self.workspace}))
+        with patch('server.folders.select',return_value=None):
+            self.assertEqual(self.request('/api/select-workspace',{}),(200,{'workspace':None}))
+        with patch('server.folders.select',side_effect=ValueError('Picker unavailable')):
+            self.assertEqual(self.request('/api/select-workspace',{})[0],400)
+
+    def test_saved_profile_edit_and_independent_preferences_without_codex(self):
+        with patch('server.codex_bridge.guided_profile',side_effect=AssertionError('No AI for manual edits')):
+            _,profile=self.request('/api/setup/start',{'workspace':self.workspace,'kind':'profile'})
+            session=profile['session'];self.assertEqual(session['state'],'review')
+            _,config=self.request('/api/setup/start',{'workspace':self.workspace,'kind':'config'})
+            self.assertEqual(config['session']['state'],'questions')
+            _,resumed=self.request('/api/setup?path='+self.workspace+'&kind=profile')
+            self.assertEqual(resumed['session']['id'],session['id'])
+            edited=session['review'].replace('**Full Name:** Ada Example','**Full Name:** Ada Updated')
+            status,saved=self.request('/api/setup/save',{'workspace':self.workspace,'id':session['id'],'revision':session['revision'],'text':edited})
+            self.assertEqual(status,200,saved)
+            self.assertEqual(saved['session']['state'],'complete')
+
 
 
 if __name__ == '__main__':

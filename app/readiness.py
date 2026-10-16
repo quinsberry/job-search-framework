@@ -25,7 +25,7 @@ def inspect(value):
             outcome = summary['outcome'] if summary else 'missing'
             state = {'ready': 'ready', 'partial': 'warning'}.get(outcome, 'blocked')
             message = {'ready': 'Profile validated.', 'partial': 'Usable for search. Some facts are unknown or disputed.',
-                       'missing': 'candidate/profile.yaml is missing.', 'needs_clarification': 'Profile needs supported CV facts.'}[outcome]
+                       'missing': 'candidate/profile.md is missing.', 'needs_clarification': 'Profile needs supported professional facts.'}[outcome]
             details = []
             if outcome == 'partial':
                 records = {r['id']: r for r in profile['records']}
@@ -58,4 +58,9 @@ def inspect(value):
     connection = codex_bridge.status()
     add('codex', 'Codex connected', 'ready' if connection['ready'] else 'blocked', connection['message'],
         '' if connection['ready'] else 'Help me connect the local job-search app to the Codex CLI using my ChatGPT subscription. Check CLI installation and login; keep credentials in the CLI account store.')
+    order = ['workspace', 'codex', 'profile', 'config']
+    checks.sort(key=lambda check: order.index(check['key']))
+    for check in checks:
+        check['label'] = {'workspace': 'Workspace opened', 'codex': 'Codex connected',
+                          'profile': 'Candidate profile', 'config': 'Search preferences'}[check['key']]
     return {'checks': checks, 'ready': all(c['state'] in {'ready', 'warning'} for c in checks)}

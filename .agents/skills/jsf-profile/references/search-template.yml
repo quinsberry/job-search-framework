@@ -1,7 +1,7 @@
 # Edit this file to choose your next job. CV expertise lives in the profile below.
 # __FILL_ME__ means unfinished; examples in comments are never active values.
 schema_version: 1
-profile_ref: candidate/profile.yaml
+profile_ref: candidate/profile.md
 criteria:
   # Fill this field. Example: [linkedin]. Unfilled fallback: [linkedin].
   sources: __FILL_ME__
