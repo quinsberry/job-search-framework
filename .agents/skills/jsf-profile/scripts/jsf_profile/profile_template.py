@@ -25,6 +25,10 @@ def definition():
         elif line.startswith('### '):
             p.require(line == '### {{title}} <!-- id: {{id}} -->' and 'record_heading' not in section, 'Invalid template record pattern')
             section['record_heading'] = line
+        elif line.startswith('<!-- Layout: '):
+            layout = line[len('<!-- Layout: '):-len(' -->')]
+            p.require(line.endswith(' -->') and layout == section['id'] and layout in {'identity', 'skills', 'languages'}, 'Invalid compact template layout')
+            section['layout'] = layout
         elif line.startswith('<!-- Example: '):
             p.require(example is None and line.endswith(' -->'), 'Invalid template example')
             example = json.loads(line[len('<!-- Example: '):-len(' -->')])
@@ -39,7 +43,7 @@ def definition():
     p.require(header == ['# Candidate profile', '{{evidence_marker}}', '{{instructions}}'], 'Invalid template header')
     p.require([s['id'] for s in sections] == list(p.FIELDS), 'Template must contain all profile sections in the agreed order')
     for section in sections:
-        p.require('record_heading' in section and {f['id'] for f in section['fields']} == set(p.FIELDS[section['id']]), 'Template fields differ from the profile contract')
+        p.require(('layout' in section) != ('record_heading' in section) and {f['id'] for f in section['fields']} == set(p.FIELDS[section['id']]), 'Template fields differ from the profile contract')
     p.require(example is None, 'Template has an unused example')
     return dict(header=header, sections=sections)
 
@@ -49,5 +53,11 @@ def help_document():
     sections = [{key: section[key] for key in ('id', 'label', 'fields')} for section in definition()['sections']]
     for section in sections:
         for field in section['fields']:
-            field['markdown_example'] = '\n'.join(field_lines(field['label'], field['example']))
+            if section['id'] == 'skills':
+                field['markdown_example'] = '- ' + field['example']
+            elif section['id'] == 'languages':
+                name = next(f['example'] for f in section['fields'] if f['id'] == 'name')
+                field['markdown_example'] = '- ' + name + (' — ' + field['example'] if field['id'] == 'level' else '')
+            else:
+                field['markdown_example'] = '\n'.join(field_lines(field['label'], field['example']))
     return dict(schema_version=1, sections=sections)

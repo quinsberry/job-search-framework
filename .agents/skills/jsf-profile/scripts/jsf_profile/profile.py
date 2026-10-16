@@ -20,7 +20,7 @@ class ValidationError(ValueError):
 FIELDS = {
     "identity": ["full_name", "location", "email", "phone", "links", "summary"],
     "experience": ["company", "role", "start_date", "end_date", "location", "achievements", "technologies"],
-    "skills": ["name", "level", "context"],
+    "skills": ["name"],
     "projects": ["name", "role", "description", "technologies", "outcomes", "url"],
     "education": ["institution", "qualification", "field", "start_date", "end_date"],
     "languages": ["name", "level"],
@@ -28,8 +28,8 @@ FIELDS = {
 }
 EXPECTED = {
     "identity": ["full_name"], "experience": ["company", "role", "start_date", "end_date"],
-    "skills": ["name", "level"], "projects": ["name", "description"],
-    "education": ["institution", "qualification"], "languages": ["name", "level"],
+    "skills": ["name"], "projects": ["name", "description"],
+    "education": ["institution", "qualification"], "languages": ["name"],
     "certifications": ["name", "issuer"],
 }
 LIST_FIELDS = {'links', 'achievements', 'technologies', 'outcomes'}
@@ -174,7 +174,7 @@ def validate_fact(fact, sources, patch=False):
 
 def validate_records(records, sources, patch=False):
     require(isinstance(records, list), "records must be a list")
-    identifiers, identities = set(), 0
+    identifiers, identities, names = set(), 0, set()
     for record in records:
         require(isinstance(record, dict) and set(record) == {"id", "section", "facts"}, "record requires id, section and facts")
         require(isinstance(record["id"], str) and re.fullmatch(r"[a-z0-9][a-z0-9-]*", record["id"]) and record["id"] not in identifiers, "record IDs must be unique stable lowercase slugs")
@@ -187,6 +187,11 @@ def validate_records(records, sources, patch=False):
             validate_fact(fact, sources, patch)
             if patch:
                 validate_value_shape(field, fact['value'])
+        if record['section'] in {'skills', 'languages'} and (not patch or 'name' in record['facts']):
+            name = string(record['facts'].get('name', {}).get('value'), 'Skill/language name')
+            key = (record['section'], normalized(name))
+            require(key not in names, 'Duplicate skill/language name; keep one entry for each name')
+            names.add(key)
 
 
 def validate_profile(profile):
@@ -397,7 +402,23 @@ def load(workspace):
         from .markdown_profile import load as readable
         return readable(workspace)
     path = directory / 'profile.yaml'
-    return validate_profile(read_yaml(path)) if path.exists() else None
+    return migrate_profile(read_yaml(path)) if path.exists() else None
+
+
+def migrate_profile(profile):
+    """One-time input conversion; retired fields never enter the active schema."""
+    profile = deepcopy(profile)
+    require(isinstance(profile, dict) and isinstance(profile.get('records'), list), 'invalid legacy profile')
+    for record in profile.get('records', []):
+        require(isinstance(record, dict) and {'id', 'section', 'facts'} <= set(record) and isinstance(record['facts'], dict), 'invalid legacy record')
+        if record.get('section') == 'skills':
+            record['facts'] = {key: value for key, value in record['facts'].items() if key not in {'level', 'context'}}
+    profile['records'] = [record for record in profile['records'] if record['section'] not in {'skills', 'languages'} or record['facts'].get('name', {}).get('value') is not None]
+    require(isinstance(profile.get('conflicts'), list) and all(isinstance(c, dict) and {'record_id', 'field'} <= set(c) for c in profile['conflicts']), 'invalid legacy conflicts')
+    profile['conflicts'] = [c for c in profile['conflicts'] if not (
+        c['record_id'] not in {r['id'] for r in profile['records']} or
+        c['field'] in {'level', 'context'} and any(r['id'] == c['record_id'] and r['section'] == 'skills' for r in profile['records']))]
+    return validate_profile(profile)
 
 
 def export(workspace):
@@ -472,6 +493,10 @@ def ensure_preserved(current, proposed):
     records = {r["id"]: r for r in proposed["records"]}
     for old in current["records"]:
         new = records.get(old["id"])
+        if new is None and old['section'] in {'skills', 'languages'}:
+            statement = f"Remove {old['section']}/{old['id']}."
+            require(any(source['kind'] == 'user' and any(statement in page['text'] for page in source['pages']) for source in proposed['sources'].values()), 'removing a list entry requires an explicit user edit')
+            continue
         require(new is not None and new["section"] == old["section"], "an update cannot remove existing records")
         for key, fact in old["facts"].items():
             target = new["facts"].get(key)

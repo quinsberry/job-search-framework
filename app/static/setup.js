@@ -117,7 +117,7 @@ function profileFieldHelp() {
     busy=true;body.replaceChildren(node('p','Loading field examples…'));
     try {
       profileTemplateHelp=profileTemplateHelp||await api('/api/profile-template');
-      body.replaceChildren(node('p','Examples are guidance, not your profile facts. Use Unknown when information is missing. Lists use indented bullets; keep dates at the precision stated in your CV.'));
+      body.replaceChildren(node('p','Examples are guidance, not your profile facts. Use Unknown when information is missing. Skills and languages use simple bullets; other lists use indented bullets. Keep dates at the precision stated in your CV.'));
       for(const section of profileTemplateHelp.sections) {
         const group=node('details');group.append(node('summary',section.label));
         for(const field of section.fields)group.append(node('strong',field.label+' · '+(field.type==='list'?'list':'text')),node('pre',field.markdown_example));
@@ -208,7 +208,7 @@ function renderGuided() {
       if(draft&&draft.revision!==guided.revision)markdownEdits.delete(guided.id);
       const updated=()=>{const changed=editor.value!==guided.review;$('guided-save').textContent='Save profile';if(changed)markdownEdits.set(guided.id,{revision:guided.revision,text:editor.value});else markdownEdits.delete(guided.id);};
       editor.addEventListener('input',updated);updated();
-      $('guided-fields').append(node('label','Edit your profile draft directly'),editor,node('p','Save validates and applies your edits without AI. Keep the section headings, record IDs and field labels. Use Unknown to clear a fact.','question-help'));
+      $('guided-fields').append(node('label','Edit your profile draft directly'),editor,node('p','Save validates and applies your edits without AI. Keep section headings and field labels, plus IDs on repeated records. Skills and languages use simple bullets. Use Unknown to clear a fact.','question-help'));
       $('guided-fields').append(profileFieldHelp());
       $('guided-save').hidden=false;
     }else $('guided-fields').append(node('pre',guided.review,'guided-review'));

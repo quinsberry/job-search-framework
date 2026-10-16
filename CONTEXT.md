@@ -13,7 +13,7 @@ The sole current profile is readable `candidate/profile.md`; separate supporting
 _Avoid_: tailored CV, search criteria
 
 **Profile template**:
-The standard sections, fields and value shapes used to represent a candidate's professional facts consistently. A CV supplies facts for this structure; its own layout does not define the profile. Instructional examples are guidance, never claims about the candidate.
+The standard sections, fields and value shapes used to represent a candidate's professional facts consistently. A CV supplies facts for this structure; its own layout does not define the profile. Instructional examples are guidance, never claims about the candidate. Identity is one field block; skills are names; languages have optional stated proficiency. Unknown optional fields are omitted from generated profiles but remain documented in template/help.
 
 **Search criteria**:
 The job seeker's requirements and preferences used to discover and assess vacancies, including role, compensation and location eligibility.

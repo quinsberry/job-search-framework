@@ -71,10 +71,10 @@ Supported sections and fields:
 | --- | --- | --- |
 | identity | full_name, location, email, phone, links, summary | full_name |
 | experience | company, role, start_date, end_date, location, achievements, technologies | company, role, start_date, end_date |
-| skills | name, level, context | name, level |
+| skills | name | name |
 | projects | name, role, description, technologies, outcomes, url | name, description |
 | education | institution, qualification, field, start_date, end_date | institution, qualification |
-| languages | name, level | name, level |
+| languages | name, level | name |
 | certifications | name, issuer, date, expiry_date | name, issuer |
 
 Records use unique stable lowercase slugs. There is at most one identity record. Reuse existing IDs when importing the same real-world item; IDs never need changing because a factual claim changes. Automatic fuzzy matching of employment/project identities is not attempted. The interpreting skill resolves correspondence or marks it ambiguous.
@@ -93,21 +93,18 @@ Different scalar values create conflicts. The original accepted value remains, w
 
 ## Canonical profile and execution result
 
-[profile-template.md](profile-template.md) defines the rendered layout and examples. Python validates its section/field coverage and example types against the owner schema before rendering. All seven headings are shown in order, and every field is shown within each actual record. Missing values are Unknown; unsupported sections have no invented placeholder records. Example comments are removed from rendered profiles.
+[profile-template.md](profile-template.md) defines the rendered layout and examples. Python validates its section/field coverage and example types against the owner schema before rendering. All seven headings are shown in order. Identity is one field block; skills are name bullets and languages are name bullets with optional ` — C1` proficiency. Other sections retain repeated records. Unknown optional fields are omitted; missing expected values are Unknown; unsupported sections have no invented placeholder records. Example comments are removed from rendered profiles.
 
-`candidate/profile.md` is the only authoritative professional profile. It contains readable facts in fixed sections, stable record IDs and supported field labels. It has one `<!-- jsf-profile:1 evidence:<digest> -->` marker pointing to immutable `candidate/evidence/<digest>.json`. Keep that marker and record IDs. Supporting JSON contains source snapshots, evidence, correction flags, value fingerprints, unresolved issues and historical conflicts; it contains no second set of current fact values.
+`candidate/profile.md` is the only authoritative professional profile. It contains readable facts in fixed sections, stable record IDs and supported field labels. It has one `<!-- jsf-profile:2 evidence:<digest> -->` marker pointing to immutable `candidate/evidence/<digest>.json`. Keep that marker and the IDs on repeated records. Compact lists have no visible IDs; unchanged names retain their evidence identities. Supporting JSON contains source snapshots, evidence, correction flags, value fingerprints, unresolved issues and historical conflicts; it contains no second set of current fact values.
 
 ```markdown
 # Candidate profile
 
-<!-- jsf-profile:1 evidence:<digest supplied by the owner> -->
+<!-- jsf-profile:2 evidence:<digest supplied by the owner> -->
 
 ## Identity
 
-### Alex Example <!-- id: identity -->
-
 - **Full Name:** Alex Example
-- **Location:** Unknown
 
 ## Experience
 
@@ -120,7 +117,7 @@ Different scalar values create conflicts. The original accepted value remains, w
   - TypeScript
 ```
 
-Section names and field labels correspond to the contract above, using title case and spaces. Record headings can have a readable title with `<!-- id: stable-slug -->`, or just `### stable-slug`. Heading titles are display text; fields hold facts. Lists use indented bullets. Scalars occupy one line; `<br>` represents a newline, while literal markup characters use HTML entities. `Unknown` clears a fact; use `&#85;nknown` for the literal string “Unknown”. Unsupported structures, duplicate IDs/fields and empty lists are errors rather than silently dropped text. Removing a previously accepted field/record clears its claims to null while retaining history.
+Section names and field labels correspond to the contract above, using title case and spaces. Record headings can have a readable title with `<!-- id: stable-slug -->`, or just `### stable-slug`. Heading titles are display text; fields hold facts. Lists use indented bullets. Scalars occupy one line; `<br>` represents a newline, while literal markup characters use HTML entities. `Unknown` clears a fact; use `&#85;nknown` for the literal string “Unknown”. Unsupported structures, duplicate IDs/fields and empty lists are errors rather than silently dropped text. Removing a previously accepted field/repeated record clears its claims to null. Removing a skill/language bullet removes that record and records the explicit user edit. Duplicate skill/language names are errors. Skills support names only; usage belongs in experience/projects. Language levels are optional and never inferred.
 
 `profile.edit_plan(existing, text, base_revision)` parses manual Markdown changes deterministically. Only changed claims receive explicit user-statement evidence and `user_corrected`; unchanged facts retain their original evidence. It returns the normal plan result and writes nothing. Direct external Markdown edits are interpreted the same way on export, without writes. Both paths need no Codex. The UI Save validates and applies through this owner; failed validation leaves saved files unchanged.
 
@@ -140,8 +137,8 @@ Section names and field labels correspond to the contract above, using title cas
 
 `apply` reads the current profile, verifies base/proposed revisions and preservation, writes immutable supporting evidence, then atomically replaces `profile.md`. Failed publication leaves the previous profile authoritative; retry can finish interrupted cleanup. Stale plans fail, and new profiles with no supported facts are rejected.
 
-Legacy `candidate/profile.yaml` remains readable only when `profile.md` is absent. Opening/exporting never migrates it. The first successful profile save backs up legacy YAML, generated README and JSON cache under `candidate/backups/<content-digest>/`, publishes Markdown, then removes old active artifacts. Facts, unknowns, sources and conflicts are retained. Once Markdown exists it is authoritative, even if cleanup was interrupted. Backups are historical and never loaded as the current profile.
+Legacy `candidate/profile.yaml` remains readable only when `profile.md` is absent. Opening/exporting never migrates it. The first successful profile save backs up legacy YAML, generated README and JSON cache under `candidate/backups/<content-digest>/`, publishes Markdown, then removes old active artifacts. Supported facts, sources and unresolved conflicts are retained. Old skill level/context fields are retired from active data and exports; their original contents remain in the backup. Old version-1 Markdown is also read-only converted on load, then backed up with its evidence before the next explicit save publishes version 2. No ongoing parallel legacy structure is maintained. Once Markdown exists it is authoritative, even if cleanup was interrupted. Backups are historical and never loaded as the current profile.
 
 `export` emits the versioned result without writes or a saved JSON cache. The original `render` CLI is retained as a read-only validation/summary alias; Python `profile.render(profile)` supplies editable Markdown. Rendering/parsing use no clock or AI. Run one writer per workspace. Original CV files and unrelated workspace files are never modified.
 
-`profile.py template` and `profile.template_help()` return read-only `{schema_version: 1, sections: [...]}` with section IDs/labels and field IDs/labels/types/examples/Markdown examples. They need no workspace, CV, sibling skill or AI. The local profile editor exposes this owner help under Field examples and formatting. Existing legacy fact shapes remain readable and round-trip without invented corrections; new imports and changed manual values must use the agreed scalar/list types. No read operation rewrites an older profile; its next explicit save renders the current template.
+`profile.py template` and `profile.template_help()` return read-only `{schema_version: 1, sections: [...]}` with section IDs/labels and field IDs/labels/types/examples/Markdown examples. They need no workspace, CV, sibling skill or AI. The local profile editor exposes this owner help under Field examples and formatting. Existing supported legacy fact shapes remain readable without invented corrections; new imports and changed manual values must use the agreed scalar/list types. No read operation rewrites an older profile; its next explicit save renders the current template.

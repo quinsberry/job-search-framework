@@ -192,7 +192,7 @@ class HTTPTests(unittest.TestCase):
         self.assertEqual((self.fixture.workspace / 'search-config.yml').read_bytes(), before)
         self.assertEqual(self.request('/setup.js')[0], 200)
 
-    def test_profile_warning_explains_missing_proficiency_without_blocking_search(self):
+    def test_skill_list_does_not_require_proficiency_or_warn(self):
         from jsf_workflow.modules import candidate
         profile = candidate.load(self.fixture.workspace)
         source = next(iter(profile['sources'].values()))
@@ -203,10 +203,8 @@ class HTTPTests(unittest.TestCase):
         result = self.readiness()
         check = next(c for c in result['checks'] if c['key'] == 'profile')
         self.assertTrue(result['ready'])
-        self.assertEqual(check['state'], 'warning')
-        self.assertIn('1 missing detail', check['message'])
-        self.assertIn('do not block searching', check['message'])
-        self.assertEqual(check['details'], ['React: proficiency level not specified'])
+        self.assertEqual(check['state'], 'ready')
+        self.assertFalse(check.get('details'))
 
     def test_workspace_picker_requires_local_authorization_and_handles_cancel(self):
         with patch('server.folders.select',return_value=self.workspace) as picker:

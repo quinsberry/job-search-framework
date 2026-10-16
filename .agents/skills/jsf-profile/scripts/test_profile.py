@@ -109,13 +109,13 @@ class ProfileTests(unittest.TestCase):
         self.assertEqual(before, self.initial)
         self.assertFalse(self.workspace.exists())
 
-    def test_complete_profile_ready_and_missing_level_partial(self):
+    def test_complete_profile_and_language_without_level_are_ready(self):
         base = plan(None, self.initial)
         self.assertEqual(base["outcome"], "ready")
         partial = plan(base["profile"], change(self.source, [record("english", "languages", name=observation(self.source, "English", "English"))]))
-        self.assertEqual(partial["outcome"], "partial")
-        self.assertIn({"record_id": "english", "field": "level"}, partial["unknowns"])
-        self.assertIn("Level:** Unknown", render(partial["profile"]))
+        self.assertEqual(partial["outcome"], "ready")
+        self.assertNotIn({"record_id": "english", "field": "level"}, partial["unknowns"])
+        self.assertIn("- English", render(partial["profile"]))
         apply_plan(self.workspace, plan(None, change(self.source, [record("english", "languages", name=observation(self.source, "English", "English"))])))
         self.assertTrue((self.workspace / "candidate" / "profile.md").exists())
 
@@ -367,7 +367,7 @@ class ProfileTests(unittest.TestCase):
     def test_markdown_round_trip_multiline_lists_special_text_and_unknown_literal(self):
         from jsf_profile import profile as owner
         existing=plan(None,self.initial)['profile']
-        text=render(existing).replace('- **Full Name:** Ada Example','- **Full Name:** &#85;nknown').replace('- **Summary:** Unknown','- **Summary:** A &amp; B &lt;br&gt;<br>Next line')
+        text=render(existing).replace('- **Full Name:** Ada Example','- **Full Name:** &#85;nknown').replace('- **Full Name:** &#85;nknown','- **Full Name:** &#85;nknown\n- **Summary:** A &amp; B &lt;br&gt;<br>Next line')
         proposal=owner.edit_plan(existing,text,digest(existing))
         owner.persist(self.workspace,proposal['profile'])
         saved=load(self.workspace)
@@ -393,7 +393,9 @@ class ProfileTests(unittest.TestCase):
         self.assertEqual([line[3:].lower() for line in text.splitlines() if line.startswith('## ')],list(owner.FIELDS))
         records=parse(text)
         self.assertEqual({r['id'] for r in records},{r['id'] for r in original['records']})
-        for record in records:self.assertEqual(set(record['facts']),set(owner.FIELDS[record['section']]))
+        for record in records:
+            self.assertTrue(set(owner.EXPECTED[record['section']])<=set(record['facts']))
+            self.assertTrue(set(record['facts'])<=set(owner.FIELDS[record['section']]))
         self.assertNotIn('<!-- Example:',text)
         self.assertNotIn('Alex Example',text)
         self.assertNotIn('Example University',text)
@@ -409,6 +411,7 @@ class ProfileTests(unittest.TestCase):
         reordered=source.replace(first,'SLOT').replace(second,first).replace('SLOT',second)
         path=self.root/'template.md';path.write_text(reordered)
         with patch.object(template,'PATH',path):
+            original['records'][0]['facts']['location']={'value':'Warsaw, Poland','evidence':original['records'][0]['facts']['full_name']['evidence']}
             text=render(original)
             self.assertLess(text.index('**Location:**'),text.index('**Full Name:**'))
         for invalid in [source.replace(first,''),source.replace('<!-- Example: ["https://example.com", "https://github.com/example"] -->','<!-- Example: "https://example.com" -->')]:
@@ -424,7 +427,7 @@ class ProfileTests(unittest.TestCase):
         proposal=owner.edit_plan(original,render(original),digest(original))
         self.assertEqual(proposal['profile'],original)
         self.assertEqual(proposal['unknowns'],[])
-        self.assertIn('**Phone:** Unknown',render(original))
+        self.assertNotIn('**Phone:**',render(original))
 
     def test_new_fact_shapes_and_manual_list_edits_are_validated(self):
         from jsf_profile import profile as owner
@@ -432,11 +435,11 @@ class ProfileTests(unittest.TestCase):
         for field,value in [('links','https://example.com'),('full_name',['Ada Example'])]:
             patch=change(self.source,[record('identity','identity',**{field:observation(self.source,value,'Ada Example')})])
             with self.assertRaises(ValidationError):plan(original,patch)
-        text=render(original).replace('- **Links:** Unknown','- **Links:**\n  - https://example.com\n  - https://github.com/example')
+        text=render(original).replace('- **Full Name:** Ada Example','- **Full Name:** Ada Example\n- **Links:**\n  - https://example.com\n  - https://github.com/example')
         edited=owner.edit_plan(original,text,digest(original))['profile']
         self.assertEqual(edited['records'][0]['facts']['links']['value'],['https://example.com','https://github.com/example'])
         self.assertTrue(edited['records'][0]['facts']['links']['user_corrected'])
-        with self.assertRaises(ValidationError):owner.edit_plan(original,render(original).replace('- **Links:** Unknown','- **Links:** https://example.com'),digest(original))
+        with self.assertRaises(ValidationError):owner.edit_plan(original,render(original).replace('- **Full Name:** Ada Example','- **Full Name:** Ada Example\n- **Links:** https://example.com'),digest(original))
 
     def test_legacy_fact_shapes_round_trip_without_reinterpreting_evidence(self):
         from jsf_profile import profile as owner
@@ -458,8 +461,122 @@ class ProfileTests(unittest.TestCase):
         for section in help['sections']:
             self.assertEqual({f['id'] for f in section['fields']},set(owner.FIELDS[section['id']]))
             for field in section['fields']:
-                self.assertTrue(field['example']);self.assertIn(field['label'],field['markdown_example'])
+                self.assertTrue(field['example']);self.assertTrue(field['markdown_example'].startswith('- '))
                 self.assertEqual(field['type']=='list',isinstance(field['example'],list))
+
+    def compact_profile(self):
+        source = self.source_from('compact.md', 'React TypeScript English C1 Polish')
+        return plan(plan(None, self.initial)['profile'], change(source, [
+            record('react', 'skills', name=observation(source, 'React', 'React')),
+            record('typescript', 'skills', name=observation(source, 'TypeScript', 'TypeScript')),
+            record('english', 'languages', name=observation(source, 'English', 'English'), level=observation(source, 'C1', 'C1')),
+            record('polish', 'languages', name=observation(source, 'Polish', 'Polish'))]))['profile']
+
+    def test_compact_lists_round_trip_preserve_ids_evidence_and_optional_language_level(self):
+        from jsf_profile import profile as owner
+        profile = self.compact_profile()
+        profile['records'][0]['id'] = 'candidate-ada'
+        text = render(profile)
+        self.assertIn('## Skills\n\n- React\n- TypeScript', text)
+        self.assertIn('- English — C1', text)
+        self.assertIn('- Polish', text)
+        self.assertNotIn('id: candidate-ada', text)
+        self.assertNotIn('id: react', text)
+        self.assertEqual(owner.edit_plan(profile, text, digest(profile))['profile'], profile)
+        owner.persist(self.workspace, profile)
+        before = {str(p): p.read_bytes() for p in self.workspace.rglob('*') if p.is_file()}
+        owner.persist(self.workspace, load(self.workspace))
+        self.assertEqual(before, {str(p): p.read_bytes() for p in self.workspace.rglob('*') if p.is_file()})
+
+    def test_compact_list_add_remove_rename_and_clear_level_are_user_edits(self):
+        from jsf_profile import profile as owner
+        profile = self.compact_profile()
+        owner.persist(self.workspace, profile)
+        text = render(profile).replace('- React\n', '- AWS\n').replace('- TypeScript\n', '').replace('English — C1', 'English')
+        proposal = owner.edit_plan(profile, text, digest(profile))
+        owner.apply_plan(self.workspace, proposal)
+        saved = load(self.workspace)
+        skills = [r for r in saved['records'] if r['section'] == 'skills']
+        self.assertEqual([r['facts']['name']['value'] for r in skills], ['AWS'])
+        self.assertTrue(skills[0]['facts']['name']['user_corrected'])
+        english = next(r for r in saved['records'] if r['id'] == 'english')
+        self.assertIsNone(english['facts']['level']['value'])
+        self.assertEqual(summary(saved)['outcome'], 'ready')
+        self.assertEqual(owner.edit_plan(saved, render(saved), digest(saved))['profile'], saved)
+
+    def test_structured_language_level_correction_does_not_require_repeating_name(self):
+        profile = self.compact_profile()
+        source = self.source_from('level.md', 'My English level is B2.', 'user')
+        updated = plan(profile, change(source, [record('english', 'languages', level=observation(source, 'B2', 'B2', True))]))['profile']
+        english = next(r for r in updated['records'] if r['id'] == 'english')
+        self.assertEqual(english['facts']['level']['value'], 'B2')
+        self.assertEqual(english['facts']['name'], next(r for r in profile['records'] if r['id'] == 'english')['facts']['name'])
+
+    def test_compact_duplicate_names_and_retired_skill_fields_are_rejected(self):
+        from jsf_profile import profile as owner
+        profile = self.compact_profile()
+        for text in [render(profile).replace('- React\n', '- React\n- react\n'),
+                     render(profile).replace('- Polish\n', '- Polish\n- Polish — B2\n')]:
+            with self.assertRaises(ValidationError): owner.edit_plan(profile, text, digest(profile))
+        with self.assertRaises(ValidationError):
+            plan(None, change(self.source, [record('react', 'skills', name=observation(self.source, 'React', 'React'), level=observation(self.source, 'expert', 'React'))]))
+
+    def legacy_markdown(self):
+        from jsf_profile import markdown_profile as md
+        profile = self.compact_profile()
+        react = next(r for r in profile['records'] if r['id'] == 'react')
+        react['facts']['level'] = deepcopy(react['facts']['name'])
+        react['facts']['level']['value'] = 'expert'
+        react['facts']['context'] = deepcopy(react['facts']['name'])
+        react['facts']['context']['value'] = 'Internal tools'
+        metadata = md.support(profile)
+        text = ['# Candidate profile', f'<!-- jsf-profile:1 evidence:{digest(metadata)} -->']
+        for section in md.p.FIELDS:
+            text.append('## ' + section.title())
+            for item in profile['records']:
+                if item['section'] != section: continue
+                text.append('### Legacy record <!-- id: ' + item['id'] + ' -->')
+                for key, fact in item['facts'].items():
+                    text.extend(md.field_lines(key.replace('_', ' ').title(), fact['value']))
+        directory = self.workspace / 'candidate'
+        (directory / 'evidence').mkdir(parents=True)
+        raw = '\n'.join(text)
+        (directory / 'profile.md').write_text(raw)
+        (directory / 'evidence' / (digest(metadata) + '.json')).write_text(encoded(metadata))
+        return raw, metadata
+
+    def test_version_one_conversion_is_read_only_then_backs_up_original_and_evidence(self):
+        from jsf_profile import profile as owner
+        raw, metadata = self.legacy_markdown()
+        before = {str(p): p.read_bytes() for p in self.workspace.rglob('*') if p.is_file()}
+        profile = load(self.workspace)
+        self.assertEqual(before, {str(p): p.read_bytes() for p in self.workspace.rglob('*') if p.is_file()})
+        react = next(r for r in profile['records'] if r['id'] == 'react')
+        self.assertEqual(set(react['facts']), {'name'})
+        self.assertEqual(react['facts']['name']['evidence'], metadata['records']['react']['facts']['name']['evidence'])
+        owner.persist(self.workspace, profile)
+        self.assertEqual(load(self.workspace), profile)
+        directory = self.workspace / 'candidate'
+        self.assertEqual(next((directory / 'backups').rglob('profile.md')).read_text(), raw)
+        self.assertEqual(json.loads(next((directory / 'backups').rglob('*.json')).read_text()), metadata)
+        self.assertIn('jsf-profile:2', (directory / 'profile.md').read_text())
+        self.assertNotIn('Internal tools', encoded(owner.export(self.workspace)))
+
+    def test_version_one_failed_publication_keeps_original_readable_and_retryable(self):
+        from unittest.mock import patch
+        from jsf_profile import profile as owner
+        raw, _ = self.legacy_markdown()
+        profile = load(self.workspace)
+        real = owner.atomic_write
+        def fail(file, text):
+            if file == self.workspace / 'candidate/profile.md': raise OSError('Disk full')
+            return real(file, text)
+        with patch.object(owner, 'atomic_write', side_effect=fail):
+            with self.assertRaises(OSError): owner.persist(self.workspace, profile)
+        self.assertEqual((self.workspace / 'candidate/profile.md').read_text(), raw)
+        self.assertEqual(load(self.workspace), profile)
+        owner.persist(self.workspace, profile)
+        self.assertEqual(load(self.workspace), profile)
 
 
 

@@ -1,13 +1,13 @@
 # Candidate profile template
 
-This is the output standard for CV imports, not a candidate profile to copy verbatim. The single fenced block defines the layout. Each section contains one repeatable record pattern. Examples are instructional; they are never facts or defaults. Python supplies the evidence marker, stable record IDs and supported values.
+This is the output standard for CV imports, not a candidate profile to copy verbatim. The single fenced block defines the layout. Experience, Projects, Education and Certifications contain repeatable record patterns. Identity is one field block; Skills and Languages use compact bullet lists. Examples are instructional; they are never facts or defaults. Python supplies the evidence marker, stable record IDs and supported values.
 
 - Keep all seven sections, including empty ones. Create records only for supported entries; never create sample jobs, skills or qualifications.
-- Show every field of an actual record. Missing values are `Unknown`; optional unknowns do not require clarification.
+- Show known fields and missing expected fields. Omit unknown optional fields; their examples remain available here and in UI help. Keep all seven section headings.
 - Lists: Links, Achievements, Technologies and Outcomes. Use indented bullets for known values and `Unknown` for an unknown list. All other fields are text.
-- Dates retain source precision (`2021`, `2021-06`, `2021-06-15`). Use `present` only for explicitly ongoing work. Levels and quantified results require source support.
+- Dates retain source precision (`2021`, `2021-06`, `2021-06-15`). Use `present` only for explicitly ongoing work. Language levels and quantified results require source support. Skill proficiency/context fields are not part of the active profile.
 - Desired roles, pay and work arrangements belong in search-config.yml. Sources/evidence remain in supporting files.
-- Example comments are removed when rendering a real profile; the UI exposes them as field help.
+- Example comments and layout directives are removed when rendering a real profile; the UI exposes field help. Skills render as `- React`; languages as `- English — C1` or `- Polish` when no level is stated. Do not invent missing levels.
 
 ```markdown
 # Candidate profile
@@ -18,7 +18,7 @@ This is the output standard for CV imports, not a candidate profile to copy verb
 
 ## Identity
 
-### {{title}} <!-- id: {{id}} -->
+<!-- Layout: identity -->
 
 <!-- Example: "Alex Example" -->
 - **Full Name:** Unknown
@@ -54,14 +54,10 @@ This is the output standard for CV imports, not a candidate profile to copy verb
 
 ## Skills
 
-### {{title}} <!-- id: {{id}} -->
+<!-- Layout: skills -->
 
 <!-- Example: "React" -->
 - **Name:** Unknown
-<!-- Example: "Advanced" -->
-- **Level:** Unknown
-<!-- Example: "Used to build a customer dashboard at Example Company." -->
-- **Context:** Unknown
 
 ## Projects
 
@@ -97,7 +93,7 @@ This is the output standard for CV imports, not a candidate profile to copy verb
 
 ## Languages
 
-### {{title}} <!-- id: {{id}} -->
+<!-- Layout: languages -->
 
 <!-- Example: "English" -->
 - **Name:** Unknown

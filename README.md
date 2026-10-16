@@ -23,7 +23,7 @@ Close the dialog to browse your jobs, then return through **View progress**, **A
 
 You can open an existing profile with **Edit profile** and edit its Markdown directly. **Save profile** validates and applies manual edits without AI or a separate revision question. Save edits before refreshing the page to preserve them across restarts.
 
-A saved profile can still be amber when details such as skill proficiency are unknown. The card shows counts and expandable **View details** explaining each warning; these do not block searching. Saving does not invent missing facts or mark them complete.
+A saved profile can still be amber when expected details such as employment dates are unknown. The card shows counts and expandable **View details** explaining each warning; these do not block searching. Saving does not invent missing facts or mark them complete.
 
 The app keeps one cumulative table. Edit a field and leave it to save; check Applied to record your own submission. Date, salary and interview details can remain unknown. Use All / Not applied / Applied filters and expand Details for longer fields and original evidence. The UI reports failed saves and retains the edit for retry.
 
