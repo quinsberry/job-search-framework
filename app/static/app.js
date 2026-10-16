@@ -10,7 +10,7 @@ function error(message='') { $('error').hidden = !message; $('error').textConten
 async function api(path, payload) {
   const response = await fetch(path, payload ? {method:'POST', headers:{'Content-Type':'application/json','X-JSF-Token':token}, body:JSON.stringify(payload)} : {});
   const value = await response.json();
-  if (!response.ok) { const e = new Error(value.error || 'Request failed'); e.confirmation = value.confirmation_required; throw e; }
+  if (!response.ok) { const e = new Error(response.status===404 ? 'The running app server does not support this action. Restart the app server and refresh this page.' : value.error || 'Request failed'); e.confirmation = value.confirmation_required; throw e; }
   return value;
 }
 function renderSetup() {
