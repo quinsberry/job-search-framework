@@ -47,7 +47,7 @@ The setup points are ordered as follows:
 
 1. **Workspace opened** — the folder holding your job-search files.
 2. **Codex connected** — use **Recheck setup** after signing in.
-3. **Candidate profile** — import a PDF/Markdown CV, or edit your existing profile. Imported CVs can be reused. Ordinary manual edits save without AI.
+3. **Candidate profile** — import a PDF/Markdown CV, or edit your existing profile. Every profile uses the same seven sections and field layout. Expand **Field examples and formatting** in the editor for examples, including lists. Imported CVs can be reused. Ordinary manual edits save without AI.
 4. **Search preferences** — configure roles, compensation, work arrangements and other search criteria in the forms. No CV upload is required.
 
 Profile and preferences have separate drafts and card actions. CV import shows a loader, confirmed stages and elapsed time. Close the dialog and use View progress, Answer questions or Review profile on the Candidate profile card to return. Failures retain your inputs and offer Retry; background completion does not reopen the dialog. Closing a dialog keeps submitted progress; active information changes only after **Save**. Unsaved editor text must be saved before refreshing or closing the browser.

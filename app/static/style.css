@@ -471,6 +471,10 @@ textarea.guided-review {display:block;width:100%;height:50vh;resize:vertical;bor
 .progress-steps .current {color:#204f37;font-weight:700}
 .progress-steps .done {color:#36734c}
 .slow-hint {font-size:13px;color:#755619}
+.profile-field-help {margin:16px 0;padding:12px;border:1px solid #d9ded5;border-radius:8px;font-size:13px}
+.profile-field-help details {margin:12px 0}
+.profile-field-help strong {display:block;margin-top:12px}
+.profile-field-help pre {white-space:pre-wrap;overflow-wrap:anywhere;padding:10px;background:#f1f5f0;border-radius:6px;font-size:12px}
 @keyframes setup-spin {to {transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce) {.spinner {animation:none;border-style:dotted}}
 #guided-fields>label {display:block;margin:16px 0 6px}

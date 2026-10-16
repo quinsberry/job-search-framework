@@ -63,7 +63,7 @@ Outcomes: `ready` means usable text without reported extraction issues; `partial
 }
 ```
 
-Source objects can be omitted from this list when evidence references already stored sources. Facts are strings, nonempty lists of strings, or null. Quote dates in YAML to preserve their precision and prevent implicit date conversion. A non-null fact requires evidence; an unknown uses null and may have empty evidence. Values and quotes may retain the original CV language. Do not translate names or manufacture a level.
+Source objects can be omitted from this list when evidence references already stored sources. Links, achievements, technologies and project outcomes are nonempty lists of strings or null. Other fields are strings or null. Dates are text at source precision (year, month or day), or an explicitly stated present; never compute missing precision. A non-null fact requires evidence; an unknown uses null and may have empty evidence. Values and quotes may retain the original CV language. Do not translate names or manufacture a level.
 
 Supported sections and fields:
 
@@ -92,6 +92,8 @@ Different scalar values create conflicts. The original accepted value remains, w
 `issues` adds free-text extraction ambiguities. `resolved_issues` removes exact previously recorded issues and requires a newly supplied user-statement source. Expected missing facts are derived automatically and disappear when supported facts are supplied.
 
 ## Canonical profile and execution result
+
+[profile-template.md](profile-template.md) defines the rendered layout and examples. Python validates its section/field coverage and example types against the owner schema before rendering. All seven headings are shown in order, and every field is shown within each actual record. Missing values are Unknown; unsupported sections have no invented placeholder records. Example comments are removed from rendered profiles.
 
 `candidate/profile.md` is the only authoritative professional profile. It contains readable facts in fixed sections, stable record IDs and supported field labels. It has one `<!-- jsf-profile:1 evidence:<digest> -->` marker pointing to immutable `candidate/evidence/<digest>.json`. Keep that marker and record IDs. Supporting JSON contains source snapshots, evidence, correction flags, value fingerprints, unresolved issues and historical conflicts; it contains no second set of current fact values.
 
@@ -130,7 +132,7 @@ Section names and field labels correspond to the contract above, using title cas
 - `outcome`: `ready`, `partial`, or `needs_clarification`.
 - `revision`: digest of canonical profile content.
 - `profile`: full canonical data.
-- `unknowns`: missing expected facts or explicitly null facts.
+- `unknowns`: missing or null expected facts. Optional unknowns do not generate warnings.
 - `conflicts`: unresolved alternatives with `id`, `record_id`, `field`, `existing` and `incoming` facts.
 - `issues`: unresolved extraction notes.
 
@@ -141,3 +143,5 @@ Section names and field labels correspond to the contract above, using title cas
 Legacy `candidate/profile.yaml` remains readable only when `profile.md` is absent. Opening/exporting never migrates it. The first successful profile save backs up legacy YAML, generated README and JSON cache under `candidate/backups/<content-digest>/`, publishes Markdown, then removes old active artifacts. Facts, unknowns, sources and conflicts are retained. Once Markdown exists it is authoritative, even if cleanup was interrupted. Backups are historical and never loaded as the current profile.
 
 `export` emits the versioned result without writes or a saved JSON cache. The original `render` CLI is retained as a read-only validation/summary alias; Python `profile.render(profile)` supplies editable Markdown. Rendering/parsing use no clock or AI. Run one writer per workspace. Original CV files and unrelated workspace files are never modified.
+
+`profile.py template` and `profile.template_help()` return read-only `{schema_version: 1, sections: [...]}` with section IDs/labels and field IDs/labels/types/examples/Markdown examples. They need no workspace, CV, sibling skill or AI. The local profile editor exposes this owner help under Field examples and formatting. Existing legacy fact shapes remain readable and round-trip without invented corrections; new imports and changed manual values must use the agreed scalar/list types. No read operation rewrites an older profile; its next explicit save renders the current template.

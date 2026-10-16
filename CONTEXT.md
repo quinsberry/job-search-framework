@@ -12,6 +12,9 @@ The candidate's source-backed professional facts, including experience, skills, 
 The sole current profile is readable `candidate/profile.md`; separate supporting files retain sources and provenance. Legacy YAML is converted only on a successful save.
 _Avoid_: tailored CV, search criteria
 
+**Profile template**:
+The standard sections, fields and value shapes used to represent a candidate's professional facts consistently. A CV supplies facts for this structure; its own layout does not define the profile. Instructional examples are guidance, never claims about the candidate.
+
 **Search criteria**:
 The job seeker's requirements and preferences used to discover and assess vacancies, including role, compensation and location eligibility.
 

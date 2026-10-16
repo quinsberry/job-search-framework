@@ -32,6 +32,17 @@ EXPECTED = {
     "education": ["institution", "qualification"], "languages": ["name", "level"],
     "certifications": ["name", "issuer"],
 }
+LIST_FIELDS = {'links', 'achievements', 'technologies', 'outcomes'}
+
+
+def validate_value_shape(field, value):
+    if value is None:
+        return
+    if field in LIST_FIELDS:
+        require(isinstance(value, list) and bool(value), field + ' must be a nonempty list, or Unknown')
+        string_list(value, field)
+    else:
+        string(value, field + ' must be text')
 
 
 def normalized(value):
@@ -172,8 +183,10 @@ def validate_records(records, sources, patch=False):
         identities += record["section"] == "identity"
         require(identities <= 1, "a candidate profile can contain only one identity record")
         require(isinstance(record["facts"], dict) and bool(record["facts"]) and not set(record["facts"]) - set(FIELDS[record["section"]]), "record contains unsupported or empty facts")
-        for fact in record["facts"].values():
+        for field, fact in record["facts"].items():
             validate_fact(fact, sources, patch)
+            if patch:
+                validate_value_shape(field, fact['value'])
 
 
 def validate_profile(profile):
@@ -221,7 +234,7 @@ def summary(profile):
     if not any(r["section"] == "identity" for r in profile["records"]):
         unknowns.append({"record_id": None, "field": "full_name"})
     for record in profile["records"]:
-        for field in set(EXPECTED[record["section"]]) | set(record["facts"]):
+        for field in EXPECTED[record["section"]]:
             if record["facts"].get(field, {}).get("value") is None:
                 unknowns.append({"record_id": record["id"], "field": field})
         known |= any(f["value"] is not None for f in record["facts"].values())
@@ -336,6 +349,11 @@ def render(profile):
 def edit_plan(existing, text, base_revision):
     from .markdown_profile import edit_plan as edited
     return edited(existing, text, base_revision)
+
+
+def template_help():
+    from .profile_template import help_document
+    return help_document()
 
 
 def yaml_module():
@@ -500,6 +518,7 @@ def main():
     extraction = commands.add_parser("extract")
     extraction.add_argument("--source", required=True)
     extraction.add_argument("--kind", choices=["cv", "user"], default="cv")
+    commands.add_parser('template', help='Show profile sections, field types and examples')
     planning = commands.add_parser("plan")
     planning.add_argument("--changes", required=True)
     planning.add_argument("--workspace", required=True)
@@ -519,7 +538,9 @@ def main():
     try:
         if hasattr(args, "workspace"):
             string(args.workspace, "workspace")
-        if args.command == "extract":
+        if args.command == 'template':
+            result = template_help()
+        elif args.command == "extract":
             result = extract(args.source, args.kind)
         elif args.command == "plan":
             changes = read_json(args.changes)

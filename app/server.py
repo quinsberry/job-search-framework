@@ -10,7 +10,7 @@ from urllib.parse import parse_qs, urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / '.agents/skills/jsf-workflow/scripts'))
 from jsf_workflow import workflow, codex_bridge, setup_sessions
-from jsf_workflow.modules import search_config, tracking
+from jsf_workflow.modules import candidate, search_config, tracking
 import readiness
 import folders
 
@@ -62,6 +62,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, {'workspace': self.server.initial_workspace, 'codex': codex_bridge.status()})
             if url.path == '/api/readiness':
                 return self.send(200, readiness.inspect(parse_qs(url.query).get('path', [''])[0]))
+            if url.path == '/api/profile-template':
+                return self.send(200, candidate.template_help())
             if url.path == '/api/setup':
                 workspace = workflow.workspace_path(parse_qs(url.query).get('path', [''])[0])
                 kind = parse_qs(url.query).get('kind', [None])[0]

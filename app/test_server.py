@@ -233,6 +233,18 @@ class HTTPTests(unittest.TestCase):
             self.assertEqual(saved['session']['state'],'complete')
 
 
+    def test_profile_field_examples_are_available_without_a_workspace(self):
+        status,data=self.request('/api/profile-template')
+        self.assertEqual(status,200)
+        self.assertEqual(data['schema_version'],1)
+        self.assertEqual(len(data['sections']),7)
+        fields=data['sections'][0]['fields']
+        links=next(f for f in fields if f['id']=='links')
+        self.assertEqual(links['type'],'list')
+        self.assertIn('\n  - https://',links['markdown_example'])
+        self.assertEqual(self.request('/api/profile-template',host='foreign.example')[0],403)
+
+
 
 if __name__ == '__main__':
     unittest.main()

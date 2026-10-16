@@ -367,7 +367,7 @@ class ProfileTests(unittest.TestCase):
     def test_markdown_round_trip_multiline_lists_special_text_and_unknown_literal(self):
         from jsf_profile import profile as owner
         existing=plan(None,self.initial)['profile']
-        text=render(existing).replace('- **Full Name:** Ada Example','- **Full Name:** &#85;nknown\n- **Summary:** A &amp; B &lt;br&gt;<br>Next line')
+        text=render(existing).replace('- **Full Name:** Ada Example','- **Full Name:** &#85;nknown').replace('- **Summary:** Unknown','- **Summary:** A &amp; B &lt;br&gt;<br>Next line')
         proposal=owner.edit_plan(existing,text,digest(existing))
         owner.persist(self.workspace,proposal['profile'])
         saved=load(self.workspace)
@@ -382,6 +382,84 @@ class ProfileTests(unittest.TestCase):
         for text in [render(original)+'\nUnstructured prose',render(original).replace('**Full Name:**','**Unsupported Field:**'),render(original)+'\n## Identity\n### identity\n- **Full Name:** Duplicate']:
             with self.assertRaises(ValidationError):owner.edit_plan(original,text,digest(original))
         self.assertEqual(load(self.workspace),original)
+
+
+    def test_template_shows_all_sections_and_fields_without_example_records(self):
+        from jsf_profile import profile as owner
+        from jsf_profile.markdown_profile import parse
+        from jsf_profile.profile_template import definition
+        original=plan(None,self.initial)['profile']
+        text=render(original)
+        self.assertEqual([line[3:].lower() for line in text.splitlines() if line.startswith('## ')],list(owner.FIELDS))
+        records=parse(text)
+        self.assertEqual({r['id'] for r in records},{r['id'] for r in original['records']})
+        for record in records:self.assertEqual(set(record['facts']),set(owner.FIELDS[record['section']]))
+        self.assertNotIn('<!-- Example:',text)
+        self.assertNotIn('Alex Example',text)
+        self.assertNotIn('Example University',text)
+        self.assertEqual(set(definition()['sections'][0]['fields'][0]),{'id','label','type','example'})
+
+    def test_template_controls_field_order_and_rejects_schema_drift(self):
+        from unittest.mock import patch
+        from jsf_profile import profile_template as template
+        original=plan(None,self.initial)['profile']
+        source=template.PATH.read_text()
+        first='<!-- Example: "Alex Example" -->\n- **Full Name:** Unknown'
+        second='<!-- Example: "Warsaw, Poland" -->\n- **Location:** Unknown'
+        reordered=source.replace(first,'SLOT').replace(second,first).replace('SLOT',second)
+        path=self.root/'template.md';path.write_text(reordered)
+        with patch.object(template,'PATH',path):
+            text=render(original)
+            self.assertLess(text.index('**Location:**'),text.index('**Full Name:**'))
+        for invalid in [source.replace(first,''),source.replace('<!-- Example: ["https://example.com", "https://github.com/example"] -->','<!-- Example: "https://example.com" -->')]:
+            path.write_text(invalid)
+            with patch.object(template,'PATH',path):
+                with self.assertRaises(ValidationError):template.definition()
+
+    def test_optional_unknowns_do_not_create_warnings_or_facts_during_render(self):
+        from jsf_profile import profile as owner
+        original=plan(None,self.initial)['profile']
+        original['records'][0]['facts']['email']={'value':None,'evidence':[]}
+        self.assertEqual(summary(original)['outcome'],'ready')
+        proposal=owner.edit_plan(original,render(original),digest(original))
+        self.assertEqual(proposal['profile'],original)
+        self.assertEqual(proposal['unknowns'],[])
+        self.assertIn('**Phone:** Unknown',render(original))
+
+    def test_new_fact_shapes_and_manual_list_edits_are_validated(self):
+        from jsf_profile import profile as owner
+        original=plan(None,self.initial)['profile']
+        for field,value in [('links','https://example.com'),('full_name',['Ada Example'])]:
+            patch=change(self.source,[record('identity','identity',**{field:observation(self.source,value,'Ada Example')})])
+            with self.assertRaises(ValidationError):plan(original,patch)
+        text=render(original).replace('- **Links:** Unknown','- **Links:**\n  - https://example.com\n  - https://github.com/example')
+        edited=owner.edit_plan(original,text,digest(original))['profile']
+        self.assertEqual(edited['records'][0]['facts']['links']['value'],['https://example.com','https://github.com/example'])
+        self.assertTrue(edited['records'][0]['facts']['links']['user_corrected'])
+        with self.assertRaises(ValidationError):owner.edit_plan(original,render(original).replace('- **Links:** Unknown','- **Links:** https://example.com'),digest(original))
+
+    def test_legacy_fact_shapes_round_trip_without_reinterpreting_evidence(self):
+        from jsf_profile import profile as owner
+        source=self.source_from('legacy.md','https://example.com')
+        profile=plan(None,change(source,[record('identity','identity',links=observation(source,['https://example.com'],'https://example.com'))]))['profile']
+        profile['records'][0]['facts']['links']['value']='https://example.com'
+        owner.persist(self.workspace,profile)
+        self.assertEqual(load(self.workspace),profile)
+        self.assertEqual(owner.edit_plan(profile,render(profile),digest(profile))['profile'],profile)
+        self.assertNotIn('user_corrected',load(self.workspace)['records'][0]['facts']['links'])
+
+    def test_template_help_is_versioned_and_has_an_example_for_every_field(self):
+        from jsf_profile import profile as owner
+        helper=str(Path(__file__).with_name('profile.py'))
+        result=subprocess.run([sys.executable,helper,'template'],capture_output=True,text=True,check=True)
+        help=json.loads(result.stdout)
+        self.assertEqual(help['schema_version'],1)
+        self.assertEqual([s['id'] for s in help['sections']],list(owner.FIELDS))
+        for section in help['sections']:
+            self.assertEqual({f['id'] for f in section['fields']},set(owner.FIELDS[section['id']]))
+            for field in section['fields']:
+                self.assertTrue(field['example']);self.assertIn(field['label'],field['markdown_example'])
+                self.assertEqual(field['type']=='list',isinstance(field['example'],list))
 
 
 

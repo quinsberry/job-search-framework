@@ -25,30 +25,33 @@ def support(profile):
                     for r in profile['records']})
 
 
+def field_lines(label, value):
+    if isinstance(value, list):
+        return [f'- **{label}:**'] + ['  - ' + escape(item) for item in value]
+    return [f'- **{label}:** ' + ('Unknown' if value is None else escape(value))]
+
+
 def render(profile):
+    from .profile_template import definition
     p.validate_profile(profile)
-    lines = ['# Candidate profile', '', f'<!-- jsf-profile:1 evidence:{p.digest(support(profile))} -->', '',
-             '<!-- Keep section names, record IDs and field labels. Use Unknown to clear a fact. -->', '']
-    for section, fields in p.FIELDS.items():
+    template = definition()
+    replacements = {'{{evidence_marker}}': f'<!-- jsf-profile:1 evidence:{p.digest(support(profile))} -->',
+                    '{{instructions}}': '<!-- Keep section names, record IDs and field labels. Use Unknown to clear a fact. -->'}
+    lines = []
+    for line in template['header']:
+        lines += [replacements.get(line, line), '']
+    for group in template['sections']:
+        section = group['id']
         records = [r for r in profile['records'] if r['section'] == section]
-        if not records:
-            continue
-        lines += ['## ' + section.title(), '']
+        lines += [group['heading'], '']
         if section in {'experience', 'education'}:
             records.sort(key=p.chronology)
         for record in records:
             title = escape(p.heading(record))
-            lines += [f"### {title} <!-- id: {record['id']} -->", '']
-            for field in fields:
-                if field not in record['facts'] and field not in p.EXPECTED[section]:
-                    continue
-                value = record['facts'].get(field, {}).get('value')
-                label = field.replace('_', ' ').title()
-                if isinstance(value, list):
-                    lines.append(f'- **{label}:**')
-                    lines.extend('  - ' + escape(item) for item in value)
-                else:
-                    lines.append(f'- **{label}:** ' + ('Unknown' if value is None else escape(value)))
+            lines += [group['record_heading'].replace('{{title}}', title).replace('{{id}}', record['id']), '']
+            for field in group['fields']:
+                value = record['facts'].get(field['id'], {}).get('value')
+                lines += field_lines(field['label'], value)
             lines.append('')
     return '\n'.join(lines)
 
@@ -111,6 +114,7 @@ def interpret(text, metadata):
             if prior and prior['fingerprint'] == p.digest(value):
                 facts[field] = {**{key: deepcopy(v) for key, v in prior.items() if key != 'fingerprint'}, 'value': value}
             else:
+                p.validate_value_shape(field, value)
                 quote = f"Clear {record['id']}/{field}." if value is None else '\n'.join(value) if isinstance(value, list) else value
                 statements.append(f"{record['id']}/{field}: {quote}")
                 facts[field] = dict(value=value, evidence=[], user_corrected=True)

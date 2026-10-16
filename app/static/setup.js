@@ -107,6 +107,28 @@ function selectControl(options,value,label) {
   el.value=value;return el;
 }
 function inputControl(type,value,label) {const el=node('input');el.type=type;el.value=value??'';el.setAttribute('aria-label',label);return el;}
+let profileTemplateHelp=null;
+function profileFieldHelp() {
+  const details=node('details',undefined,'profile-field-help'),body=node('div');
+  details.append(node('summary','Field examples and formatting'),body);
+  let loaded=false,busy=false;
+  details.addEventListener('toggle',async()=>{
+    if(!details.open||loaded||busy)return;
+    busy=true;body.replaceChildren(node('p','Loading field examples…'));
+    try {
+      profileTemplateHelp=profileTemplateHelp||await api('/api/profile-template');
+      body.replaceChildren(node('p','Examples are guidance, not your profile facts. Use Unknown when information is missing. Lists use indented bullets; keep dates at the precision stated in your CV.'));
+      for(const section of profileTemplateHelp.sections) {
+        const group=node('details');group.append(node('summary',section.label));
+        for(const field of section.fields)group.append(node('strong',field.label+' · '+(field.type==='list'?'list':'text')),node('pre',field.markdown_example));
+        body.append(group);
+      }
+      loaded=true;
+    }catch(e){body.replaceChildren(node('p','Could not load examples. Close and reopen this help to retry. '+e.message));}
+    finally{busy=false;}
+  });
+  return details;
+}
 function questionControl(q,wrap) {
   const unset=q.value==='__FILL_ME__',value=unset?null:q.value;
   let get,controls=node('div',undefined,'question-controls');
@@ -187,6 +209,7 @@ function renderGuided() {
       const updated=()=>{const changed=editor.value!==guided.review;$('guided-save').textContent='Save profile';if(changed)markdownEdits.set(guided.id,{revision:guided.revision,text:editor.value});else markdownEdits.delete(guided.id);};
       editor.addEventListener('input',updated);updated();
       $('guided-fields').append(node('label','Edit your profile draft directly'),editor,node('p','Save validates and applies your edits without AI. Keep the section headings, record IDs and field labels. Use Unknown to clear a fact.','question-help'));
+      $('guided-fields').append(profileFieldHelp());
       $('guided-save').hidden=false;
     }else $('guided-fields').append(node('pre',guided.review,'guided-review'));
     $('guided-form').hidden=false;$('guided-next').hidden=true;
