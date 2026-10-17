@@ -47,13 +47,15 @@ function renderSetup() {
     }
     $('setup-checks').append(item);
   }
-  const blockers=(setup?.checks || []).filter(c=>['blocked','pending'].includes(c.state));
+  const scriptsOnly=Number($('ai-calls').value)===0;
+  const blockers=(setup?.checks || []).filter(c=>['blocked','pending'].includes(c.state)&&!(scriptsOnly&&c.key==='codex'));
   const running=data?.job?.state==='running';
   let reason=setupChecking?'Checking setup…':!setup?'Setup could not be checked. Recheck setup to retry.':blockers.length?'Before searching: '+blockers.map(c=>c.label+' — '+c.message).join(' · '):'Ready to search. The target counts new matching jobs; rejected and uncertain listings do not count.';
   if(trackerError)reason='Could not load tracked jobs: '+trackerError;
   else if(running)reason='A search is already running. You can search again when it finishes.';
+  if(scriptsOnly&&setup&&!setupChecking&&!running&&!trackerError&&!blockers.length)reason='Scripts and saved facts only. Unresolved listings stop the run without using AI.';
   $('search-reason').textContent=reason;
-  $('find').disabled=setupChecking||!setup?.ready||!!trackerError||running||removalBusy;
+  $('find').disabled=setupChecking||!setup||!!blockers.length||!!trackerError||running||removalBusy;
   $('find').title=reason;$('find').setAttribute('aria-describedby','search-reason');
   const connected=setup?.checks.find(c=>c.key==='workspace')?.state==='ready';
   document.querySelector('.local').textContent=connected?'✓ Workspace opened':'○ No workspace opened';
@@ -292,7 +294,8 @@ $('browse-workspace').addEventListener('click',async()=>{
   try {if(await selectWorkspace())await openWorkspace();}catch(e){error(e.message);}
 });
 $('count').addEventListener('input',()=>{countEdited=true;});
-$('find-form').addEventListener('submit',async e=>{e.preventDefault();error();try{await api('/api/find',{workspace,count:Number($('count').value)});await refresh();}catch(e){error(e.message);}});
+$('ai-calls').addEventListener('input',renderSetup);
+$('find-form').addEventListener('submit',async e=>{e.preventDefault();error();try{await api('/api/find',{workspace,count:Number($('count').value),max_ai_calls:Number($('ai-calls').value)});await refresh();}catch(e){error(e.message);}});
 $('recheck').addEventListener('click',async()=>{error();await recheckSetup();if(workspace&&setup?.checks.find(c=>c.key==='workspace')?.state==='ready')await refresh();});
 $('refresh').addEventListener('click',()=>{if(pending||drafts.size){error('Your unsaved edits are still visible. Save or retry them before refreshing.');return;}recheckSetup().then(()=>refresh(true));});
 $('adopt').addEventListener('click',async()=>{if(pending||drafts.size){error('Finish unsaved edits before importing applications.');return;}try{await api('/api/adopt-applications',{workspace});await refresh(true);}catch(e){error(e.message);}});

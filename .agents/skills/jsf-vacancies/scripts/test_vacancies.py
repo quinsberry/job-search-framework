@@ -81,6 +81,19 @@ class HistoryTests(unittest.TestCase):
         restored = imported(vacancy(), vacancy('2'), vacancy('3'), history=removed)['history']
         self.assertEqual(set(restored['vacancies']), set(original['vacancies']))
 
+    def test_saved_extraction_interface_and_removal_do_not_retain_forgotten_facts(self):
+        from jsf_vacancies import vacancies as owner
+        v = vacancy(); v['extraction_key'] = 'a' * 64
+        history = imported(v)['history']
+        self.assertNotIn('extraction_key', next(iter(history['vacancies']['linkedin:1']['observations'].values()))['posting'])
+        with tempfile.TemporaryDirectory() as workspace:
+            owner.save(workspace, history)
+            cached = owner.reusable_facts(workspace, ['a' * 64, 'b' * 64])['facts']
+            self.assertEqual(cached['a' * 64], v['facts'])
+            removed = owner.remove(history, 'linkedin:1', owner.digest(history['vacancies']['linkedin:1']))
+            owner.save(workspace, removed)
+            self.assertEqual(owner.reusable_facts(workspace, ['a' * 64])['facts'], {})
+
     def test_pure_replay_and_repeated_later_observation(self):
         h, r = empty_history(), result(vacancy())
         before = deepcopy((h, r))

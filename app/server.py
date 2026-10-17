@@ -133,8 +133,11 @@ class Handler(BaseHTTPRequestHandler):
                 count = data['count']
                 if type(count) is not int or count < 1:
                     raise ValueError('Enter a positive number of new jobs')
+                max_ai_calls = data.get('max_ai_calls', 5)
+                if type(max_ai_calls) is not int or max_ai_calls < 0:
+                    raise ValueError('Maximum AI calls must be a nonnegative integer')
                 search_config.export(workspace)  # Fail synchronously for missing setup.
-                connection = codex_bridge.status()
+                connection = codex_bridge.status() if max_ai_calls else {'ready': True}
                 if not connection['ready']:
                     raise ValueError(connection['message'])
                 key = str(workspace)
@@ -145,12 +148,23 @@ class Handler(BaseHTTPRequestHandler):
                     self.server.jobs[key] = job
                 def run():
                     try:
-                        result = workflow.find_jobs(workspace, count, progress=lambda message: job.update(message=message))
+                        options = {'max_ai_calls': max_ai_calls} if 'max_ai_calls' in data else {}
+                        result = workflow.find_jobs(workspace, count, progress=lambda message: job.update(message=message), **options)
                         reason = result.get('coverage', {}).get('stopping_reason')
-                        explanation = {'discovery_budget': 'Inspection limit reached.',
+                        explanation = {'ai_limit': 'AI allowance reached; unresolved listings were left for a later search.', 'discovery_budget': 'Inspection limit reached.',
                                        'source_exhausted': 'No more listings available from the source.',
                                        'source_failure': 'Source access prevented further searching.'}.get(reason, '')
-                        job.update(state='complete', message=f"Search finished. Added {result['found']} of {result['requested']} new matching jobs. {explanation}".strip(), result=result)
+                        usage = result.get('ai_usage', {})
+                        tokens = usage.get('reported_tokens')
+                        usage_message = ''
+                        if usage:
+                            usage_message = f" AI calls {usage['ai_calls']}/{usage['max_ai_calls']}; {usage['reused']} reused, {usage['scripted']} scripted, {usage['known_skipped']} tracked skipped."
+                            if tokens:
+                                counts = ', '.join(f"{tokens[key]} {label}" for key, label in [('input_tokens', 'input'), ('output_tokens', 'output'), ('cached_input_tokens', 'cached input')] if key in tokens)
+                                usage_message += f" Reported tokens: {counts} ({usage['calls_with_token_usage']}/{usage['ai_calls']} calls reported)."
+                            else:
+                                usage_message += ' Token counts were not reported.' if usage['ai_calls'] else ' No AI tokens used.'
+                        job.update(state='complete', message=f"Search finished. Added {result['found']} of {result['requested']} new matching jobs. {explanation}{usage_message}".strip(), result=result)
                     except Exception as exc:
                         job.update(state='failed', message=str(exc))
                 threading.Thread(target=run, daemon=True).start()

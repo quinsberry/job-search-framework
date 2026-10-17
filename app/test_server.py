@@ -187,6 +187,19 @@ class HTTPTests(unittest.TestCase):
         _, data = self.request('/api/workspace?path=' + quote(self.workspace))
         self.assertFalse(data['rows'])
 
+    def test_zero_ai_allowance_can_run_without_codex_and_reports_limit(self):
+        done = threading.Event()
+        def fake(workspace, count, progress, max_ai_calls):
+            self.assertEqual(max_ai_calls, 0)
+            done.set()
+            return {'requested': count, 'found': 0, 'shortfall': count, 'coverage': {'stopping_reason': 'ai_limit'},
+                    'ai_usage': {'ai_calls': 0, 'max_ai_calls': 0, 'reused': 0, 'scripted': 1, 'known_skipped': 0, 'reported_tokens': {}}}
+        with patch('server.codex_bridge.status', return_value={'ready': False}), patch('server.workflow.find_jobs', side_effect=fake):
+            status, _ = self.request('/api/find', {'workspace': self.workspace, 'count': 1, 'max_ai_calls': 0})
+            self.assertEqual(status, 202)
+            self.assertTrue(done.wait(1))
+            self.assertEqual(self.request('/api/find', {'workspace': self.workspace, 'count': 1, 'max_ai_calls': -1})[0], 400)
+
     def test_missing_codex_blocks_search_without_side_effects(self):
         with patch('server.codex_bridge.status', return_value={'ready': False, 'message': 'Sign in first'}):
             status, response = self.request('/api/find', {'workspace': self.workspace, 'count': 2})

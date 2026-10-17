@@ -52,11 +52,12 @@ def resolve(history, identifier):
 
 
 def validate(history):
-    require(isinstance(history, dict) and {"schema_version", "vacancies", "redirects", "scopes", "imports"} <= set(history) and not set(history) - {"schema_version", "vacancies", "redirects", "scopes", "imports", "rediscovery"}, "invalid history schema")
+    require(isinstance(history, dict) and {"schema_version", "vacancies", "redirects", "scopes", "imports"} <= set(history) and not set(history) - {"schema_version", "vacancies", "redirects", "scopes", "imports", "rediscovery", "extractions"}, "invalid history schema")
     require(type(history["schema_version"]) is int and history["schema_version"] == 1, "history schema_version must be 1")
     require(all(isinstance(history[k], dict) for k in ("vacancies", "redirects", "scopes")) and isinstance(history["imports"], list), "invalid history collections")
     require(all(isinstance(x, str) for x in history["imports"]), "invalid import IDs")
     require(isinstance(history.get('rediscovery', {}), dict) and all(isinstance(k, str) and isinstance(v, list) and all(isinstance(a, str) for a in v) for k, v in history.get('rediscovery', {}).items()), 'invalid rediscovery identities')
+    require(isinstance(history.get('extractions', {}), dict) and all(isinstance(k, str) and len(k) == 64 and isinstance(v, dict) and isinstance(v.get('facts'), dict) and isinstance(v.get('vacancy_id'), str) for k, v in history.get('extractions', {}).items()), 'invalid saved extraction facts')
     aliases = set()
     for identifier, record in history["vacancies"].items():
         require(isinstance(record, dict) and record.get("id") == identifier, "invalid vacancy ID")
@@ -192,6 +193,12 @@ def known_identities(workspace):
     return {'schema_version': 1, 'identities': sorted(identities), 'rediscovery_identities': sorted(rediscovery)}
 
 
+def reusable_facts(workspace, keys):
+    """Return saved annotations by opaque extraction key; callers revalidate evidence."""
+    cache = load(workspace).get('extractions', {})
+    return {'schema_version': 1, 'facts': {key: deepcopy(cache[key]['facts']) for key in keys if key in cache}}
+
+
 def restore_identity(history, record, keys):
     for old, aliases in list(history.get('rediscovery', {}).items()):
         if set(aliases) & keys:
@@ -247,6 +254,8 @@ def remove_many(existing, selections):
     for scope in history['scopes'].values():
         for field in ('known', 'seen'):
             scope[field] = [key for key in scope[field] if resolve(history, key) not in identifiers]
+    if 'extractions' in history:
+        history['extractions'] = {key: entry for key, entry in history['extractions'].items() if resolve(history, entry['vacancy_id']) not in identifiers}
     history['redirects'] = {key: value for key, value in history['redirects'].items() if old_targets[key] not in identifiers}
     for identifier in identifiers:
         del history['vacancies'][identifier]
@@ -431,10 +440,14 @@ def import_results(existing, result):
         record["aliases"] = sorted(set(record["aliases"]) | group["keys"])
         restore_identity(history, record, group["keys"])
         for vacancy in group["members"]:
-            posting = {k: deepcopy(v) for k, v in vacancy.items() if k != "facts"}
+            posting = {k: deepcopy(v) for k, v in vacancy.items() if k not in {"facts", "extraction_key", "search_skip"}}
             posting["url"] = canonical_url(posting["url"])
             comparable = {k: normalized(v) if k in FIELDS else v for k, v in posting.items()}
             add_entry(record["observations"], digest(comparable), {"posting": posting}, at)
+            extraction_key = vacancy.get('extraction_key')
+            if extraction_key is not None:
+                require(isinstance(extraction_key, str) and len(extraction_key) == 64, 'invalid extraction key')
+                history.setdefault('extractions', {})[extraction_key] = {'vacancy_id': record['id'], 'facts': deepcopy(vacancy.get('facts', {}))}
         associated = []
         for row, aliases in zip(rows, row_aliases):
             if aliases & group["keys"]:

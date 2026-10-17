@@ -4,4 +4,6 @@
 
 Structured fact extraction and its supporting evidence belong to acquisition, because free-text interpretation may vary. Snapshot replay evaluates saved facts using deterministic rules; reinterpretation is an explicit new operation rather than an implicit part of replay.
 
+Acquisition first attempts conservative Python extraction. The workflow may request compatible, validated facts from the vacancy-history owner before interpreting new evidence. Exact evidence, semantic criteria and extractor/interpreter versions determine compatibility; current pay thresholds and conversions are reevaluated in Python. Known vacancies lacking compatible facts keep their prior assessment until an explicit monitoring operation. A per-search AI allowance bounds new interpretation; unresolved records are deferred without entering history. This does not add history access or AI interpretation to pure snapshot replay.
+
 Search deduplicates listings within the current acquisition, including confirmed cross-source identities, but does not read previous results or maintain search history. The user chose to delegate cross-run deduplication to another skill to keep persistent history outside search's responsibility. Stable vacancy identities and provenance in search results support that downstream operation.

@@ -254,6 +254,49 @@ class EvaluationTests(unittest.TestCase):
             criteria(c)
 
 
+class ScriptExtractionTests(unittest.TestCase):
+    def test_explicit_fields_and_pay_are_grounded_and_ambiguous_text_abstains(self):
+        from jsf_search import extraction
+        c = config(); c['technical']['preferred'] = []; c['technical']['excluded'] = []
+        v = vacancy()
+        v['description'] = ('Role: Frontend Engineer\nSeniority: senior\nWork arrangement: remote\n'
+                            'Eligible countries: Poland\nRequired skills: React, TypeScript\nB2B: 25000-28000 PLN/month before VAT')
+        prepared = extraction.prepare(c, v, snapshot()['observed_at'])
+        self.assertFalse(prepared['needs_ai'])
+        self.assertTrue(extraction.prepare(c, {**v, 'description': v['description'] + '\nAlternatively this office requirement can be waived.'}, snapshot()['observed_at'])['needs_ai'])
+        v['facts'] = prepared['facts']
+        self.assertEqual(evaluate(c, snapshot(v))['outcome'], 'partial')  # One match of two requested.
+        self.assertEqual(len(evaluate(c, snapshot(v))['matches']), 1)
+        ambiguous = vacancy()
+        ambiguous['description'] = 'Junior in title only. React optional. Remote company; Gdansk HQ. Salary negotiable.'
+        prepared = extraction.prepare(c, ambiguous, snapshot()['observed_at'])
+        self.assertTrue(prepared['needs_ai'])
+        self.assertEqual(prepared['facts'], {})
+
+    def test_closed_old_excluded_and_unreadable_skip_ai_without_keyword_rejection(self):
+        from jsf_search import extraction
+        c = config(); c['posting_age_days'] = 7; c['company_exclusions'] = ['excluded']
+        for patch in ({'active': False}, {'posted_at': '2026-01-01'}, {'company': 'Excluded'}, {'fetch_status': 'error'}, {'description': None}):
+            v = {**vacancy(), **patch}
+            prepared = extraction.prepare(c, v, snapshot()['observed_at'])
+            self.assertFalse(prepared['needs_ai'], patch)
+            self.assertFalse(prepared['cacheable'], patch)
+        v = vacancy(); v['title'] = 'Junior engineer'; v['location'] = 'Gdansk'
+        self.assertTrue(extraction.prepare(c, v, snapshot()['observed_at'])['needs_ai'])
+
+    def test_cache_keys_ignore_comparison_only_changes_but_track_content_and_extractor(self):
+        from jsf_search import extraction
+        c, v = config(), vacancy()
+        key = extraction.cache_key(c, v, 'model-v1')
+        changed = deepcopy(c); changed['compensation'][0]['minimum'] += 1000
+        changed['conversions'] = {'hours_per_month': 160}
+        self.assertEqual(key, extraction.cache_key(changed, v, 'model-v1'))
+        changed = deepcopy(c); changed['technical']['required'].append('python')
+        self.assertNotEqual(key, extraction.cache_key(changed, v, 'model-v1'))
+        self.assertNotEqual(key, extraction.cache_key(c, {**v, 'description': v['description'] + ' Changed.'}, 'model-v1'))
+        self.assertNotEqual(key, extraction.cache_key(c, v, 'model-v2'))
+
+
 CARD_HTML = '''<li><div data-entity-urn="urn:li:jobPosting:123">
 <a class="base-card__full-link" href="https://www.linkedin.com/jobs/view/dev-123?trk=x"><span class="sr-only">Fallback</span></a>
 <h3 class="base-search-card__title">Frontend &amp; UI Engineer</h3>

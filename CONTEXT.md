@@ -42,6 +42,12 @@ The employer's published fixed-cash pay amount or range for a vacancy, with its 
 **Discovery budget**:
 The limit on search effort used to find qualifying vacancies. It is separate from the requested count of qualifying vacancies.
 
+**AI allowance**:
+The maximum number of interpretation batches permitted in one search. It is separate from the discovery budget and requested vacancy count. Zero permits only Python screening and compatible saved facts; unresolved vacancies remain available for a later search.
+
+**Reusable vacancy facts**:
+Validated, evidence-backed extraction retained by the vacancy-history owner. Reuse requires unchanged evidence, semantic criteria and extraction/interpreter version. Current monetary thresholds and fit rules are reevaluated in Python; a saved assessment is not a substitute for that evaluation.
+
 **Vacancy snapshot**:
 The vacancy facts and supporting evidence observed at a recorded time. It preserves what was known for a search assessment even when the live posting later changes.
 

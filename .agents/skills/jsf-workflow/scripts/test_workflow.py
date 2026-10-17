@@ -206,7 +206,7 @@ class WorkflowTests(unittest.TestCase):
         result = workflow.find_jobs(self.workspace, 2, interpreter=lambda c, records, expertise: [vacancy(r['source_id'])['facts'] for r in records], adapters={'linkedin': Adapter}, delay=0)
         self.assertEqual(result['found'], 2)
         self.assertCountEqual(result['vacancy_ids'], ['linkedin:2', 'linkedin:4'])
-        self.assertEqual(len(workflow.table(self.workspace)['rows']), 4)
+        self.assertEqual(len(workflow.table(self.workspace)['rows']), 3)
         self.assertEqual((self.workspace / 'search-config.yml').read_bytes(), before)
 
     def test_find_jobs_saves_results_with_b2b_and_uop_preferences(self):
@@ -303,6 +303,97 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual([r['vacancy_id'] for r in workflow.table(self.workspace)['rows']], ['linkedin:3'])
         self.assertEqual((self.workspace / 'applications_table.csv').read_bytes(), applications_before)
 
+    def test_ai_limit_defers_unsaved_listings_and_reports_usage(self):
+        class Adapter:
+            page_size = 10
+            def __init__(self, delay=0): pass
+            def queries(self, c): return [{}]
+            def page(self, q, offset): return [vacancy(str(i)) for i in range(1, 11)] if offset == 0 else []
+            def detail(self, v): return {**v, 'facts': {}, 'description': v['description'] + ' Reference ' + v['source_id']}
+        calls = []
+        def interpret(c, records, expertise):
+            calls.append(len(records))
+            return {'schema_version': 1, 'facts': [vacancy()['facts'] for r in records], 'usage': {'input_tokens': 100, 'output_tokens': 20}, 'prompt_characters': 300}
+        result = workflow.find_jobs(self.workspace, 10, interpreter=interpret, adapters={'linkedin': Adapter}, delay=0, max_ai_calls=1, cache_version='fixture-v1')
+        self.assertEqual(calls, [5])
+        self.assertEqual(result['found'], 5)
+        self.assertEqual(result['coverage']['stopping_reason'], 'ai_limit')
+        self.assertEqual(result['ai_usage']['deferred'], 5)
+        self.assertEqual(result['ai_usage']['reported_tokens']['input_tokens'], 100)
+        self.assertEqual(len(workflow.table(self.workspace)['rows']), 5)
+        reused = workflow.find_jobs(self.workspace, 10, interpreter=interpret, adapters={'linkedin': Adapter}, delay=0, max_ai_calls=0, cache_version='fixture-v1')
+        self.assertEqual(calls, [5])
+        self.assertEqual(reused['ai_usage']['reused'], 5)
+        self.assertEqual(reused['found'], 0)  # Tracked matches are never new again.
+        self.assertEqual(reused['ai_usage']['deferred'], 5)
+
+    def test_identical_evidence_reuses_facts_and_pay_changes_recheck_without_ai(self):
+        class Adapter:
+            page_size = 10
+            def __init__(self, delay=0): pass
+            def queries(self, c): return [{}]
+            def page(self, q, offset): return [vacancy(str(i)) for i in range(1, 11)] if offset == 0 else []
+            def detail(self, v): return {**v, 'facts': {}}
+        calls = []
+        def interpret(c, records, expertise):
+            calls.append(len(records)); return [vacancy()['facts'] for r in records]
+        first = workflow.find_jobs(self.workspace, 10, interpreter=interpret, adapters={'linkedin': Adapter}, delay=0, max_ai_calls=1, cache_version='fixture-v1')
+        self.assertEqual(first['found'], 10)
+        self.assertEqual(calls, [5])
+        self.assertEqual(first['ai_usage']['reused'], 5)
+        c = config(); c['compensation'][0]['minimum'] = 30000; self.write_config(c)
+        second = workflow.find_jobs(self.workspace, 1, interpreter=interpret, adapters={'linkedin': Adapter}, delay=0, max_ai_calls=0, cache_version='fixture-v1')
+        self.assertEqual(calls, [5])
+        self.assertGreater(second['ai_usage']['reused'], 0)
+        self.assertEqual(self.row()['fit'], 'rejected')
+
+    def test_scripted_rejections_and_zero_allowance_make_no_ai_calls(self):
+        class Adapter:
+            page_size = 10
+            def __init__(self, delay=0): pass
+            def queries(self, c): return [{}]
+            def page(self, q, offset): return [{**vacancy(), 'active': False}] if offset == 0 else []
+            def detail(self, v): return {**v, 'facts': {}}
+        def never(*args): raise AssertionError('AI must not be called')
+        result = workflow.find_jobs(self.workspace, 1, interpreter=never, adapters={'linkedin': Adapter}, delay=0, max_ai_calls=0)
+        self.assertEqual(result['ai_usage']['ai_calls'], 0)
+        self.assertEqual(result['ai_usage']['scripted'], 1)
+        self.assertEqual(self.row()['fit'], 'rejected')
+
+    def test_interpreter_can_clear_a_contradicted_script_fact(self):
+        class Adapter:
+            page_size = 10
+            def __init__(self, delay=0): pass
+            def queries(self, c): return [{}]
+            def page(self, q, offset): return [vacancy()] if offset == 0 else []
+            def detail(self, v): return {**v, 'facts': {}, 'description': 'Required skills: React, TypeScript\n' + v['description']}
+        def interpret(c, records, expertise):
+            self.assertTrue(records[0]['facts']['technical']['react']['value'])
+            facts = vacancy()['facts']
+            facts['technical']['react'] = None
+            return [facts]
+        result = workflow.find_jobs(self.workspace, 1, interpreter=interpret, adapters={'linkedin': Adapter}, delay=0)
+        self.assertEqual(result['found'], 0)
+        self.assertEqual(self.row()['fit'], 'needs_clarification')
+
+    def test_bridge_prompt_and_json_usage_are_compact_and_no_profile_evidence_is_sent(self):
+        from types import SimpleNamespace
+        prompt = codex_bridge.annotation_prompt(evaluate.criteria(config()), [vacancy()])
+        self.assertLess(len(prompt), 6000)
+        self.assertNotIn('Candidate profile', prompt)
+        self.assertEqual(codex_bridge.token_usage('not json'), None)
+        self.assertEqual(codex_bridge.token_usage('{"type":"turn.completed","usage":{"input_tokens":12,"cached_input_tokens":4,"output_tokens":2}}')['input_tokens'], 12)
+        def fake_run(command, **kwargs):
+            self.assertIn('--json', command)
+            self.assertNotIn('private-profile-evidence', kwargs['input'])
+            output = Path(command[command.index('--output-last-message') + 1])
+            output.write_text(json.dumps({'annotations': [{'index': 0, 'facts_json': json.dumps(vacancy()['facts'])}]}))
+            return SimpleNamespace(returncode=0, stdout='{"type":"turn.completed","usage":{"input_tokens":12,"output_tokens":2}}')
+        with patch.object(codex_bridge, 'status', return_value={'ready': True}), patch.object(codex_bridge.subprocess, 'run', side_effect=fake_run):
+            result = codex_bridge.interpret_batch(evaluate.criteria(config()), [vacancy()], {'private-profile-evidence': True})
+        self.assertEqual(result['usage']['input_tokens'], 12)
+        self.assertEqual(result['facts'], [vacancy()['facts']])
+
     def test_budget_shortfall_and_invalid_ai_evidence(self):
         c = config(); c.update(target_count=1, discovery_budget=1)
         self.write_config(c)
@@ -319,8 +410,10 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(result['coverage']['stopping_reason'], 'discovery_budget')
         before = (self.workspace / 'vacancies/history.json').read_bytes()
         bad = vacancy()['facts']; bad['role_titles']['evidence'][0]['quote'] = 'Invented evidence'
+        class NewAdapter(Adapter):
+            def page(self, q, offset): return [vacancy('2')] if offset == 0 else []
         with self.assertRaises(ValueError):
-            workflow.find_jobs(self.workspace, 1, interpreter=lambda c, records, expertise: [bad], adapters={'linkedin': Adapter}, delay=0)
+            workflow.find_jobs(self.workspace, 1, interpreter=lambda c, records, expertise: [bad], adapters={'linkedin': NewAdapter}, delay=0)
         self.assertEqual((self.workspace / 'vacancies/history.json').read_bytes(), before)
 
     def test_codex_does_not_fall_back_to_api_key_billing(self):

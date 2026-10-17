@@ -10,7 +10,7 @@ for name in ('search', 'profile', 'vacancies', 'application'):
     if str(scripts) not in sys.path:
         sys.path.append(str(scripts))
 
-from jsf_search import evaluate, search
+from jsf_search import evaluate, search, extraction
 from jsf_profile import profile as candidate, search_config
 from jsf_vacancies import vacancies
 from jsf_application import applications, tracking
