@@ -40,6 +40,7 @@ const buttonVariants = cva(
 
 interface ButtonProps extends ButtonPrimitive.Props, VariantProps<typeof buttonVariants> {
     isInProgress?: boolean;
+    ProgressIndicator?: React.ComponentType<React.SVGProps<SVGSVGElement>>;
 }
 
 function Button({
@@ -47,6 +48,7 @@ function Button({
     variant = 'default',
     size = 'default',
     isInProgress = false,
+    ProgressIndicator = Loader,
     children,
     disabled,
     ...props
@@ -56,18 +58,16 @@ function Button({
             data-slot="button"
             className={cn(buttonVariants({ variant, size, className }))}
             disabled={disabled || isInProgress}
-            children={
-                isInProgress ? (
-                    <Fragment>
-                        <Loader className="animate-spin" />
-                        {children}
-                    </Fragment>
-                ) : (
-                    children
-                )
-            }
-            {...props}
-        />
+            {...props}>
+            {isInProgress ? (
+                <Fragment>
+                    <ProgressIndicator className="animate-spin" />
+                    {children}
+                </Fragment>
+            ) : (
+                children
+            )}
+        </ButtonPrimitive>
     );
 }
 

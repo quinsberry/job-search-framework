@@ -1,8 +1,8 @@
 # Candidate Profile in the Next.js app
 
-Status: ready-for-agent
+Status: ready-for-human
 
-Implementation plan approved by the user on 2026-10-18. Shared understanding is confirmed. This task covers planning; runtime implementation is a subsequent task.
+Implementation plan approved and implemented on 2026-10-18. Standards and Spec reviews completed; all findings corrected. Ready for human review.
 
 ## Settled scope
 
@@ -52,7 +52,7 @@ Keep schema.ts as the single validation definition and inferred CandidateProfile
 - Preserve existing meaningful record requirements such as company/role or institution in the publication schema. Partial extracted records remain editable until corrected or removed.
 - Make achievements and technologies string arrays. Edit one item per row or line; avoid lossy comma splitting.
 - Preserve date precision as strings: year, year-month, full date, or explicitly ongoing end date. Validate actual dates without inventing precision or forcing a date picker.
-- Accept A1, A2, B1, B2, C1, C2, Native and source descriptions for language proficiency; never infer a level.
+- Accept only unknown (empty string), A1, A2, B1, B2, C1, C2 and Native for language proficiency. Use a fixed selector without a free-text field; never infer a level from a description.
 - Retain certification credential ID/URL and experience description from the supplied schema; no legacy mapping is needed.
 - Store stable repeated-record IDs and source/conversion metadata outside editable facts. Use React Hook Form field arrays and stable row keys.
 - Version persisted envelopes. Reject unsupported versions/unexpected stored fields with actionable errors instead of silently stripping data.
@@ -145,7 +145,15 @@ No Python integration or compatibility migration, Projects, experience location,
 
 All interview decisions are reflected above and approved. Exact module filenames, PDF extractor compatibility and installed Codex flags are implementation verification tasks, not unresolved product decisions.
 
-## References
+## Implementation verification
+
+- All 27 web tests passed, including the existing directory-picker checks.
+- TypeScript and production build passed. Feature-scoped and full ESLint passed; the applications table retains its pre-existing unused-import warnings. The reused Button received an equivalent children-markup correction to clear its pre-existing JSX lint error.
+- Production-server smoke test used a fake Codex executable: real PDF extraction, conversion, duplicate upload cache reuse, recovered manual edit and YAML publication passed with exactly one mocked conversion and no live AI tokens.
+- Browser checks with a fictional workspace confirmed draft recovery after reload, Save publication/disabled state, visible invalid-link feedback and focus, and profile controls within a 390px viewport. The existing applications table causes page-level overflow. Preview screenshots were unavailable.
+- No Python code, real candidate data, or live conversion calls were used.
+
+## Source references
 
 - web/src/modules/profile/schema.ts
 - web/src/modules/profile/candidate-profile.tsx

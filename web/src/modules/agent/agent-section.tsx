@@ -4,7 +4,8 @@ import Image from 'next/image';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Field } from '@/shared/components/ui/field';
-import { useState } from 'react';
+import { useAgent } from './agent-session';
+import { FieldDescription } from '@/shared/components/ui/field';
 import {
     Select,
     SelectContent,
@@ -15,17 +16,15 @@ import {
 } from '@/shared/components/ui/select';
 import chatgptIcon from '@/assets/chatgpt-icon.png';
 import claudeIcon from '@/assets/claude-icon.png';
+import { RefreshCw } from 'lucide-react';
+import { cn } from '@/shared/lib/utils';
 
 const items = [
-    { icon: chatgptIcon, label: 'ChatGPT', value: 'chatgpt', disabled: false },
+    { icon: chatgptIcon, label: 'ChatGPT', value: 'codex', disabled: false },
     { icon: claudeIcon, label: 'Claude', value: 'claude', disabled: true },
 ] as const;
 export function ActiveAgentSection() {
-    const [selectedAgent, setSelectedAgent] = useState<(typeof items)[number]['value']>(items[0].value);
-    const handleConnectAgent = () => {
-        // Implement the logic to connect to the selected agent here
-        console.log(`Connecting to agent: ${selectedAgent}`);
-    };
+    const { provider, selectProvider, connection, connecting, connect } = useAgent();
     return (
         <Card>
             <CardHeader>
@@ -34,7 +33,12 @@ export function ActiveAgentSection() {
             </CardHeader>
             <CardContent>
                 <Field orientation="horizontal">
-                    <Select items={items} value={selectedAgent} onValueChange={setSelectedAgent}>
+                    <Select
+                        items={items}
+                        value={provider}
+                        onValueChange={(value) => {
+                            if (value) selectProvider(value);
+                        }}>
                         <SelectTrigger className="w-full max-w-48">
                             <SelectValue />
                         </SelectTrigger>
@@ -57,10 +61,14 @@ export function ActiveAgentSection() {
                             </SelectGroup>
                         </SelectContent>
                     </Select>
-                    <Button disabled={!selectedAgent} isInProgress={false} onClick={handleConnectAgent}>
-                        Connect
+                    <Button
+                        disabled={connecting}
+                        variant={connection.available ? 'outline' : 'default'}
+                        onClick={() => void connect()}>
+                        {connection.available ? <RefreshCw className={cn(connecting && 'animate-spin')} /> : 'Connect'}
                     </Button>
                 </Field>
+                <FieldDescription role="status">{connection.message}</FieldDescription>
             </CardContent>
         </Card>
     );

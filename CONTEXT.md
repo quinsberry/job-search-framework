@@ -9,7 +9,8 @@ A skill that can complete its defined responsibility when invoked directly with 
 
 **Candidate profile**:
 The candidate's source-backed professional facts, including experience, skills, projects, education and languages. It is distinct from search preferences, compensation expectations and vacancy-specific application materials.
-The sole current profile is readable `candidate/profile.md`; separate supporting files retain sources and provenance. Legacy YAML is converted only on a successful save.
+In the Python framework, the sole current profile is readable `candidate/profile.md`; separate supporting files retain sources and provenance. Legacy YAML is converted only on a successful save.
+The independent Next.js app uses a separate candidate-profile model and storage contract. Its editable professional facts include identity, experience, skills, education, certifications and languages; projects and experience location are outside that app's scope. It does not import or migrate Python workspace data.
 _Avoid_: tailored CV, search criteria
 
 **Profile template**:
