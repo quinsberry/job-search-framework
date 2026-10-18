@@ -24,13 +24,14 @@ test('application uses an injected neutral provider; manual commands and reads n
 			path,
 			loaded.snapshot.revision,
 			new File(['# Fictional CV'], 'cv.md'),
-			'fictional-provider',
+			'codex',
 		);
 		for (let n = 0; n < 100 && processing(result.snapshot.job); n++) {
 			await Bun.sleep(5);
 			result = await app.readSnapshot(path);
 		}
 		expect(result.snapshot.job?.phase).toBe('ready');
+		expect(result.snapshot.job?.provider).toBe('fictional-provider');
 		const values = result.snapshot.draft!.values;
 		const recordIds = result.snapshot.draft!.recordIds;
 		const edited = await app.persistDraft({

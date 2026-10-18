@@ -3,14 +3,14 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { FieldDescription, FieldError } from '@/shared/components/ui/field';
 import { UploadFileButton } from '@/shared/components/upload-file-button';
-import type { ProviderReadiness } from '@/shared/ai/contracts';
+import type { Provider, ProviderReadiness } from '@/shared/ai/contracts';
 import type { LoadedWorkspace } from '@/modules/workspace/contracts';
 import { profileOptions } from './client/queries';
 import { ProfileEditor } from './ui/profile-editor';
 import type { ProfileHandle } from './client/use-profile-session';
 export type { ProfileHandle } from './client/use-profile-session';
 
-type AgentProps = { provider: string; connection: ProviderReadiness };
+type AgentProps = { provider: Provider; connection: ProviderReadiness };
 
 export function ProfileSection({
 	loaded,

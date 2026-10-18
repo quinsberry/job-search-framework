@@ -2,7 +2,7 @@
 import type { Control } from 'react-hook-form';
 import type { FormValues } from '../../model/form-model';
 import { FieldGroup, FieldSet } from '@/shared/components/ui/field';
-import { TextField, ListField } from './controls';
+import { TextField, ListField } from '@/shared/components/form/controls';
 export function IdentityFields({ control }: { control: Control<FormValues> }) {
 	return (
 		<FieldSet>

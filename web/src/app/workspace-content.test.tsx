@@ -7,6 +7,9 @@ import type { ProfileHandle } from '@/modules/profile/profile-section';
 let section: { workspace: string | null; workspaceError: string; loadWorkspace: (path: string) => Promise<void> };
 let sessionId: string | undefined;
 let failFlush = false;
+let failPreferencesFlush = false;
+let preferenceFlushes = 0;
+let preferenceDisposals = 0;
 let flushes = 0;
 let disposals = 0;
 mock.module('@/modules/workspace/workspace-section', () => ({
@@ -15,8 +18,8 @@ mock.module('@/modules/workspace/workspace-section', () => ({
 		return null;
 	},
 }));
-mock.module('@/modules/profile/candidate-profile', () => ({
-	CandidateProfile: ({
+mock.module('@/modules/profile/profile-section', () => ({
+	ProfileSection: ({
 		loaded,
 		onSession,
 	}: {
@@ -41,7 +44,30 @@ mock.module('@/modules/profile/candidate-profile', () => ({
 	},
 }));
 mock.module('@/modules/agent/agent-section', () => ({ ActiveAgentSection: () => null }));
-mock.module('@/modules/search/search-preferences-section', () => ({ SearchPreferencesSection: () => null }));
+mock.module('@/modules/search/search-preferences-section', () => ({
+	SearchPreferencesSection: ({
+		loaded,
+		onSession,
+	}: {
+		loaded: { sessionId: string } | null;
+		onSession: (handle: ProfileHandle | null) => void;
+	}) => {
+		useEffect(() => {
+			if (loaded)
+				onSession({
+					prepareToLeave: async () => {
+						preferenceFlushes++;
+						if (failPreferencesFlush) throw new Error('Preferences recovery unavailable');
+					},
+					dispose: () => {
+						preferenceDisposals++;
+					},
+				});
+			return () => onSession(null);
+		}, [loaded, onSession]);
+		return null;
+	},
+}));
 const { WorkspaceContent } = await import('./workspace-content');
 const originalFetch = globalThis.fetch;
 const originalAct = Object.getOwnPropertyDescriptor(globalThis, 'IS_REACT_ACT_ENVIRONMENT');
@@ -51,6 +77,9 @@ const requests: string[] = [];
 beforeEach(() => {
 	Object.defineProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT', { configurable: true, value: true });
 	failFlush = false;
+	failPreferencesFlush = false;
+	preferenceFlushes = 0;
+	preferenceDisposals = 0;
 	flushes = 0;
 	disposals = 0;
 	requests.length = 0;
@@ -58,12 +87,21 @@ beforeEach(() => {
 	globalThis.fetch = (async (url, options) => {
 		const input = JSON.parse(String(options?.body));
 		requests.push(input.workspace);
-		if (input.workspace === '/invalid')
+		if (
+			input.workspace === '/invalid' ||
+			(input.workspace === '/bad-preferences' && url === '/api/search-preferences')
+		)
 			return Response.json({ error: 'Invalid workspace', code: 'invalid' }, { status: 400 });
 		return Response.json(
 			url === '/api/workspace'
 				? { workspace: input.workspace }
-				: { workspace: input.workspace, snapshot: { ...emptyState, profile: null, revision: 'initial' } },
+				: {
+						workspace: input.workspace,
+						snapshot:
+							url === '/api/search-preferences'
+								? { preferences: null, draft: null, revision: 'initial' }
+								: { ...emptyState, profile: null, revision: 'initial' },
+					},
 		);
 	}) as typeof fetch;
 });
@@ -108,4 +146,42 @@ test('workspace composition keeps the old editor on failed flush/load and delibe
 	expect(sessionId).not.toBe(initialSession);
 	expect(flushes).toBe(3);
 	expect(disposals).toBe(1);
+	expect(preferenceFlushes).toBe(3);
+	expect(preferenceDisposals).toBe(1);
+});
+
+test('a preferences flush or target preferences load failure retains both editors', async () => {
+	await act(async () => {
+		renderer = create(
+			<QueryClientProvider client={client}>
+				<WorkspaceContent />
+			</QueryClientProvider>,
+		);
+	});
+	await act(async () => {
+		await section.loadWorkspace('/first');
+	});
+	const initialSession = sessionId;
+	failPreferencesFlush = true;
+	const before = requests.length;
+	await act(async () => {
+		await section.loadWorkspace('/second');
+	});
+	expect(requests.length).toBe(before);
+	expect(section.workspace).toBe('/first');
+	expect(section.workspaceError).toBe('Preferences recovery unavailable');
+	expect(sessionId).toBe(initialSession);
+	failPreferencesFlush = false;
+	await act(async () => {
+		await section.loadWorkspace('/bad-preferences');
+	});
+	expect(section.workspace).toBe('/first');
+	expect(disposals).toBe(0);
+	expect(preferenceDisposals).toBe(0);
+	await act(async () => {
+		await section.loadWorkspace('/second');
+	});
+	expect(section.workspace).toBe('/second');
+	expect(disposals).toBe(1);
+	expect(preferenceDisposals).toBe(1);
 });

@@ -1,8 +1,10 @@
-import type { AIProvider } from '../contracts';
+import type { AIProvider, Provider } from '../contracts';
 import { codexProvider } from './codex';
-const providers: ReadonlyMap<string, AIProvider> = new Map([[codexProvider.id, codexProvider]]);
-export function getProvider(id: string): AIProvider {
-	const provider = providers.get(id);
-	if (!provider) throw new Error('Unknown AI provider.');
-	return provider;
+
+export const providers = {
+	[codexProvider.id]: codexProvider,
+} satisfies { [Id in Provider]: AIProvider & { readonly id: Id } };
+
+export function getProvider(id: Provider): AIProvider {
+	return providers[id];
 }

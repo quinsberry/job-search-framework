@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useSyncExternalStore } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
 import { FieldGroup, FieldDescription, FieldError } from '@/shared/components/ui/field';
@@ -8,9 +8,10 @@ import { processing, type ProfileSnapshot } from '../model/contracts';
 import { fromFormValues } from '../model/form-model';
 import { hasProfileChanges } from '../model/editor-state';
 import { useProfileSession, type ProfileHandle } from '../client/use-profile-session';
-import type { ProviderReadiness } from '@/shared/ai/contracts';
+import type { Provider, ProviderReadiness } from '@/shared/ai/contracts';
 import { ProfileConfirmation, type Confirmation } from './profile-confirmation';
-import { ProfileProgress, RecoveryStatus } from './profile-progress';
+import { ProfileProgress } from './profile-progress';
+import { RecoveryStatus } from '@/shared/components/form/recovery-status';
 import { ProfileForm, useProfileForm } from './profile-form';
 
 export function ProfileEditor({
@@ -27,7 +28,7 @@ export function ProfileEditor({
 	sessionId: string;
 	initial: ProfileSnapshot;
 	snapshot: ProfileSnapshot;
-	provider: string;
+	provider: Provider;
 	connection: ProviderReadiness;
 	switching: boolean;
 	onSession: (handle: ProfileHandle | null) => void;
@@ -46,6 +47,7 @@ export function ProfileEditor({
 		onSession,
 		onConverted: converted,
 	});
+	const recovery = useSyncExternalStore(session.subscribe, session.getState, session.getState);
 	const active = processing(snapshot.job);
 	const hasEditor = !!(snapshot.profile || snapshot.draft);
 	const disabled = busy || active || switching;
@@ -75,7 +77,11 @@ export function ProfileEditor({
 			</FieldDescription>
 			<ProfileProgress job={snapshot.job} busy={busy} />
 			<RecoveryStatus
-				session={session}
+				status={recovery.status}
+				error={recovery.error}
+				retry={() => void session.retry().catch(() => {})}
+				reloadLabel="Reload current profile"
+				disabled={disabled}
 				showMessage={hasEditor && !active}
 				reload={() => setConfirmation({ action: 'reload' })}
 			/>

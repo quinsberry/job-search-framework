@@ -21,6 +21,13 @@ The job seeker's requirements and preferences used to discover and assess vacanc
 
 **Search configuration**:
 The job seeker's editable choices for a vacancy search, linked to their professional profile. It can contain unfinished decisions; past experience alone does not establish desired roles or mandatory vacancy requirements.
+The independent web app allows manual search configuration without a saved candidate profile or AI connection. Residence means where the candidate lives; it does not by itself establish an acceptable commute or remote-country eligibility.
+
+**Baseline salary**:
+The minimum acceptable compensation in a search preference, expressed with a contract type, currency, pay period and pay basis.
+
+**Target salary**:
+The desired compensation in a search preference, at least its baseline salary when supplied. It is not an upper cutoff for acceptable vacancy pay and is distinct from vacancy-specific asking compensation.
 
 **Search readiness**:
 Whether the selected workspace, usable candidate profile, search preferences and AI connection satisfy the prerequisites for starting a search. Optional unknown profile facts can produce warnings without blocking search. Readiness does not guarantee live source access or available AI capacity.

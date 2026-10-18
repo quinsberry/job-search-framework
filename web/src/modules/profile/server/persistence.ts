@@ -1,8 +1,7 @@
 import { YAML } from 'bun';
-import { createHash, randomUUID } from 'node:crypto';
-import { lstat, mkdir, readFile, realpath, rename, rm, stat, writeFile } from 'node:fs/promises';
-import { isAbsolute, join, relative, sep } from 'node:path';
 import { z } from 'zod';
+import { WorkspaceFiles, digest, alive } from '@/shared/server/workspace-files';
+export { digest } from '@/shared/server/workspace-files';
 import {
 	emptyState,
 	processing,
@@ -18,103 +17,30 @@ import {
 } from '../model/contracts';
 import { profileDraftSchema, profileSchema, toDraft, type ProfileDraft } from '../model/schema';
 
-export const digest = (value: string | Uint8Array) => createHash('sha256').update(value).digest('hex');
-const missing = (error: unknown) => (error as NodeJS.ErrnoException).code === 'ENOENT';
-export function alive(pid: number) {
-	try {
-		process.kill(pid, 0);
-		return true;
-	} catch {
-		return false;
-	}
-}
-
 export class ProfileRepository {
-	private constructor(
-		readonly workspace: string,
-		private root: string,
-	) {}
+	private constructor(private files: WorkspaceFiles) {}
+	get workspace() {
+		return this.files.workspace;
+	}
 	static async open(workspace: string) {
-		if (!isAbsolute(workspace)) throw new ProfileError('invalid', 'Select an absolute workspace folder.');
-		const resolved = await realpath(workspace);
-		if (!(await stat(resolved)).isDirectory()) throw new ProfileError('invalid', 'Workspace must be a folder.');
-		const root = join(resolved, 'candidate-profile');
-		await mkdir(root, { recursive: true });
-		if ((await lstat(root)).isSymbolicLink())
-			throw new ProfileError('invalid', 'Profile storage cannot use symbolic links.');
-		return new ProfileRepository(resolved, root);
+		return new ProfileRepository(await WorkspaceFiles.open(workspace, 'candidate-profile'));
 	}
-	private async path(name: string) {
-		const path = join(this.root, name);
-		const rel = relative(this.root, path);
-		if (rel.startsWith('..') || isAbsolute(rel)) throw new ProfileError('invalid', 'Invalid storage path.');
-		let current = this.workspace;
-		for (const part of relative(this.workspace, path).split(sep)) {
-			current = join(current, part);
-			try {
-				if ((await lstat(current)).isSymbolicLink())
-					throw new ProfileError('invalid', 'Profile storage cannot use symbolic links.');
-			} catch (error) {
-				if (!missing(error)) throw error;
-			}
-		}
-		return path;
+	private read(name: string) {
+		return this.files.read(name);
 	}
-	private async read(name: string): Promise<string | null> {
-		try {
-			return await readFile(await this.path(name), 'utf8');
-		} catch (error) {
-			if (missing(error)) return null;
-			throw error;
-		}
+	private write(name: string, value: unknown) {
+		return this.files.write(name, value);
 	}
-	private async write(name: string, value: unknown) {
-		await this.writeBytes(name, YAML.stringify(value, null, 2));
+	private writeBytes(name: string, bytes: string | Uint8Array) {
+		return this.files.writeBytes(name, bytes);
 	}
-	private async writeBytes(name: string, bytes: string | Uint8Array) {
-		const path = await this.path(name);
-		await mkdir(join(path, '..'), { recursive: true });
-		await this.path(name);
-		const temporary = path + '.' + randomUUID() + '.tmp';
-		try {
-			await writeFile(temporary, bytes, { flag: 'wx', mode: 0o600 });
-			await rename(temporary, path);
-		} finally {
-			await rm(temporary, { force: true });
-		}
+	private lock<T>(action: () => Promise<T>): Promise<T> {
+		return this.files.lock(action);
 	}
-	async readSource(name: string) {
-		return readFile(await this.path('sources/' + name));
+	readSource(name: string) {
+		return this.files.readBytes('sources/' + name);
 	}
-	private async lock<T>(action: () => Promise<T>): Promise<T> {
-		const lock = await this.path('.lock');
-		for (let attempt = 0; ; attempt++) {
-			try {
-				await mkdir(lock);
-				break;
-			} catch (error) {
-				if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-				try {
-					const owner = await this.read('.lock/owner');
-					if (owner ? !alive(Number(owner)) : Date.now() - (await stat(lock)).mtimeMs > 5000) {
-						await rm(lock, { recursive: true, force: true });
-						continue;
-					}
-				} catch (error) {
-					if (missing(error)) continue;
-					throw error;
-				}
-				if (attempt >= 100) throw new ProfileError('conflict', 'Profile is busy. Please retry.');
-				await new Promise((resolve) => setTimeout(resolve, 20));
-			}
-		}
-		try {
-			await writeFile(join(lock, 'owner'), String(process.pid));
-			return await action();
-		} finally {
-			await rm(lock, { recursive: true, force: true });
-		}
-	}
+
 	private async snapshot(): Promise<ProfileSnapshot> {
 		const [profileText, stateText] = await Promise.all([this.read('profile.yaml'), this.read('draft.yaml')]);
 		const published = profileText === null ? null : profileFileSchema.parse(YAML.parse(profileText));
@@ -190,7 +116,7 @@ export class ProfileRepository {
 			if (ids.length !== values[section].length || new Set(ids).size !== ids.length)
 				throw new ProfileError('invalid', 'Record identities must match the profile entries.');
 		}
-		return { id: state.draft?.id ?? randomUUID(), values, recordIds };
+		return { id: state.draft?.id ?? crypto.randomUUID(), values, recordIds };
 	}
 	async publish(values: unknown, expected: string, recordIds?: RecordIds) {
 		const profile = profileSchema.parse(values);

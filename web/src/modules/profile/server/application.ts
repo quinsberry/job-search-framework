@@ -1,3 +1,4 @@
+import type { Provider } from '@/shared/ai/contracts';
 import { ProfileRepository, type ProfilePersistence } from './persistence';
 import { ConversionService } from './conversion';
 import { getProvider } from '@/shared/ai/server/providers';
@@ -16,9 +17,9 @@ export function createProfileApplication(
 	};
 	return {
 		readSnapshot: (workspace: string) => result(workspace, (repo) => repo.load()),
-		startImport: (workspace: string, revision: string, file: File, provider: string) =>
+		startImport: (workspace: string, revision: string, file: File, provider: Provider) =>
 			result(workspace, (repo) => new ConversionService(resolveProvider(provider)).start(repo, file, revision)),
-		retryImport: (workspace: string, revision: string, provider: string) =>
+		retryImport: (workspace: string, revision: string, provider: Provider) =>
 			result(workspace, (repo) => new ConversionService(resolveProvider(provider)).retry(repo, revision)),
 		persistDraft: (input: Extract<ProfileRequest, { action: 'edit' | 'publish' }>) =>
 			result(input.workspace, (repo) => repo.edit(input.values, input.revision, input.recordIds)),

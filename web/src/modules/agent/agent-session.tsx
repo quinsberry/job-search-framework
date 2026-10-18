@@ -3,8 +3,12 @@ import { createContext, useContext, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { agentOptions } from './queries';
 import { disconnected } from './contracts';
+import { type Provider } from '@/shared/ai/contracts';
+
+const DEFAULT_PROVIDER: Provider = 'codex';
+
 function useAgentState() {
-	const [provider, selectProvider] = useState('codex');
+	const [provider, selectProvider] = useState<Provider>(DEFAULT_PROVIDER);
 	const { data, error, isFetching, refetch } = useQuery(agentOptions(provider));
 	return {
 		provider,

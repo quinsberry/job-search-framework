@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { providerSchema } from '@/shared/ai/contracts';
 import { profileDraftSchema, profileSchema } from './schema';
 import type { ProfileDraft } from './schema';
 
@@ -61,7 +62,7 @@ export const profileRequestSchema = z.discriminatedUnion('action', [
 		action: z.literal('retry'),
 		workspace: z.string(),
 		revision: z.string(),
-		provider: z.string().default('codex'),
+		provider: providerSchema.default(providerSchema.options[0]),
 	}),
 	z.strictObject({
 		action: z.enum(['edit', 'publish']),

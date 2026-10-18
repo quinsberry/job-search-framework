@@ -92,18 +92,64 @@ Run `bun test` for the web tests, `bunx tsc --noEmit` for typechecking, and
 `bun run lint` / `bun run build` for integration checks. Tests use fictional
 workspaces and mocked AI, without spending conversion tokens.
 
+## Search Preferences
+
+Load a workspace to edit target titles, seniorities, position types, acceptable
+work arrangements, residence, optional compensation preferences and search limits.
+This editor works without a saved candidate profile or AI connection. It does not
+run a vacancy search or read/migrate the Python `search-config.yml`.
+
+Select one or more acceptable arrangements. City and country describe where you
+live and are required for hybrid or on-site work. They do not define commute
+distance, relocation or eligibility for remote jobs in a country.
+
+Salary entries are optional; no entries means no compensation restriction. Each
+entry shares a contract type, currency, pay period and pay basis across `min`
+(Baseline salary) and optional `desired` (Target salary). Baseline is the minimum
+acceptable amount; target must be at least baseline and never acts as an upper
+cutoff. Gross and net invoice amounts excluding VAT are explicit choices; the
+editor does not convert currencies or calculate taxes.
+
+`maxJobsToProcess` is the inspection limit; `maxJobsToMatch` is the desired number
+of qualifying results, no greater than that limit. Both require positive integers.
+No business choices or search limits are silently filled in.
+
+```text
+search-preferences/
+  config.yaml                  # schemaVersion: 1, preferences, publication marker
+  draft.yaml                   # schemaVersion: 1, recoverable unfinished values
+```
+
+The saved envelope contains `preferences: { targetPosition, settings }`. The
+authoritative schemas are in `src/modules/search/schema.ts`. Recovery keeps
+unfinished numeric text and empty choices; Save validates and activates the
+configuration, while confirmed Discard restores saved values. Wait for “Draft
+saved for recovery” before closing. A saved configuration stays active while a
+new draft is unfinished. YAML comments/formatting may be regenerated on Save.
+
+Both editors flush recovery before switching workspaces; a failed flush or target
+load keeps the current editors open. Confirmed Discard waits for in-flight work
+without first saving the discarded edits, so a previous recovery failure does not
+block it. Revision checks still apply, and failed commands retain local values.
+
+External file edits and other tabs are checked on writes, window-focus refetch
+and explicit reload. A newly observed external revision offers Reload without
+resetting local values or silently adopting its write revision. Confirmed Reload
+reads the current disk state. There is no continuous preferences polling/watcher.
+
 ### Architecture
 
-`app/workspace-content.tsx` composes independent Workspace, Agent and Profile
-modules. It flushes the active editing session and validates the target before
-switching; failed flushes/loads retain the old editor. A deliberate same-folder
+`app/workspace-content.tsx` composes independent Workspace, Agent, Profile and Search
+modules. It flushes both editing sessions and validates both target snapshots before
+switching; failed flushes/loads retain the old editors. A deliberate same-folder
 reload creates a new session. `app/providers.tsx` owns the stable QueryClient.
 
 Within `modules/profile/`, `model/` holds portable schemas and the mapping between
 form rows and persisted facts/IDs. `client/queries.ts` owns workspace/session-scoped
 snapshots, cancellation and active-job polling. The React-independent
-`client/recovery-session.ts` owns debounce, ordered writes, acknowledged generations
-and explicit command/job reconciliation. Ordinary query observations cannot reset
+`shared/drafts/recovery-session.ts` owns debounce, ordered writes, acknowledged
+generations and explicit command reconciliation. Profile's `client/recovery-session.ts`
+adapts it to conversion-job reconciliation. Ordinary query observations cannot reset
 the form or silently advance its write cursor. `client/use-profile-session.ts`
 connects that session to RHF and the browser lifecycle. `ui/` owns six typed field
 sections, focused subscriptions, confirmations and the isolated progress clock.
@@ -113,9 +159,19 @@ profile prompt/schema policy; `server/persistence.ts` hides YAML, paths, locks,
 publication recovery and checkpoint formats behind domain operations. Routes
 share local-origin and bounded-body validation through `shared/http/`.
 
-`shared/ai/contracts.ts` defines neutral interpretation requests and immutable
-readiness identities. A future Claude adapter belongs in `shared/ai/server/`
-and its provider registration, plus Agent availability/selection metadata. It
+Search owns its model, form mapping, typed transport, queries and YAML repository.
+Shared form controls/status live in `shared/components/form/`; safe filesystem
+operations live in `shared/server/workspace-files.ts`. Shared code never imports
+either feature. Bun provides YAML, file reads and SHA-256 hashing. Exclusive file
+creation, atomic rename, directory locks and symlink checks retain Node APIs;
+unrelated code is not rewritten solely to replace Node imports.
+
+`shared/ai/contracts.ts` owns supported provider IDs, request validation, neutral
+interpretation requests and immutable readiness identities. The registry and
+Agent presentation metadata must cover every supported ID. Runtime readiness is
+separate from support; disconnected providers remain selectable. Stored job IDs
+remain strings so historical providers can still be read. A future Claude adapter
+belongs in `shared/ai/server/`, the shared catalogue, registry and Agent metadata. It
 does not require changes to profile forms, recovery or persistence. A new profile
 field belongs in the model, relevant typed field section and its defaults/mapping;
 transport, query scheduling and workspace switching stay unchanged.
@@ -124,6 +180,10 @@ Existing caches retain the exact source/key derivation and `text.txt`,
 `raw-output.yaml`, `result.yaml` checkpoint formats. Fictional pre-refactor
 fixtures fail if interpretation is attempted for reusable output. ESLint import
 restrictions enforce feature independence and client/server boundaries.
+Feature directories under `src/modules/` are discovered automatically. Features
+may share type-only imports; runtime composition belongs in `app/`. Shared code
+cannot import features. Outside `server/`, `server.ts`, `actions/` and tests,
+shared and feature code cannot import server modules, Node built-ins or Bun.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 

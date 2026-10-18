@@ -12,7 +12,7 @@ function environment() {
 		),
 	) as Record<string, string>;
 }
-export const codexProvider: AIProvider = {
+export const codexProvider: AIProvider & { readonly id: 'codex' } = {
 	id: 'codex',
 	async check() {
 		try {

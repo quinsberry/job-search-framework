@@ -2,7 +2,7 @@
 import type { Control } from 'react-hook-form';
 import type { FormValues } from '../../model/form-model';
 import { FieldGroup, FieldSet, FieldLegend, FieldDescription } from '@/shared/components/ui/field';
-import { TextField, ListField } from './controls';
+import { TextField, ListField } from '@/shared/components/form/controls';
 import { useFieldArray } from 'react-hook-form';
 import { Button } from '@/shared/components/ui/button';
 import { newExperience } from '../../model/form-model';

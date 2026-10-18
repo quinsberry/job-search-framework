@@ -1,7 +1,9 @@
 import { z } from 'zod';
+import { providerSchema } from '@/shared/ai/contracts';
 import { localRequest } from '@/shared/http/server';
 import { profileRequestSchema } from '@/modules/profile/model/contracts';
 import { profileApplication as app } from '@/modules/profile/server/application';
+
 export async function POST(request: Request) {
 	return localRequest(request, async (body) => {
 		if (request.headers.get('content-type')?.startsWith('multipart/form-data')) {
@@ -12,7 +14,7 @@ export async function POST(request: Request) {
 				z.string().parse(data.get('workspace')),
 				z.string().parse(data.get('revision')),
 				file,
-				z.string().parse(data.get('provider') ?? 'codex'),
+				providerSchema.parse(data.get('provider') ?? providerSchema.options[0]),
 			);
 		}
 		const input = profileRequestSchema.parse(await body.json());

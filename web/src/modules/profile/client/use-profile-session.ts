@@ -1,4 +1,5 @@
 'use client';
+import type { Provider } from '@/shared/ai/contracts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { UseFormReturn } from 'react-hook-form';
@@ -9,8 +10,9 @@ import { createRecoverySession, type DraftData, type CommandKind } from './recov
 import { commitProfile } from './queries';
 import * as api from './api';
 import { toast } from '@/shared/components/ui/toast';
+import type { SessionHandle } from '@/shared/drafts/recovery-session';
 
-export type ProfileHandle = { prepareToLeave: () => Promise<void>; dispose: () => void };
+export type ProfileHandle = SessionHandle;
 export type ProfileFormApi = UseFormReturn<FormValues>;
 type Intent = { kind: Exclude<CommandKind, 'start'> } | { kind: 'start'; file: File };
 export function useProfileSession({
@@ -28,7 +30,7 @@ export function useProfileSession({
 	initial: ProfileSnapshot;
 	snapshot: ProfileSnapshot;
 	form: ProfileFormApi;
-	provider: string;
+	provider: Provider;
 	onSession: (handle: ProfileHandle | null) => void;
 	onConverted?: () => void;
 }) {

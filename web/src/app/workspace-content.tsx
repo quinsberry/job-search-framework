@@ -7,12 +7,15 @@ import { AgentSession, useAgent } from '@/modules/agent/agent-session';
 import type { ComponentProps } from 'react';
 import { ActiveAgentSection } from '@/modules/agent/agent-section';
 import { ProfileSection, type ProfileHandle } from '@/modules/profile/profile-section';
+import type { SessionHandle } from '@/shared/drafts/recovery-session';
+import { preferencesOptions } from '@/modules/search/client/queries';
 import { profileOptions } from '@/modules/profile/client/queries';
 import { SearchPreferencesSection } from '@/modules/search/search-preferences-section';
 
 export function WorkspaceContent() {
 	const client = useQueryClient();
 	const profile = useRef<ProfileHandle | null>(null);
+	const preferences = useRef<SessionHandle | null>(null);
 	const opening = useRef(false);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState('');
@@ -23,12 +26,16 @@ export function WorkspaceContent() {
 		setLoading(true);
 		setError('');
 		try {
-			await profile.current?.prepareToLeave();
+			await Promise.all([profile.current?.prepareToLeave(), preferences.current?.prepareToLeave()]);
 			const result = await validateWorkspace(directory);
 			const target = { workspace: result.workspace, sessionId: crypto.randomUUID() };
-			// Validate profile storage before replacing the active workspace and its editor.
-			await client.fetchQuery(profileOptions(target.workspace, target.sessionId));
+			// Validate both storage contracts before replacing the active editors.
+			await Promise.all([
+				client.fetchQuery(profileOptions(target.workspace, target.sessionId)),
+				client.fetchQuery(preferencesOptions(target.workspace, target.sessionId)),
+			]);
 			profile.current?.dispose();
+			preferences.current?.dispose();
 			session.accept(target);
 		} catch (error) {
 			setError(error instanceof Error ? error.message : 'Could not load workspace.');
@@ -40,6 +47,9 @@ export function WorkspaceContent() {
 	const attach = useCallback((handle: ProfileHandle | null) => {
 		profile.current = handle;
 	}, []);
+	const attachPreferences = useCallback((handle: SessionHandle | null) => {
+		preferences.current = handle;
+	}, []);
 	return (
 		<AgentSession>
 			<WorkspaceSection
@@ -50,12 +60,17 @@ export function WorkspaceContent() {
 			/>
 			<ActiveAgentSection />
 			<ConnectedProfile
-				key={session.loaded?.sessionId ?? 'empty'}
+				key={'profile-' + (session.loaded?.sessionId ?? 'empty')}
 				loaded={session.loaded}
 				switching={loading}
 				onSession={attach}
 			/>
-			<SearchPreferencesSection />
+			<SearchPreferencesSection
+				key={'preferences-' + (session.loaded?.sessionId ?? 'empty')}
+				loaded={session.loaded}
+				switching={loading}
+				onSession={attachPreferences}
+			/>
 		</AgentSession>
 	);
 }

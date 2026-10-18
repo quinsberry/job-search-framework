@@ -8,43 +8,29 @@ import { SkillsFields } from './sections/skills-fields';
 import { EducationFields } from './sections/education-fields';
 import { CertificationFields } from './sections/certification-fields';
 import { LanguageFields } from './sections/language-fields';
-import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { FieldSection } from '@/shared/components/form/field-section';
 
 export default function ProfileFields({ control }: { control: Control<FormValues> }) {
 	return (
 		<FieldGroup>
-			<ProfileField title="Identity">
+			<FieldSection title="Identity">
 				<IdentityFields control={control} />
-			</ProfileField>
-			<ProfileField title="Experience">
+			</FieldSection>
+			<FieldSection title="Experience">
 				<ExperienceFields control={control} />
-			</ProfileField>
-			<ProfileField title="Skills">
+			</FieldSection>
+			<FieldSection title="Skills">
 				<SkillsFields control={control} />
-			</ProfileField>
-			<ProfileField title="Education">
+			</FieldSection>
+			<FieldSection title="Education">
 				<EducationFields control={control} />
-			</ProfileField>
-			<ProfileField title="Certifications">
+			</FieldSection>
+			<FieldSection title="Certifications">
 				<CertificationFields control={control} />
-			</ProfileField>
-			<ProfileField title="Languages">
+			</FieldSection>
+			<FieldSection title="Languages">
 				<LanguageFields control={control} />
-			</ProfileField>
+			</FieldSection>
 		</FieldGroup>
-	);
-}
-interface ProfileFieldProps {
-	title: string;
-	children: React.ReactNode;
-}
-export function ProfileField({ title, children }: ProfileFieldProps) {
-	return (
-		<Card>
-			<CardHeader>
-				<CardTitle>{title}</CardTitle>
-			</CardHeader>
-			<CardContent>{children}</CardContent>
-		</Card>
 	);
 }

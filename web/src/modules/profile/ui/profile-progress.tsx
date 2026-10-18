@@ -1,10 +1,8 @@
 'use client';
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useState } from 'react';
 import { Loader } from 'lucide-react';
-import { FieldDescription, FieldError } from '@/shared/components/ui/field';
-import { Button } from '@/shared/components/ui/button';
+import { FieldDescription } from '@/shared/components/ui/field';
 import { processing, type ConversionJob } from '../model/contracts';
-import type { RecoverySession } from '../client/recovery-session';
 export function ProfileProgress({ job, busy }: { job: ConversionJob | null; busy: boolean }) {
 	const [now, setNow] = useState(() => Date.now());
 	const active = processing(job);
@@ -40,39 +38,5 @@ export function ProfileProgress({ job, busy }: { job: ConversionJob | null; busy
 				</FieldDescription>
 			) : null}
 		</div>
-	);
-}
-const messages = {
-	clean: 'Draft saved for recovery',
-	pending: 'Changes waiting for recovery save…',
-	writing: 'Saving recovery draft…',
-	failed: 'Recovery failed; recent edits are only in this page',
-	conflicted: 'Profile changed; your edits are retained',
-};
-export function RecoveryStatus({
-	session,
-	reload,
-	showMessage = true,
-}: {
-	session: RecoverySession;
-	reload: () => void;
-	showMessage?: boolean;
-}) {
-	const state = useSyncExternalStore(session.subscribe, session.getState, session.getState);
-	return (
-		<>
-			{showMessage ? <FieldDescription role="status">{messages[state.status]}</FieldDescription> : null}
-			<FieldError>{state.error}</FieldError>
-			{state.status === 'conflicted' ? (
-				<Button variant="outline" onClick={reload}>
-					Reload current profile
-				</Button>
-			) : null}
-			{state.status === 'failed' ? (
-				<Button variant="outline" onClick={() => void session.retry().catch(() => {})}>
-					Retry draft recovery
-				</Button>
-			) : null}
-		</>
 	);
 }
