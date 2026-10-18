@@ -16,6 +16,18 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+Folder selection uses `Bun.spawn` through a Next.js server action. The dev, build
+and start scripts run Next.js with Bun. On macOS the picker uses the system
+folder dialog via `osascript`; Windows uses PowerShell's folder dialog; Linux
+requires `zenity`. Python is not required for this picker.
+Selection is restricted to the local app and returns an absolute
+path on the computer running Next.js, or `null` when cancelled.
+
+`SelectDirectoryButton` provides successful selections to a client component
+through `onSelect(path)`. Cancellation preserves the previous selection.
+
+Run the folder-selection checks with `bun test src/shared/actions/select-directory.test.ts`.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
