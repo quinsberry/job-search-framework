@@ -185,6 +185,96 @@ may share type-only imports; runtime composition belongs in `app/`. Shared code
 cannot import features. Outside `server/`, `server.ts`, `actions/` and tests,
 shared and feature code cannot import server modules, Node built-ins or Bun.
 
+## Vacancy acquisition
+
+Portable schemas and types live in `shared/search-sources/contracts.ts`. Import
+`listSearchSources` and `createSearchSourceRun` from
+`shared/search-sources/server/search-sources.ts` only in server code. The existing
+ESLint boundary rules prohibit importing source execution from client/shared
+portable modules. LinkedIn is the only registered source in this ticket.
+
+```ts
+const run = createSearchSourceRun(
+	{
+		sourceIds: ['linkedin'],
+		query: {
+			query: 'Platform Engineer',
+			location: 'Poland',
+			workArrangements: ['remote', 'hybrid'],
+			publishedAfter: '2026-10-01T00:00:00Z',
+		},
+	},
+	AbortSignal.any([callerSignal, AbortSignal.timeout(60_000)]),
+);
+try {
+	const batch = await run.next(10); // 1–100 summaries, possibly fewer or none
+	for (const summary of batch.jobs) {
+		const detail = await run.getDetail({
+			sourceId: summary.sourceId,
+			sourceJobId: summary.sourceJobId,
+			url: summary.url,
+		});
+		// Pass successful details plus explicit criteria/facts to the future matcher.
+	}
+	// Repeat next() within the workflow's inspection/result budgets until done.
+	// Inspect batch.sources: done also includes terminal acquisition failures.
+} finally {
+	run.dispose();
+}
+```
+
+All public payloads use strict Zod schemas. Query and source selection are bound
+once per run; callers supply no defaults implicitly. Discovery filters are hints,
+with applied/approximate/unsupported reports, rather than proof of candidate fit.
+LinkedIn translates every requested work arrangement and converts the absolute
+publication cutoff to a rounded native age window. Location interpretation and
+age filtering are reported as approximations.
+
+The run holds native cursors, overflow and exact `(sourceId, sourceJobId)`
+deduplication in memory. Sequential round-robin acquisition (concurrency one)
+keeps ordering deterministic and gives each selected source turns, including
+batches smaller than the source count. Each `next()` acquires at most one page
+per participating source. Concurrent advancement rejects with `busy`; empty
+batches can still have continuation. Adapter pages above their requested limit,
+invalid data and non-progress cursors fail that source rather than dropping data.
+Source failures are terminal for the run and remain in reports. Detail failures
+are attached to their reference and leave other acquisition usable. Invalid
+facade inputs and cancellation/deadline termination reject with typed errors.
+Call `dispose()` to abort pending work and release state. There is no persistence,
+cache, frozen upstream snapshot, cross-source identity inference or restart resume.
+
+LinkedIn uses its public guest HTML endpoints with three attempts maximum,
+10-second per-request deadlines, at most two seconds of retry wait, and 2 MiB
+response limits. Cancellation covers fetch, body reads and retry delays. Details
+are fetched from validated LinkedIn IDs, never arbitrary reference URLs. Actual
+title/description structure is required; missing closure evidence stays `unknown`.
+Blank guest search responses and explicit no-results markers mean exhaustion;
+nonempty unrecognized pages fail. Upstream HTML changes can require parser updates.
+Dates retain their source precision, and detail results retain observed summary
+publication evidence when details omit it. Observation time, expiry, publication
+and availability remain separate facts. Native compensation supports multiple
+contract/range entries with original currency, amounts, period and text; undisclosed
+facts stay null. No salary conversion or fit inference occurs during acquisition.
+
+To add a source, implement `SearchSourceAdapter` under `server/<source>/`, add its
+ID to `sourceIdSchema`, and add its adapter to `server/providers.ts`. The exhaustive
+registry checks enum coverage. Validate source cursors and external payloads,
+preserve overflow and source-owned identities, report requested filter limitations,
+and add fixtures for parsing, access failures, pagination and cancellation.
+Adapters import portable contracts, never the facade or feature modules. Tests
+inject adapters through the same run-creation argument. A multi-source check uses
+an isolated copy with one fictional enum addition; production accepts only real IDs.
+
+The later app workflow owns query construction, inspection/result budgets,
+progress, matcher calls and persistence. The matcher receives normalized details,
+criteria and relevant candidate facts; outcomes are match, no-match or
+needs-clarification, while model/transport failures remain errors. Jev, search UI,
+HTTP endpoints and additional network adapters are follow-up work. This TypeScript
+module is independent of Python acquisition/evaluation and workspace storage.
+
+Run `bun test src/shared/search-sources` for deterministic acquisition tests.
+They use fictional HTML and fake adapters; no live scraping or AI calls occur.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

@@ -1,0 +1,5 @@
+# Independent web acquisition with a run-scoped facade
+
+The Bun/Next.js app owns typed vacancy acquisition independently of the Python runtime. Source adapters normalize their own requests, pagination and evidence behind portable contracts; a server-only registry and run-scoped facade own fair acquisition, exact within-source deduplication and failures. Keeping continuation in a disposable in-memory run avoids a public cursor protocol, persisted sessions and source-specific workflow branches, at the cost of no restart resumption or frozen upstream snapshot.
+
+Acquisition retains advertised evidence and explicit unknowns without judging fit. The future app workflow owns budgets and persistence; the future matcher receives normalized details with criteria and candidate facts, with AI confined to semantic matching in that pipeline. ADR 0001's acquisition/evaluation separation still applies; its Python extraction and replay pipeline is unchanged. Advertised compensation preserves native ranges and pay periods rather than website conversions, so later evaluation can distinguish employer evidence from inferred comparisons.

@@ -47,6 +47,18 @@ _Avoid_: qualifying vacancy, confirmed match
 **Advertised compensation**:
 The employer's published fixed-cash pay amount or range for a vacancy, with its contract type, currency, pay period and pay basis. It is distinct from the candidate's asking range and an employer offer.
 
+**Discovery query**:
+A plain-text request for vacancy discovery, optionally constrained by workplace location, acceptable work arrangements and publication cutoff. These discovery hints do not establish that a vacancy satisfies the candidate's search criteria.
+
+**Search source**:
+A vacancy publisher from which listings and details are acquired. Its source-owned vacancy identity remains distinct from the identity of a hiring opening appearing across publishers.
+
+**Acquisition run**:
+One bounded effort to acquire vacancy evidence from explicitly selected sources for a discovery query. Continuation observes a changing publisher, rather than a frozen snapshot.
+
+**Vacancy availability**:
+The observed open, closed or unknown state of a posting. Missing closure evidence and failed acquisition do not establish that a vacancy is open or closed.
+
 **Discovery budget**:
 The limit on search effort used to find qualifying vacancies. It is separate from the requested count of qualifying vacancies.
 
