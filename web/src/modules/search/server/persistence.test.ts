@@ -107,3 +107,26 @@ test('failed publication preserves old data; committed Save survives interrupted
 	const changed = await reopened.edit(valid(), committed.revision);
 	expect(changed.draft?.id).not.toBe(draft.draft?.id);
 });
+
+test('skill threshold survives draft recovery and saved YAML; old configs and drafts still load', async () => {
+	const { repo, path } = await setup();
+	const values = valid();
+	values.settings.minSkillMatch = '65';
+	const edited = await repo.edit(values, (await repo.load()).revision);
+	const recovered = await PreferencesRepository.open(path).then((repo) => repo.load());
+	expect(recovered.draft?.values.settings.minSkillMatch).toBe('65');
+	const saved = await repo.publish(values, edited.revision);
+	expect(saved.preferences?.settings.minSkillMatch).toBe(65);
+	const reopened = await PreferencesRepository.open(path).then((repo) => repo.load());
+	expect(reopened.preferences?.settings.minSkillMatch).toBe(65);
+	const cleared = valid();
+	cleared.settings.minSkillMatch = '';
+	const without = await repo.publish(cleared, reopened.revision);
+	expect(without.preferences?.settings.minSkillMatch).toBeUndefined();
+	const legacy = valid();
+	delete legacy.settings.minSkillMatch;
+	await repo.edit(legacy, without.revision);
+	expect(
+		(await PreferencesRepository.open(path).then((repo) => repo.load())).draft?.values.settings.minSkillMatch,
+	).toBeUndefined();
+});

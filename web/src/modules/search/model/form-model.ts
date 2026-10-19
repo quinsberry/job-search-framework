@@ -20,6 +20,7 @@ export function toPreferences(values: PreferencesDraft) {
 		settings: {
 			maxJobsToProcess: number(values.settings.maxJobsToProcess),
 			maxJobsToMatch: number(values.settings.maxJobsToMatch),
+			minSkillMatch: number(values.settings.minSkillMatch ?? ''),
 		},
 	};
 }
@@ -41,6 +42,7 @@ export function toDraft(saved: SearchPreferences | null): PreferencesDraft {
 		settings: {
 			maxJobsToProcess: String(saved.settings.maxJobsToProcess),
 			maxJobsToMatch: String(saved.settings.maxJobsToMatch),
+			minSkillMatch: saved.settings.minSkillMatch === undefined ? '' : String(saved.settings.minSkillMatch),
 		},
 	});
 }

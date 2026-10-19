@@ -58,6 +58,7 @@ export const targetPositionSearchSchema = z
 	});
 export const searchSettingsSchema = z
 	.strictObject({
+		minSkillMatch: z.number().int('Use a whole percentage').min(1).max(100).optional(),
 		maxJobsToProcess: z
 			.number({ error: 'Enter an inspection limit' })
 			.int('Use a whole number')
@@ -94,7 +95,7 @@ export const preferencesDraftSchema = z.strictObject({
 		positionType: z.array(z.enum(positionTypes)).max(positionTypes.length),
 		workArrangements: z.array(z.enum(workArrangements)).max(workArrangements.length),
 	}),
-	settings: z.strictObject({ maxJobsToProcess: text, maxJobsToMatch: text }),
+	settings: z.strictObject({ maxJobsToProcess: text, maxJobsToMatch: text, minSkillMatch: text.optional() }),
 });
 export type TargetPositionSearch = z.infer<typeof targetPositionSearchSchema>;
 export type SearchSettings = z.infer<typeof searchSettingsSchema>;
@@ -109,7 +110,7 @@ export const emptyPreferences: PreferencesDraft = {
 		positionType: [],
 		workArrangements: [],
 	},
-	settings: { maxJobsToProcess: '', maxJobsToMatch: '' },
+	settings: { maxJobsToProcess: '', maxJobsToMatch: '', minSkillMatch: '' },
 };
 export const emptySalary: z.output<typeof salaryDraftSchema> = {
 	contractType: '',

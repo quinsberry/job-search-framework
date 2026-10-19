@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createSearchSourceRun } from '../search.service';
+import { SearchRun } from '../search.service';
 import {
 	SearchSourceError,
 	type SearchSourceAdapter,
@@ -40,7 +40,7 @@ function fake(id: SourceId, delay: number, fail = false): SearchSourceAdapter {
 	};
 }
 async function collect(limit: number, delays: number[]) {
-	const run = createSearchSourceRun(
+	const run = new SearchRun(
 		{ sourceIds: ['linkedin', fixtureId], query: { query: 'x' } },
 		new AbortController().signal,
 		[fake('linkedin', delays[0]), fake(fixtureId, delays[1])],
@@ -76,11 +76,10 @@ failing.search = async (...args: Parameters<SearchSourceAdapter['search']>) => {
 	failures++;
 	return failingSearch(...args);
 };
-const run = createSearchSourceRun(
-	{ sourceIds: ['linkedin', fixtureId], query: { query: 'x' } },
-	new AbortController().signal,
-	[fake('linkedin', 0), failing],
-);
+const run = new SearchRun({ sourceIds: ['linkedin', fixtureId], query: { query: 'x' } }, new AbortController().signal, [
+	fake('linkedin', 0),
+	failing,
+]);
 let batch = await run.next(2);
 assert.equal(batch.jobs.length, 1);
 assert.equal(batch.sources[1].error?.code, 'blocked');
@@ -88,7 +87,7 @@ batch = await run.next(2);
 assert.ok(batch.jobs.length);
 assert.equal(failures, 1);
 run.dispose();
-const allFailed = createSearchSourceRun(
+const allFailed = new SearchRun(
 	{ sourceIds: ['linkedin', fixtureId], query: { query: 'x' } },
 	new AbortController().signal,
 	[fake('linkedin', 0, true), fake(fixtureId, 0, true)],
@@ -98,11 +97,10 @@ assert.equal(failed.done, true);
 assert.ok(failed.sources.every((source: { status: string }) => source.status === 'failed'));
 allFailed.dispose();
 
-const selected = createSearchSourceRun(
-	{ sourceIds: ['linkedin'], query: { query: 'x' } },
-	new AbortController().signal,
-	[fake('linkedin', 0), fake(fixtureId, 0)],
-);
+const selected = new SearchRun({ sourceIds: ['linkedin'], query: { query: 'x' } }, new AbortController().signal, [
+	fake('linkedin', 0),
+	fake(fixtureId, 0),
+]);
 await assert.rejects(
 	() => selected.getDetail({ sourceId: fixtureId, sourceJobId: 'other', url: 'https://example.com/other' }),
 	{ code: 'invalid-input' },
@@ -110,10 +108,8 @@ await assert.rejects(
 selected.dispose();
 const wrongSource = fake('linkedin', 0);
 wrongSource.search = async () => ({ jobs: [job(fixtureId, 'other')], nextCursor: null, filters: [] });
-const invalid = createSearchSourceRun(
-	{ sourceIds: ['linkedin'], query: { query: 'x' } },
-	new AbortController().signal,
-	[wrongSource],
-);
+const invalid = new SearchRun({ sourceIds: ['linkedin'], query: { query: 'x' } }, new AbortController().signal, [
+	wrongSource,
+]);
 assert.equal((await invalid.next(1)).sources[0].error?.code, 'invalid-response');
 invalid.dispose();

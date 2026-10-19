@@ -278,6 +278,15 @@ export function PreferencesFields({ control, disabled }: Props) {
                     </Button>
                 </FieldGroup>
             </FieldSection>
+            <FieldSection title="Skill matching">
+                <TextField
+                    control={control}
+                    name="settings.minSkillMatch"
+                    label="Minimum skill match (%, optional)"
+                    inputMode="numeric"
+                    help="Enter 1–100 for the share of required skills you must have. Leave empty to skip skill matching. Add skills to your profile before using a threshold."
+                />
+            </FieldSection>
             <FieldSection title="Search limits">
                 <FieldGroup className="grid gap-4 sm:grid-cols-2">
                     <TextField

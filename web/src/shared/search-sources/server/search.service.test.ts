@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { cp, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createSearchSourceRun, listSearchSources } from './search.service';
+import { SearchRun, listSearchSources } from './search.service';
 import { SearchSourceError, type JobSummary, type SearchSourceAdapter } from '../contracts';
 
 const job: JobSummary = {
@@ -38,9 +38,9 @@ test('registry metadata and facade inputs validate without acquisition', () => {
 		calls++;
 		return { jobs: [], nextCursor: null, filters: [] };
 	});
-	expect(() => createSearchSourceRun({ ...input, sourceIds: [] }, signal(), [fake])).toThrow();
-	expect(() => createSearchSourceRun(input, signal(), [])).toThrow();
-	expect(() => createSearchSourceRun(input, signal(), [fake, fake])).toThrow();
+	expect(() => new SearchRun({ ...input, sourceIds: [] }, signal(), [fake])).toThrow();
+	expect(() => new SearchRun(input, signal(), [])).toThrow();
+	expect(() => new SearchRun(input, signal(), [fake, fake])).toThrow();
 	expect(calls).toBe(0);
 });
 
@@ -55,7 +55,7 @@ test('busy rejection, exact deduplication and non-progress failure are bounded',
 				})
 			: { jobs: [job], nextCursor: 'next', filters: [] };
 	});
-	const run = createSearchSourceRun(input, signal(), [fake]);
+	const run = new SearchRun(input, signal(), [fake]);
 	await expect(run.next(0)).rejects.toMatchObject({ code: 'invalid-input' });
 	const pending = run.next(1);
 	await expect(run.next(1)).rejects.toMatchObject({ code: 'busy' });
@@ -73,7 +73,7 @@ test('busy rejection, exact deduplication and non-progress failure are bounded',
 
 test('empty pages with advancing cursors and repeated IDs acquire only once per next call', async () => {
 	let calls = 0;
-	const run = createSearchSourceRun(input, signal(), [
+	const run = new SearchRun(input, signal(), [
 		adapter(async () => {
 			calls++;
 			return {
@@ -98,7 +98,7 @@ test('over-limit, wrong-source and malformed adapter responses fail terminally',
 		{ jobs: [{ ...job, title: '' }], nextCursor: null, filters: [] },
 		{ jobs: [], nextCursor: '', filters: [] },
 	]) {
-		const run = createSearchSourceRun(input, signal(), [adapter(async () => page)]);
+		const run = new SearchRun(input, signal(), [adapter(async () => page)]);
 		const batch = await run.next(1);
 		expect(batch.done).toBe(true);
 		expect(batch.sources[0].error?.code).toBe('invalid-response');
@@ -108,12 +108,12 @@ test('over-limit, wrong-source and malformed adapter responses fail terminally',
 
 test('requested filters must have an explicit application report', async () => {
 	const requested = { ...input, query: { query: 'engineer', location: 'Poland' } };
-	const missing = createSearchSourceRun(requested, signal(), [
+	const missing = new SearchRun(requested, signal(), [
 		adapter(async () => ({ jobs: [], nextCursor: null, filters: [] })),
 	]);
 	expect((await missing.next(1)).sources[0].error?.code).toBe('invalid-response');
 	missing.dispose();
-	const unsupported = createSearchSourceRun(requested, signal(), [
+	const unsupported = new SearchRun(requested, signal(), [
 		adapter(async () => ({
 			jobs: [],
 			nextCursor: null,
@@ -133,7 +133,7 @@ test('detail failure stays local and identity mismatch is rejected', async () =>
 		if (++calls === 1) throw new SearchSourceError('network', 'failed');
 		return { ok: true, job: { ...job, description: 'content', availability: 'unknown' } };
 	};
-	const run = createSearchSourceRun(input, signal(), [fake]);
+	const run = new SearchRun(input, signal(), [fake]);
 	const failed = await run.getDetail(ref);
 	expect(!failed.ok && failed.error.code).toBe('network');
 	expect((await run.getDetail(ref)).ok).toBe(true);
@@ -147,9 +147,7 @@ test('cancellation/disposal reject pending and future operations even for an unc
 		const controller = new AbortController();
 		const fake = adapter(async () => new Promise(() => {}));
 		fake.getDetail = async () => new Promise(() => {});
-		const run = createSearchSourceRun(input, stop === 'timeout' ? AbortSignal.timeout(5) : controller.signal, [
-			fake,
-		]);
+		const run = new SearchRun(input, stop === 'timeout' ? AbortSignal.timeout(5) : controller.signal, [fake]);
 		const pending = Promise.allSettled([run.next(1), run.getDetail(ref)]);
 		if (stop === 'cancel') controller.abort();
 		else if (stop === 'dispose') run.dispose();
@@ -164,6 +162,27 @@ test('cancellation/disposal reject pending and future operations even for an unc
 	}
 });
 
+test('separate run instances keep identities, cursors and cancellation isolated', async () => {
+	const controller = new AbortController();
+	const cursors: (string | undefined)[] = [];
+	const fake = adapter(async ({ cursor }) => {
+		cursors.push(cursor);
+		return { jobs: [job], nextCursor: cursor ? null : 'next', filters: [] };
+	});
+	const first = new SearchRun(input, controller.signal, [fake]);
+	const second = new SearchRun(input, signal(), [fake]);
+	expect((await first.next(1)).jobs).toHaveLength(1);
+	expect((await second.next(1)).jobs).toHaveLength(1);
+	controller.abort();
+	await expect(first.next(1)).rejects.toMatchObject({ code: 'cancelled' });
+	const remaining = await second.next(1);
+	expect(remaining.done).toBe(true);
+	expect(remaining.jobs).toHaveLength(0);
+	expect(cursors).toEqual([undefined, undefined, 'next']);
+	first.dispose();
+	second.dispose();
+});
+
 // Extend only the enum in an isolated copy, exactly as adding a second production source would.
 // Fictional IDs never become accepted production inputs or leak through Bun's global module mocks.
 test('multiple adapters share the unmodified facade fairly and isolate failures', async () => {
@@ -171,7 +190,7 @@ test('multiple adapters share the unmodified facade fairly and isolate failures'
 	try {
 		await cp(new URL('../', import.meta.url), directory, { recursive: true });
 		await symlink(
-			new URL('../../../../../node_modules', import.meta.url).pathname,
+			new URL('../../../../node_modules', import.meta.url).pathname,
 			join(directory, 'node_modules'),
 			'dir',
 		);

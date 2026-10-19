@@ -78,11 +78,16 @@ interface SearchSourceRun {
 
 // Server entry points; tests supply adapters through the same creation seam.
 listSearchSources(): SourceDescriptor[];
-createSearchSourceRun(
-  input: { sourceIds: SourceId[]; query: DiscoveryQuery },
-  signal: AbortSignal,
-  adapters?: readonly SearchSourceAdapter[],
-): SearchSourceRun;
+class SearchRun implements SearchSourceRun {
+  constructor(
+    input: { sourceIds: SourceId[]; query: DiscoveryQuery },
+    signal: AbortSignal,
+    adapters?: readonly SearchSourceAdapter[],
+  );
+  next(limit: number): Promise<SearchBatch>;
+  getDetail(ref: JobRef): Promise<DetailResult>;
+  dispose(): void;
+}
 ```
 
 The run-scoped facade binds the selected sources, immutable query and signal once. The run object holds all source cursors, buffers and progress in memory; callers just call `next(limit)` until `done`. Adapter cursors stay source-owned and never leave the run. `getDetail` dispatches by `sourceId` only and rejects references outside the selected registry. It constructs requests from adapter-validated identities; an untrusted reference URL must not turn into arbitrary server-side fetching.

@@ -20,7 +20,7 @@ export function TextField<F extends FieldValues>({
 	multiline,
 	className,
 	inputMode,
-}: Props<F, string> & {
+}: Props<F, string | undefined> & {
 	multiline?: boolean;
 	className?: string;
 	inputMode?: 'decimal' | 'numeric';

@@ -57,7 +57,6 @@ test('salary baseline and optional target share units; invalid or legacy endpoin
 		contractType: 'B2B',
 		currency: 'PLN',
 		period: 'month',
-		basis: 'net-excluding-vat',
 		min: 20_000,
 		desired: 30_000,
 	};
@@ -82,4 +81,30 @@ test('drafts retain invalid numeric text and empty choices; saved normalization 
 	expect(formSchema.safeParse(toDraft(saved)).success).toBe(true);
 	expect(hasChanges(toDraft(saved), saved)).toBe(false);
 	expect(hasChanges(values, saved)).toBe(true);
+});
+
+test('optional skill threshold validates 1–100 and round-trips without changing old configs', () => {
+	const old = searchPreferencesSchema.parse(validPreferences());
+	expect(old.settings.minSkillMatch).toBeUndefined();
+	expect(toDraft(old).settings.minSkillMatch).toBe('');
+	for (const minSkillMatch of [1, 50, 100]) {
+		const saved = searchPreferencesSchema.parse({ ...old, settings: { ...old.settings, minSkillMatch } });
+		expect(toDraft(saved).settings.minSkillMatch).toBe(String(minSkillMatch));
+		expect(searchPreferencesSchema.parse(toPreferences(toDraft(saved))).settings).toEqual(saved.settings);
+		expect(hasChanges(toDraft(saved), saved)).toBe(false);
+	}
+	for (const minSkillMatch of [0, 101, 0.5, NaN, Infinity, '50'])
+		expect(
+			searchPreferencesSchema.safeParse({ ...old, settings: { ...old.settings, minSkillMatch } }).success,
+		).toBe(false);
+	const legacy = toDraft(old);
+	delete legacy.settings.minSkillMatch;
+	expect(preferencesDraftSchema.safeParse(legacy).success).toBe(true);
+	expect(formSchema.safeParse(legacy).success).toBe(true);
+	for (const value of ['not yet', '0', '101', '50.5']) {
+		const draft = toDraft(old);
+		draft.settings.minSkillMatch = value;
+		expect(preferencesDraftSchema.parse(draft).settings.minSkillMatch).toBe(value);
+		expect(formSchema.safeParse(draft).success).toBe(false);
+	}
 });

@@ -38,6 +38,12 @@ _Avoid_: inspected listing, possible match
 A vacancy with missing or ambiguous evidence for at least one mandatory search criterion and no confirmed disqualifying condition.
 _Avoid_: qualifying vacancy, confirmed match
 
+**Skill match**:
+The share of a vacancy's must-have skills the candidate has, compared to the job seeker's chosen threshold. Nice-to-have skills do not count toward this share.
+
+**Match outcome**:
+The result of evaluating vacancy evidence against the candidate's criteria: match, no-match or needs-clarification. Failures to evaluate are errors rather than match outcomes.
+
 **Advertised compensation**:
 The employer's published fixed-cash pay amount or range for a vacancy, with its contract type, currency, pay period and original text. A vacancy may advertise several. It is distinct from the candidate's baseline and target salary and from an employer offer.
 
