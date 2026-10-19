@@ -1,8 +1,8 @@
 ## Agent skills
 
-### Skill authoring
+### Web app
 
-Use the project's modular skill and Python execution conventions. See `docs/agents/skills.md`.
+The app is in `web/`; see `web/README.md`. From `web/`, check changes with `bun test`, `bunx tsc --noEmit`, `bun run lint` and `bun run build`.
 
 ### Issue tracker
 

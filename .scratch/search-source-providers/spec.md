@@ -137,7 +137,7 @@ web/src/shared/search-sources/
 
 Move the existing LinkedIn files under `server/linkedin/` so execution is clearly separated from portable contracts and existing lint rules protect client imports. Keep responsibilities together; merge `provider.ts` into a nearby file if it becomes only a forwarding wrapper. Do not extract a generic scraping framework or shared network module until a second implemented adapter actually needs it.
 
-No matcher implementation, UI, search-run HTTP endpoints or workspace schema changes in this change. Document the future workflow/matcher handoff in the web README. Add an ADR and root vocabulary updates during implementation where they record the accepted independent web ownership; do not claim the Python runtime depends on this TypeScript module. ADR 0001's separation of acquisition and evaluation remains relevant, while its Python fact-extraction pipeline is unchanged.
+No matcher implementation, UI, search-run HTTP endpoints or workspace schema changes in this change. Document the future workflow/matcher handoff in the web README. Add an ADR (0007) and root vocabulary updates recording acquisition ownership and its separation from evaluation.
 
 ## Implementation sequence
 
