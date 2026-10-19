@@ -48,7 +48,7 @@ export const codexProvider: AIProvider & { readonly id: 'codex' } = {
 		} catch {
 			return {
 				available: false,
-				cacheIdentity: 'codex-cli:default:profile-v1',
+				cacheIdentity: 'codex-cli:default',
 				message: 'Codex CLI is unavailable. Install it, run codex login, then Connect again.',
 			};
 		}
@@ -60,7 +60,7 @@ export const codexProvider: AIProvider & { readonly id: 'codex' } = {
 			const output = join(folder, 'result.json');
 			const jsonSchema = request.outputSchema;
 			await writeFile(schema, JSON.stringify(jsonSchema));
-			const prompt = request.instructions + '\n<untrusted_cv>\n' + request.inputText + '\n</untrusted_cv>';
+			const prompt = request.instructions + '\n<untrusted_input>\n' + request.inputText + '\n</untrusted_input>';
 			const child = Bun.spawn(
 				[
 					'codex',
@@ -116,9 +116,9 @@ export const codexProvider: AIProvider & { readonly id: 'codex' } = {
 			if (signal.aborted) cancel();
 			try {
 				const code = await child.exited;
-				if (signal.aborted) throw new Error('Conversion cancelled. Retry may spend tokens again.');
+				if (signal.aborted) throw new Error('Codex request cancelled. Retry may spend tokens again.');
 				if (code !== 0)
-					throw new Error('Codex conversion failed or timed out. Check your login and retry explicitly.');
+					throw new Error('Codex request failed or timed out. Check your login and retry explicitly.');
 				const raw = await readFile(output, 'utf8');
 				try {
 					return JSON.parse(raw);
@@ -134,4 +134,4 @@ export const codexProvider: AIProvider & { readonly id: 'codex' } = {
 	},
 };
 
-export const codexCacheIdentity = (version: string) => 'codex-cli:' + version.trim() + ':default:profile-v1';
+export const codexCacheIdentity = (version: string) => 'codex-cli:' + version.trim() + ':default';

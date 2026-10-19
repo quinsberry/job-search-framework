@@ -5,11 +5,16 @@ test('rejects unsupported providers for multipart imports and JSON retries befor
 	const data = new FormData();
 	data.set('workspace', '/does-not-exist');
 	data.set('revision', 'revision');
-	data.set('provider', 'claude');
+	data.set('provider', 'retired-provider');
 	data.set('file', new File(['CV'], 'cv.md'));
 	for (const body of [
 		data,
-		JSON.stringify({ action: 'retry', workspace: '/does-not-exist', revision: 'revision', provider: 'claude' }),
+		JSON.stringify({
+			action: 'retry',
+			workspace: '/does-not-exist',
+			revision: 'revision',
+			provider: 'retired-provider',
+		}),
 	]) {
 		const response = await POST(
 			new Request('http://localhost:3000/api/profile', {

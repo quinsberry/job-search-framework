@@ -6,6 +6,10 @@ import { extractText, fileExtension } from './extraction';
 import { digest, errorMessage, type ProfilePersistence } from './persistence';
 import { profileDraftSchema, proficiencyLevels } from '../model/schema';
 
+// The profile prompt/schema version belongs here, not to providers; keep the bytes or cached conversions are paid for again.
+const conversionCacheKey = (source: string, providerIdentity: string) =>
+	digest(source + ':' + providerIdentity + ':profile-v1');
+
 export class ConversionService {
 	constructor(private provider: AIProvider) {}
 	async start(repo: ProfilePersistence, file: File, expected: string) {
@@ -14,7 +18,7 @@ export class ConversionService {
 		const source = digest(bytes) + '.' + extension;
 		const readiness = await this.provider.check();
 		if (!readiness.available) throw new ProfileError('unavailable', readiness.message);
-		const cacheKey = digest(source + ':' + readiness.cacheIdentity);
+		const cacheKey = conversionCacheKey(source, readiness.cacheIdentity);
 		const current = await repo.load();
 		if (processing(current.job) && current.job?.cacheKey === cacheKey) return current;
 		if (current.revision !== expected)
@@ -28,7 +32,7 @@ export class ConversionService {
 			throw new ProfileError('invalid', 'There is no failed conversion to retry.');
 		const readiness = await this.provider.check();
 		if (!readiness.available) throw new ProfileError('unavailable', readiness.message);
-		if (digest(current.job.source + ':' + readiness.cacheIdentity) !== current.job.cacheKey)
+		if (conversionCacheKey(current.job.source, readiness.cacheIdentity) !== current.job.cacheKey)
 			throw new ProfileError(
 				'conflict',
 				'The conversion provider changed. Upload the CV again to use the current version.',

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const providerSchema = z.enum(['codex']);
+export const providerSchema = z.enum(['codex', 'claude']);
 export type Provider = z.infer<typeof providerSchema>;
 
 export const readinessSchema = z.object({

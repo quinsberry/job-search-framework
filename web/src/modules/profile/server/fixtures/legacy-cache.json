@@ -1,7 +1,7 @@
 {
 	"bytes": "# Fictional Alex\nSoftware engineer",
 	"source": "6a19e85198eab4275f63f676d6fab353b4ecd1901cf48ecdf0f034fa0c01a784.md",
-	"identity": "codex-cli:codex-cli 1.0.0:default:profile-v1",
+	"identity": "codex-cli:codex-cli 1.0.0:default",
 	"cacheKey": "5baa1843c021e430a50b44f86f14e3a998cb0aea5b60d351658f977d85d92aa7",
 	"text": "# Fictional Alex\nSoftware engineer",
 	"output": {

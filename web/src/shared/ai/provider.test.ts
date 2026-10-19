@@ -1,5 +1,6 @@
 import { expect, spyOn, test } from 'bun:test';
 import { writeFile } from 'node:fs/promises';
+import { claudeProvider } from './server/claude';
 import { codexProvider, codexCacheIdentity } from './server/codex';
 const output = { fictional: 'structured output' };
 test('checked provider identity preserves the pre-refactor spelling and is immutable per check', async () => {
@@ -13,7 +14,7 @@ test('checked provider identity preserves the pre-refactor spelling and is immut
 		const first = await codexProvider.check();
 		version = 'codex-cli 2.0.0\n';
 		const second = await codexProvider.check();
-		expect(first.cacheIdentity).toBe('codex-cli:codex-cli 1.0.0:default:profile-v1');
+		expect(first.cacheIdentity).toBe('codex-cli:codex-cli 1.0.0:default');
 		expect(first.cacheIdentity).not.toBe(second.cacheIdentity);
 		expect(codexCacheIdentity('codex-cli 1.0.0\n')).toBe(first.cacheIdentity);
 		expect(codexProvider).not.toHaveProperty('cacheIdentity');
@@ -46,6 +47,54 @@ test('Codex conversion uses a restricted subprocess and validates the JSON hando
 				new AbortController().signal,
 			),
 		).toEqual(output);
+	} finally {
+		spawn.mockRestore();
+	}
+});
+
+test('Claude readiness requires a subscription login, not an API key', async () => {
+	process.env.ANTHROPIC_API_KEY = 'fictional-key';
+	let status = { loggedIn: true, authMethod: 'claude.ai' };
+	const spawn = spyOn(Bun, 'spawn').mockImplementation(((command: string[], options: { env: object }) => {
+		expect(options.env).not.toHaveProperty('ANTHROPIC_API_KEY');
+		return {
+			stdout: new Blob([
+				command[1] === '--version' ? '2.1.292 (Claude Code)\n' : JSON.stringify(status),
+			]).stream(),
+			exited: Promise.resolve(0),
+		};
+	}) as unknown as typeof Bun.spawn);
+	try {
+		const ready = await claudeProvider.check();
+		expect(ready.available).toBe(true);
+		expect(ready.cacheIdentity).toBe('claude-cli:2.1.292 (Claude Code):default');
+		status = { loggedIn: true, authMethod: 'api-key' };
+		expect((await claudeProvider.check()).available).toBe(false);
+	} finally {
+		spawn.mockRestore();
+		delete process.env.ANTHROPIC_API_KEY;
+	}
+});
+
+test('Claude conversion uses a tool-less subprocess and returns the structured output without a live AI call', async () => {
+	const spawn = spyOn(Bun, 'spawn').mockImplementation(((command: string[]) => {
+		expect(command.slice(command.indexOf('--tools'), command.indexOf('--tools') + 2)).toEqual(['--tools', '']);
+		expect(command).toContain('--strict-mcp-config');
+		expect(command).toContain('--no-session-persistence');
+		expect(command[command.indexOf('--json-schema') + 1]).toBe('{"type":"object"}');
+		return {
+			stdout: new Blob([JSON.stringify({ is_error: false, structured_output: output })]).stream(),
+			exited: Promise.resolve(0),
+			kill: () => {},
+		};
+	}) as unknown as typeof Bun.spawn);
+	try {
+		const request = {
+			instructions: 'Extract fictional facts.',
+			inputText: 'Untrusted fictional CV',
+			outputSchema: { type: 'object' },
+		};
+		expect(await claudeProvider.interpret(request, new AbortController().signal)).toEqual(output);
 	} finally {
 		spawn.mockRestore();
 	}

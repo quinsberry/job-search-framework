@@ -22,7 +22,7 @@ import { providerSchema, type Provider } from '@/shared/ai/contracts';
 
 const providers = [
 	{ icon: chatgptIcon, label: 'ChatGPT', value: 'codex', disabled: false },
-	{ icon: claudeIcon, label: 'Claude', value: 'claude', disabled: true },
+	{ icon: claudeIcon, label: 'Claude', value: 'claude', disabled: false },
 ] satisfies (
 	| { icon: StaticImageData; label: string; value: Provider; disabled: boolean }
 	| { icon: StaticImageData; label: string; value: string; disabled: true }

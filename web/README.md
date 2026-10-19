@@ -11,7 +11,7 @@ bunx tsc --noEmit
 bun run lint
 ```
 
-AI conversion needs an installed Codex CLI with a ChatGPT login (`codex login`). Profile/preference editing works without it. The folder picker uses `osascript` on macOS, PowerShell on Windows and requires `zenity` on Linux.
+AI conversion needs either an installed Codex CLI with a ChatGPT login (`codex login`) or the Claude Code CLI with a Claude subscription login (`claude auth login`). Profile/preference editing works without it. The folder picker uses `osascript` on macOS, PowerShell on Windows and requires `zenity` on Linux.
 
 Keep the Bun server running during conversion: server termination interrupts unfinished jobs, which then need explicit Retry. No hosted/serverless execution.
 
@@ -40,7 +40,7 @@ ESLint enforces these boundaries:
 
 Prefer Bun built-ins; exclusive file creation, atomic rename, directory locks and symlink checks keep Node APIs.
 
-**Adding an AI provider** (e.g. Claude): adapter in `shared/ai/server/`, its ID in `shared/ai/contracts.ts`, registry entry and Agent metadata. Profile forms, recovery and persistence don't change.
+**Adding an AI provider**: adapter in `shared/ai/server/`, its ID in `shared/ai/contracts.ts`, registry entry and Agent metadata. Profile forms, recovery and persistence don't change.
 
 ## Vacancy acquisition
 

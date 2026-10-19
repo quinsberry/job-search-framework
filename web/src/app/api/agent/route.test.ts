@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { POST } from './route';
 
 test('rejects unsupported providers before checking readiness', async () => {
-	for (const provider of ['claude', 'unknown', '', null]) {
+	for (const provider of ['retired-provider', 'unknown', '', null]) {
 		const response = await POST(
 			new Request('http://localhost:3000/api/agent', {
 				method: 'POST',
