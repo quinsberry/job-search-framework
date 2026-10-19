@@ -15,9 +15,14 @@ import {
 	type SearchSourceAdapter,
 	type SearchSourceRun,
 	type SourceDescriptor,
+	type SourceId,
 	type SourceReport,
 } from '../contracts';
-import { providers } from './providers';
+import { linkedinProvider } from './linkedin/provider';
+
+const providers = {
+	linkedin: linkedinProvider,
+} satisfies { [Id in SourceId]: SearchSourceAdapter & { descriptor: { id: Id } } };
 
 function input<T>(schema: z.ZodType<T>, value: unknown): T {
 	const result = schema.safeParse(value);

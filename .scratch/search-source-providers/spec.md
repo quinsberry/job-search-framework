@@ -87,7 +87,7 @@ createSearchSourceRun(
 
 The run-scoped facade binds the selected sources, immutable query and signal once. The run object holds all source cursors, buffers and progress in memory; callers just call `next(limit)` until `done`. Adapter cursors stay source-owned and never leave the run. `getDetail` dispatches by `sourceId` only and rejects references outside the selected registry. It constructs requests from adapter-validated identities; an untrusted reference URL must not turn into arbitrary server-side fetching.
 
-The default registry supplies production adapters; explicit injected adapters make the facade independently testable without network calls. Mirror `shared/ai`: the portable contract declares `sourceIdSchema = z.enum([...])` listing implemented sources only, and the server registry is a map checked with `satisfies` so every enum value has an adapter. Adding a source is its adapter, one enum value and one registry entry, with no UI switch or readiness table. Unknown IDs fail input validation. A later UI reads metadata through its application transport; it never imports the server registry into a client bundle.
+The default registry supplies production adapters; explicit injected adapters make the facade independently testable without network calls. Mirror `shared/ai`: the portable contract declares `sourceIdSchema = z.enum([...])` listing implemented sources only, and the private registry inside `server/search.service.ts` is a map checked with `satisfies` so every enum value has an adapter. Adding a source is its adapter, one enum value and one registry entry, with no UI switch or readiness table. Unknown IDs fail input validation. A later UI reads metadata through its application transport; it never imports the server registry into a client bundle.
 
 No mandatory `check()`, Connect action, AI-like `cacheIdentity`, source result cache or credential framework. Report access problems from actual acquisition. Credential setup can be added when an implemented source requires it.
 
@@ -119,9 +119,8 @@ Run cancellation/disposal stops scheduling and aborts in-flight work; callers re
 web/src/shared/search-sources/
   contracts.ts                    portable Zod schemas/types and errors
   server/
-    providers.ts                  the one production adapter registry
-    search-sources.ts             public creation/metadata entry points and run facade
-    search-sources.test.ts         fake-adapter contract and orchestration tests
+    search.service.ts             public creation/metadata entry points, private registry and run facade
+    search.service.test.ts         fake-adapter contract and orchestration tests
     linkedin/
       provider.ts                 descriptor and SearchSourceAdapter implementation
       search.ts                   LinkedIn query and native-page mechanics

@@ -16,3 +16,7 @@ Implemented portable strict contracts, the exhaustive LinkedIn registry, the dis
 Validation: all 20 acquisition tests pass. Typecheck, production build and lint pass (lint reports seven existing warnings in untouched files). The full web suite has 113 passing tests and one existing failure in `web/src/modules/search/model/schema.test.ts:69`: its salary fixture includes `basis`, which `salaryBandSchema` rejects as an unknown key. Both files are unchanged from HEAD; the failure also reproduces when that test file runs alone. No live source requests or AI calls were made.
 
 Implementation is complete, but this issue remains claimed because its full-suite acceptance condition is blocked by that separate preferences fixture/schema mismatch. No preference contract or unrelated test was changed.
+
+### Agreed layout refinement
+
+Renamed the public acquisition entry point to `server/search.service.ts` and moved the exhaustive production adapter registry into it as a private constant. Removed `server/providers.ts`; adapters remain grouped under `server/<source>/`, and portable contracts remain at the module root. Updated test imports, fixture imports, README and spec. The module still owns acquisition only; the consuming workflow owns matching, budgets and persistence. All 20 acquisition tests, typecheck and lint pass (the same seven existing warnings). Full-suite/build checks were not repeated for this structural refactor.

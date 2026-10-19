@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { cp, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createSearchSourceRun, listSearchSources } from './search-sources';
+import { createSearchSourceRun, listSearchSources } from './search.service';
 import { SearchSourceError, type JobSummary, type SearchSourceAdapter } from '../contracts';
 
 const job: JobSummary = {

@@ -44,8 +44,8 @@ Prefer Bun built-ins; exclusive file creation, atomic rename, directory locks an
 
 ## Vacancy acquisition
 
-Server-only entry points: `listSearchSources` and `createSearchSourceRun` in `shared/search-sources/server/search-sources.ts`. A run keeps all continuation in memory: call `next(limit)` until `done`, inspect `batch.sources` for failures, and always `dispose()`. There is no persistence, restart resume, cache or cross-source identity inference. Acquisition never judges fit; filters are reported as applied, approximate or unsupported.
+Server-only entry points: `listSearchSources` and `createSearchSourceRun` in `shared/search-sources/server/search.service.ts`. A run keeps all continuation in memory: call `next(limit)` until `done`, inspect `batch.sources` for failures, and always `dispose()`. There is no persistence, restart resume, cache or cross-source identity inference. Acquisition never judges fit; filters are reported as applied, approximate or unsupported.
 
-**Adding a source**: implement `SearchSourceAdapter` under `server/<source>/`, add its ID to `sourceIdSchema` and its adapter to `server/providers.ts` (the registry is checked for enum coverage). Validate cursors and external payloads, preserve overflow and source-owned IDs, never fetch arbitrary reference URLs, and add fixtures for parsing, access failures, pagination and cancellation. Adapters import only the portable contracts.
+**Adding a source**: implement `SearchSourceAdapter` under `server/<source>/`, add its ID to `sourceIdSchema` and its adapter to the private registry in `server/search.service.ts` (checked for enum coverage). Validate cursors and external payloads, preserve overflow and source-owned IDs, never fetch arbitrary reference URLs, and add fixtures for parsing, access failures, pagination and cancellation. Adapters import only the portable contracts.
 
 LinkedIn uses public guest HTML endpoints; upstream HTML changes can require parser updates.

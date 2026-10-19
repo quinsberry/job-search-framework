@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createSearchSourceRun } from '../search-sources';
+import { createSearchSourceRun } from '../search.service';
 import {
 	SearchSourceError,
 	type SearchSourceAdapter,
