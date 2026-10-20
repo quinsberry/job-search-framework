@@ -34,6 +34,7 @@ search-preferences/  config.yaml, draft.yaml
 `app/workspace-content.tsx` composes the independent Workspace, Agent, Profile and Search modules and flushes both editors before switching workspaces.
 
 ESLint enforces these boundaries:
+
 - Feature modules under `src/modules/` don't import each other at runtime (type-only is fine); composition belongs in `app/`.
 - Shared code never imports features.
 - Outside `server/`, `server.ts`, `actions/` and tests, code cannot import server modules, Node built-ins or Bun.
