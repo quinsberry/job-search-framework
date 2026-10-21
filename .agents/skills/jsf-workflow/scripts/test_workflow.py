@@ -1,7 +1,5 @@
-from copy import deepcopy
 import json
 from pathlib import Path
-import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -9,7 +7,7 @@ from unittest.mock import patch
 from jsf_workflow import workflow
 from jsf_workflow.modules import candidate, evaluate, vacancies, tracking, applications
 from test_search import config, vacancy, snapshot
-from jsf_workflow import codex_bridge
+from jsf_workflow import ai, claude_bridge, codex_bridge
 import yaml
 
 
@@ -422,6 +420,82 @@ class WorkflowTests(unittest.TestCase):
             self.assertNotIn('CODEX_API_KEY', codex_bridge.environment())
         with patch('jsf_workflow.codex_bridge.shutil.which', return_value=None):
             self.assertFalse(codex_bridge.status()['ready'])
+
+    def test_claude_bridge_uses_structured_output_without_tools_or_api_billing(self):
+        from types import SimpleNamespace
+        def fake_run(command, **kwargs):
+            self.assertEqual(command[:2], ['claude', '-p'])
+            self.assertEqual(command[command.index('--tools') + 1], '')
+            self.assertEqual(command[command.index('--setting-sources') + 1], '')
+            self.assertIn('--no-session-persistence', command)
+            self.assertNotIn('ANTHROPIC_API_KEY', kwargs['env'])
+            self.assertNotIn('CLAUDE_CODE_USE_BEDROCK', kwargs['env'])
+            self.assertNotIn('private-profile-evidence', kwargs['input'])
+            return SimpleNamespace(returncode=0, stdout=json.dumps({'type': 'result', 'is_error': False, 'usage': {'input_tokens': 12, 'output_tokens': 2, 'service_tier': 'standard'},
+                                                                    'structured_output': {'annotations': [{'index': 0, 'facts_json': json.dumps(vacancy()['facts'])}]}}))
+        with patch.dict('os.environ', {'ANTHROPIC_API_KEY': 'test', 'CLAUDE_CODE_USE_BEDROCK': '1', 'JSF_CLAUDE_AUTH': ''}), patch.object(claude_bridge, 'status', return_value={'ready': True}), patch.object(claude_bridge.subprocess, 'run', side_effect=fake_run):
+            result = claude_bridge.interpret_batch(evaluate.criteria(config()), [vacancy()], {'private-profile-evidence': True})
+        self.assertEqual(result['facts'], [vacancy()['facts']])
+        self.assertEqual(result['usage'], {'input_tokens': 12, 'output_tokens': 2})
+        declined = SimpleNamespace(returncode=0, stdout=json.dumps({'type': 'result', 'is_error': False, 'result': 'No'}))
+        incomplete = SimpleNamespace(returncode=0, stdout=json.dumps({'structured_output': {'annotations': []}}))
+        for run in (declined, incomplete, SimpleNamespace(returncode=1, stdout='')):
+            with patch.object(claude_bridge, 'status', return_value={'ready': True}), patch.object(claude_bridge.subprocess, 'run', return_value=run):
+                with self.assertRaises(ValueError):
+                    claude_bridge.interpret_batch(evaluate.criteria(config()), [vacancy()])
+
+    def test_claude_status_accepts_only_subscription_logins(self):
+        from types import SimpleNamespace
+        def state(**fields):
+            return SimpleNamespace(returncode=0, stdout=json.dumps(fields), stderr='')
+        with patch('jsf_workflow.claude_bridge.shutil.which', return_value='/bin/claude'), patch.dict('os.environ', {'JSF_CLAUDE_AUTH': ''}):
+            for method, ready in [('claude.ai', True), ('oauth_token', True), ('api_key', False), ('third_party', False), ('none', False)]:
+                with patch.object(claude_bridge.subprocess, 'run', return_value=state(loggedIn=method != 'none', authMethod=method)):
+                    self.assertEqual(claude_bridge.status()['ready'], ready, method)
+            with patch.object(claude_bridge.subprocess, 'run', return_value=SimpleNamespace(returncode=1, stdout='oops', stderr='')):
+                self.assertFalse(claude_bridge.status()['ready'])
+        with patch('jsf_workflow.claude_bridge.shutil.which', return_value=None):
+            self.assertFalse(claude_bridge.status()['ready'])
+
+    def test_claude_bedrock_is_explicit_opt_in_and_keeps_only_the_bedrock_switch(self):
+        from types import SimpleNamespace
+        def state(**fields):
+            return SimpleNamespace(returncode=0, stdout=json.dumps(fields), stderr='')
+        bedrock = state(loggedIn=True, authMethod='third_party', apiProvider='bedrock')
+        aws = {'CLAUDE_CODE_USE_BEDROCK': '1', 'AWS_PROFILE': 'example', 'AWS_REGION': 'us-west-2', 'ANTHROPIC_API_KEY': 'test'}
+        with patch('jsf_workflow.claude_bridge.shutil.which', return_value='/bin/claude'):
+            with patch.dict('os.environ', {**aws, 'JSF_CLAUDE_AUTH': ''}), patch.object(claude_bridge.subprocess, 'run', return_value=bedrock):
+                self.assertFalse(claude_bridge.status()['ready'])
+                self.assertNotIn('CLAUDE_CODE_USE_BEDROCK', claude_bridge.environment())
+            with patch.dict('os.environ', {**aws, 'JSF_CLAUDE_AUTH': 'bedrock'}), patch.object(claude_bridge.subprocess, 'run', return_value=bedrock):
+                self.assertTrue(claude_bridge.status()['ready'])
+                env = claude_bridge.environment()
+                self.assertEqual((env['CLAUDE_CODE_USE_BEDROCK'], env['AWS_PROFILE']), ('1', 'example'))
+                self.assertNotIn('ANTHROPIC_API_KEY', env)
+                self.assertIn(':bedrock:', claude_bridge.cache_version())
+            with patch.dict('os.environ', {**aws, 'JSF_CLAUDE_AUTH': 'bedrock'}), patch.object(claude_bridge.subprocess, 'run', return_value=state(loggedIn=True, authMethod='claude.ai')):
+                self.assertFalse(claude_bridge.status()['ready'])
+            with patch.dict('os.environ', {'JSF_CLAUDE_AUTH': 'bedrock', 'CLAUDE_CODE_USE_BEDROCK': ''}):
+                self.assertIn('CLAUDE_CODE_USE_BEDROCK=1', claude_bridge.status()['message'])
+            with patch.dict('os.environ', {'JSF_CLAUDE_AUTH': 'vertex'}):
+                self.assertFalse(claude_bridge.status()['ready'])
+
+    def test_ai_provider_selection_is_explicit_or_first_installed(self):
+        with patch.dict('os.environ', {'JSF_AI_PROVIDER': 'claude'}):
+            self.assertIs(ai.bridge(), claude_bridge)
+        with patch.dict('os.environ', {'JSF_AI_PROVIDER': 'gemini'}):
+            self.assertFalse(ai.status()['ready'])
+            self.assertIn('codex', ai.status()['message'])
+        with patch.dict('os.environ', {'JSF_AI_PROVIDER': ''}):
+            with patch('jsf_workflow.ai.shutil.which', side_effect=lambda cli: '/bin/claude' if cli == 'claude' else None):
+                self.assertIs(ai.bridge(), claude_bridge)
+            with patch('jsf_workflow.ai.shutil.which', return_value='/bin/cli'):
+                self.assertIs(ai.bridge(), codex_bridge)
+            with patch('jsf_workflow.ai.shutil.which', return_value=None):
+                self.assertIs(ai.bridge(), codex_bridge)
+        with patch.dict('os.environ', {'JSF_AI_PROVIDER': 'claude'}), patch.object(claude_bridge, 'status', return_value={'ready': True, 'message': 'ok'}):
+            self.assertEqual(ai.status()['label'], 'Claude Code')
+            self.assertNotEqual(claude_bridge.cache_version(), codex_bridge.cache_version())
 
 
 if __name__ == '__main__':

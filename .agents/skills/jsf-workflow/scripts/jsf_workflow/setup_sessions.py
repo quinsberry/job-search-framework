@@ -2,14 +2,13 @@
 import base64
 from copy import deepcopy
 from datetime import datetime, timezone
-import json
 from pathlib import Path
 import re
 import shutil
 import threading
 import uuid
 
-from . import codex_bridge
+from . import ai
 from . import workflow
 from .modules import candidate
 from jsf_profile import guided_setup as owner
@@ -114,7 +113,7 @@ def launch(workspace, session):
     session.pop('failure_detail', None)
     session.update(state='processing', phase='reading' if reading else 'preparing',
                    started_at=datetime.now(timezone.utc).isoformat(),
-                   message='Reading your document…' if reading else 'Preparing your profile with Codex…', questions=[])
+                   message='Reading your document…' if reading else f'Preparing your profile with {ai.label()}…', questions=[])
     ACTIVE[session['id']] = event
     result = write(workspace, session)
     worker = threading.Thread(target=process_profile, args=(workspace, deepcopy(session), event), daemon=True)
@@ -138,14 +137,14 @@ def process_profile(workspace, snapshot, event):
         if snapshot.get('pending_upload'):
             snapshot['sources'] = [candidate.import_source(workspace, snapshot['pending_upload'])]
             snapshot.pop('pending_upload')
-        if not progress(workspace, snapshot, event, 'preparing', 'Preparing your profile with Codex…'):
+        if not progress(workspace, snapshot, event, 'preparing', f'Preparing your profile with {ai.label()}…'):
             raise ValueError('Setup cancelled or replaced')
-        response = codex_bridge.guided_profile(owner.profile_prompt(snapshot['base_profile'], snapshot['sources'], snapshot['transcript']), event)
+        response = ai.guided_profile(owner.profile_prompt(snapshot['base_profile'], snapshot['sources'], snapshot['transcript']), event)
         if not progress(workspace, snapshot, event, 'validating', 'Checking your profile draft…'):
             raise ValueError('Setup cancelled or replaced')
         candidate.require(isinstance(response, dict) and isinstance(response.get('message'), str), 'Invalid guided setup response')
         questions = response.get('questions')
-        candidate.require(isinstance(questions, list) and len(questions) <= 6, 'Codex returned too many or invalid questions')
+        candidate.require(isinstance(questions, list) and len(questions) <= 6, 'The AI returned too many or invalid questions')
         seen = set()
         for q in questions:
             candidate.require(isinstance(q, dict) and set(q) == {'id', 'label', 'help', 'type', 'required', 'options'}, 'Invalid setup question')
@@ -176,7 +175,7 @@ def process_profile(workspace, snapshot, event):
                    if 'timed out' in detail.lower() else
                    'We couldn’t finish reading your document. Choose a readable PDF or Markdown CV, or retry.'
                    if snapshot.get('pending_upload') else
-                   'We couldn’t prepare your profile. Your CV and answers are saved. Check your connection or Codex sign-in, then retry.')
+                   'We couldn’t prepare your profile. Your CV and answers are saved. Check your connection or AI sign-in, then retry.')
         snapshot.update(state='failed', phase='failed', message=message, failure_detail=detail)
     with workflow.LOCK:
         live = read(workspace, snapshot['kind'])

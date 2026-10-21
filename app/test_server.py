@@ -1,7 +1,6 @@
 import http.client
 import json
 from pathlib import Path
-import sys
 import threading
 import unittest
 from unittest.mock import patch
@@ -111,7 +110,7 @@ class HTTPTests(unittest.TestCase):
             started.set()
             release.wait(3)
             return {'requested': count, 'found': 0, 'shortfall': count}
-        with patch('server.codex_bridge.status', return_value={'ready': True}), patch('server.workflow.find_jobs', side_effect=fake_search):
+        with patch('server.ai.status', return_value={'ready': True}), patch('server.workflow.find_jobs', side_effect=fake_search):
             status, _ = self.request('/api/find', {'workspace': self.workspace, 'count': 2})
             self.assertEqual(status, 202)
             self.assertTrue(started.wait(1))
@@ -124,7 +123,7 @@ class HTTPTests(unittest.TestCase):
         import time
         from urllib.parse import quote
         result = {'requested': 10, 'found': 0, 'shortfall': 10, 'coverage': {'stopping_reason': 'discovery_budget', 'inspection_limit': 100}}
-        with patch('server.codex_bridge.status', return_value={'ready': True}), patch('server.workflow.find_jobs', return_value=result):
+        with patch('server.ai.status', return_value={'ready': True}), patch('server.workflow.find_jobs', return_value=result):
             status, _ = self.request('/api/find', {'workspace': self.workspace, 'count': 10})
             self.assertEqual(status, 202)
             deadline = time.monotonic() + 2
@@ -194,14 +193,14 @@ class HTTPTests(unittest.TestCase):
             done.set()
             return {'requested': count, 'found': 0, 'shortfall': count, 'coverage': {'stopping_reason': 'ai_limit'},
                     'ai_usage': {'ai_calls': 0, 'max_ai_calls': 0, 'reused': 0, 'scripted': 1, 'known_skipped': 0, 'reported_tokens': {}}}
-        with patch('server.codex_bridge.status', return_value={'ready': False}), patch('server.workflow.find_jobs', side_effect=fake):
+        with patch('server.ai.status', return_value={'ready': False}), patch('server.workflow.find_jobs', side_effect=fake):
             status, _ = self.request('/api/find', {'workspace': self.workspace, 'count': 1, 'max_ai_calls': 0})
             self.assertEqual(status, 202)
             self.assertTrue(done.wait(1))
             self.assertEqual(self.request('/api/find', {'workspace': self.workspace, 'count': 1, 'max_ai_calls': -1})[0], 400)
 
     def test_missing_codex_blocks_search_without_side_effects(self):
-        with patch('server.codex_bridge.status', return_value={'ready': False, 'message': 'Sign in first'}):
+        with patch('server.ai.status', return_value={'ready': False, 'message': 'Sign in first'}):
             status, response = self.request('/api/find', {'workspace': self.workspace, 'count': 2})
         self.assertEqual(status, 400)
         self.assertEqual(response['error'], 'Sign in first')
@@ -209,7 +208,7 @@ class HTTPTests(unittest.TestCase):
 
     def readiness(self, path=None):
         from urllib.parse import quote
-        with patch('server.codex_bridge.status', return_value={'ready': True, 'message': 'ChatGPT login detected'}):
+        with patch('server.ai.status', return_value={'ready': True, 'message': 'ChatGPT login detected'}):
             status, result = self.request('/api/readiness?path=' + quote(self.workspace if path is None else path))
         self.assertEqual(status, 200)
         return result
@@ -236,8 +235,8 @@ class HTTPTests(unittest.TestCase):
 
     def test_readiness_missing_workspace_and_profile_are_explained(self):
         checks = self.readiness('')['checks']
-        self.assertEqual([c['key'] for c in checks], ['workspace','codex','profile','config'])
-        self.assertTrue(all(c['state']=='pending' for c in checks if c['key']!='codex'))
+        self.assertEqual([c['key'] for c in checks], ['workspace','ai','profile','config'])
+        self.assertTrue(all(c['state']=='pending' for c in checks if c['key']!='ai'))
         self.assertEqual(self.readiness(self.workspace + '/absent')['checks'][0]['state'], 'blocked')
         (self.fixture.workspace / 'candidate/profile.md').unlink()
         check = next(c for c in self.readiness()['checks'] if c['key']=='profile')
@@ -248,11 +247,11 @@ class HTTPTests(unittest.TestCase):
     def test_readiness_survives_corrupt_tracker_and_rechecks_codex(self):
         (self.fixture.workspace / 'applications_table.csv').write_text('broken')
         self.assertTrue(self.readiness()['ready'])
-        with patch('server.codex_bridge.status', return_value={'ready': False, 'message': 'Sign in first'}):
+        with patch('server.ai.status', return_value={'ready': False, 'message': 'Sign in first'}):
             status, result = self.request('/api/readiness?path=' + self.workspace)
         self.assertEqual(status, 200)
         self.assertFalse(result['ready'])
-        self.assertEqual(next(c for c in result['checks'] if c['key']=='codex')['message'], 'Sign in first')
+        self.assertEqual(next(c for c in result['checks'] if c['key']=='ai')['message'], 'Sign in first')
 
     def test_guided_preferences_require_token_and_keep_drafts_separate(self):
         payload = {'workspace': self.workspace, 'kind': 'config'}
@@ -298,7 +297,7 @@ class HTTPTests(unittest.TestCase):
             self.assertEqual(self.request('/api/select-workspace',{})[0],400)
 
     def test_saved_profile_edit_and_independent_preferences_without_codex(self):
-        with patch('server.codex_bridge.guided_profile',side_effect=AssertionError('No AI for manual edits')):
+        with patch('server.ai.guided_profile',side_effect=AssertionError('No AI for manual edits')):
             _,profile=self.request('/api/setup/start',{'workspace':self.workspace,'kind':'profile'})
             session=profile['session'];self.assertEqual(session['state'],'review')
             _,config=self.request('/api/setup/start',{'workspace':self.workspace,'kind':'config'})

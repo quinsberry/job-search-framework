@@ -17,13 +17,14 @@ python3 -m venv .venv
 .venv/bin/python3 -m pip install -r ../.agents/skills/jsf-profile/scripts/requirements.txt
 ```
 
-CV interpretation and job discovery also need the Codex CLI installed and signed in with your ChatGPT account:
+CV interpretation and job discovery also need an AI CLI: either the Codex CLI signed in with your ChatGPT account, or Claude Code signed in with your Claude subscription:
 
 ```sh
-codex login
+codex login          # Codex
+claude auth login    # Claude Code
 ```
 
-Manual editing of an existing profile and search preferences works without Codex. The app uses the CLI's login; you do not enter credentials or an API key in the browser.
+If both are installed, Codex is used unless you start the app with `--ai-provider claude` (or set `JSF_AI_PROVIDER=claude`). API-key and cloud-provider logins are not used for either, except Claude Code on Amazon Bedrock when you opt in with `--claude-auth bedrock` (see the [repository README](../README.md)). Manual editing of an existing profile and search preferences works without an AI CLI. The app uses the CLI's login; you do not enter credentials or an API key in the browser.
 
 ## Start the app
 
@@ -39,6 +40,12 @@ To open an existing workspace immediately:
 .venv/bin/python3 server.py --workspace "/absolute/path/to/job-search-workspace"
 ```
 
+To use Claude Code when Codex is also installed:
+
+```sh
+.venv/bin/python3 server.py --ai-provider claude
+```
+
 The workspace must be an existing folder. In the UI, use **Select workspace** to choose one, or enter its path and click **Open workspace**. **Browse…** lets you choose another folder. The native picker opens on the computer running the app; if unavailable, enter the path manually.
 
 ## Set up and use your workspace
@@ -46,7 +53,7 @@ The workspace must be an existing folder. In the UI, use **Select workspace** to
 The setup points are ordered as follows:
 
 1. **Workspace opened** — the folder holding your job-search files.
-2. **Codex connected** — use **Recheck setup** after signing in.
+2. **Codex connected** / **Claude Code connected** — use **Recheck setup** after signing in.
 3. **Candidate profile** — import a PDF/Markdown CV, or edit your existing profile. Every profile uses the same seven sections and field layout. Expand **Field examples and formatting** in the editor for examples, including lists. Imported CVs can be reused. Ordinary manual edits save without AI.
 4. **Search preferences** — configure roles, compensation, work arrangements and other search criteria in the forms. No CV upload is required.
 
@@ -68,4 +75,4 @@ If port 8765 is already occupied, use another port:
 
 Then open **http://127.0.0.1:8766**. Run one app process per workspace.
 
-The app binds to the local computer only. CV interpretation and job searches make external requests to Codex and job sources; the app never submits applications or contacts recruiters.
+The app binds to the local computer only. CV interpretation and job searches make external requests to the selected AI CLI and job sources; the app never submits applications or contacts recruiters.

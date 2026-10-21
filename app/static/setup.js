@@ -194,7 +194,7 @@ function renderGuided() {
     $('guided-form').hidden=false;
     const pick=selectControl([['','Choose an imported CV…'],...(guided.existing_sources||[]).map(s=>[s.id,s.name])],'','Imported CV');
     const upload=inputControl('file','','Choose another CV');upload.accept='.pdf,.md';upload.id='guided-cv';
-    $('guided-fields').append(node('label','Reuse an imported CV'),pick,node('label','Or choose a PDF or Markdown CV (up to 10 MB)'),upload,node('p','CV text and professional answers are sent to your connected Codex for interpretation.','question-help'));
+    $('guided-fields').append(node('label','Reuse an imported CV'),pick,node('label','Or choose a PDF or Markdown CV (up to 10 MB)'),upload,node('p','CV text and professional answers are sent to your connected AI CLI (Codex or Claude Code) for interpretation.','question-help'));
     guidedGetters.set('source',async()=>{const file=upload.files[0];if(!file){if(!pick.value)throw new Error('Choose a CV to continue');return {source_id:pick.value};}if(file.size>10*1024*1024)throw new Error('CV must be under 10 MB');const data=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result.split(',')[1]);reader.onerror=()=>reject(new Error('Could not read the CV'));reader.readAsDataURL(file);});return {upload:{name:file.name,data}};});
     $('guided-next').textContent='Continue with CV';
   }else if(guided.state==='questions') {

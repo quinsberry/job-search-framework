@@ -20,13 +20,13 @@ Profile review uses an editable Markdown textarea. Existing profiles open direct
 
 All writes retain local Host, same-origin and session-token checks. Only source upload has a larger (15 MB JSON) request limit; other requests remain below 1 MB. Files are never served through an arbitrary-path endpoint. The browser uses native dialog/forms and text rendering; models do not supply executable HTML.
 
-Profile AI calls use a separate `codex_bridge.guided_profile` structured-output operation with ChatGPT authentication, isolated temporary cwd, read-only sandbox, no-tool prompt, cancellation and a five-minute deadline. Each user submission drives one bounded turn. The model proposes facts/questions; Python validates and persists. The vacancy-only interpretation contract remains unchanged. Provider login remains owned by the installed CLI, outside this app.
+Profile AI calls use a separate `ai.guided_profile` structured-output operation (Codex with ChatGPT authentication, or Claude Code with Claude subscription authentication), isolated temporary cwd, read-only sandbox, no-tool prompt, cancellation and a five-minute deadline. Each user submission drives one bounded turn. The model proposes facts/questions; Python validates and persists. The vacancy-only interpretation contract remains unchanged. Provider login remains owned by the installed CLI, outside this app.
 
 ## Checks
 
 Run `scripts/test_setup_sessions.py`, the profile owner suites, and `app/test_server.py`. Mock AI for deterministic workflow tests; use fictional source documents for live subscription/browser checks. No live job discovery is needed to verify setup.
 
-Search setup displays Workspace opened → Codex connected → Candidate profile → Search preferences. Workspace is required for edits; Codex is required only for CV interpretation and discovery. Manual editing does not require an AI connection. An empty workspace input offers Select workspace; a populated input offers Open workspace and Browse. POST /api/select-workspace opens a native chooser on the server computer, protected by the same local/session/origin checks. Cancellation changes no selection. Unsupported environments retain manual path entry.
+Search setup displays Workspace opened → Codex connected (or Claude Code connected) → Candidate profile → Search preferences. Workspace is required for edits; the AI CLI is required only for CV interpretation and discovery. Manual editing does not require an AI connection. An empty workspace input offers Select workspace; a populated input offers Open workspace and Browse. POST /api/select-workspace opens a native chooser on the server computer, protected by the same local/session/origin checks. Cancellation changes no selection. Unsupported environments retain manual path entry.
 
 ## Setup feedback
 

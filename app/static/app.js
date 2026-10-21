@@ -48,7 +48,7 @@ function renderSetup() {
     $('setup-checks').append(item);
   }
   const scriptsOnly=Number($('ai-calls').value)===0;
-  const blockers=(setup?.checks || []).filter(c=>['blocked','pending'].includes(c.state)&&!(scriptsOnly&&c.key==='codex'));
+  const blockers=(setup?.checks || []).filter(c=>['blocked','pending'].includes(c.state)&&!(scriptsOnly&&c.key==='ai'));
   const running=data?.job?.state==='running';
   let reason=setupChecking?'Checking setup…':!setup?'Setup could not be checked. Recheck setup to retry.':blockers.length?'Before searching: '+blockers.map(c=>c.label+' — '+c.message).join(' · '):'Ready to search. The target counts new matching jobs; rejected and uncertain listings do not count.';
   if(trackerError)reason='Could not load tracked jobs: '+trackerError;
@@ -59,8 +59,8 @@ function renderSetup() {
   $('find').title=reason;$('find').setAttribute('aria-describedby','search-reason');
   const connected=setup?.checks.find(c=>c.key==='workspace')?.state==='ready';
   document.querySelector('.local').textContent=connected?'✓ Workspace opened':'○ No workspace opened';
-  const codex=setup?.checks.find(c=>c.key==='codex');
-  if(codex)$('connection').textContent=codex.message;
+  const connection=setup?.checks.find(c=>c.key==='ai');
+  if(connection)$('connection').textContent=connection.message;
 }
 async function recheckSetup() {
   setupChecking=true;$('recheck').disabled=true;renderSetup();
