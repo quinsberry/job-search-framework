@@ -444,6 +444,21 @@ class WorkflowTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     claude_bridge.interpret_batch(evaluate.criteria(config()), [vacancy()])
 
+    def test_claude_search_model_applies_to_annotation_only(self):
+        from jsf_workflow import bridge_common
+        with patch.dict('os.environ', {'JSF_SEARCH_MODEL': 'sonnet'}):
+            commands = []
+            def fake_run(command, **kwargs):
+                commands.append(command)
+                from types import SimpleNamespace
+                return SimpleNamespace(returncode=0, stdout=json.dumps({'structured_output': {'annotations': [{'index': 0, 'facts_json': json.dumps(vacancy()['facts'])}]}}))
+            with patch.object(claude_bridge, 'status', return_value={'ready': True}), patch.object(claude_bridge.subprocess, 'run', side_effect=fake_run):
+                claude_bridge.interpret_batch(evaluate.criteria(config()), [vacancy()])
+            self.assertEqual(commands[0][commands[0].index('--model') + 1], 'sonnet')
+            with patch.object(claude_bridge, 'status', return_value={'ready': True}), patch.object(claude_bridge, 'run_cancellable', return_value=(0, json.dumps({'structured_output': {'message': 'ok', 'questions': [], 'changes_json': '{}'}}))) as guided:
+                claude_bridge.guided_profile('Fictional CV')
+            self.assertNotIn('--model', guided.call_args[0][0])
+
     def test_claude_status_accepts_only_subscription_logins(self):
         from types import SimpleNamespace
         def state(**fields):

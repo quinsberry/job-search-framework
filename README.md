@@ -26,9 +26,30 @@ AI interpretation runs through a locally installed, subscription-backed CLI — 
     .venv/bin/python3 app/server.py --ai-provider claude --claude-auth bedrock
   ```
 
-  Only the Bedrock switch is kept; API keys, gateways and other cloud providers are still removed. Settings files are not loaded, so Bedrock must be configured through environment variables (a wrapper script that exports them works). `ANTHROPIC_MODEL` or `JSF_SEARCH_MODEL` can select a Bedrock model ID.
+  Only the Bedrock switch is kept; API keys, gateways and other cloud providers are still removed. Settings files are not loaded, so Bedrock must be configured through environment variables (a wrapper script that exports them works). Model selection is described below.
 
-Choose one with `--ai-provider codex|claude` (or `JSF_AI_PROVIDER`); otherwise the first installed CLI is used, Codex first. `JSF_SEARCH_MODEL` passes a model name to whichever CLI is selected. Switching provider invalidates reusable vacancy facts, so they are re-extracted once.
+Choose one with `--ai-provider codex|claude` (or `JSF_AI_PROVIDER`); otherwise the first installed CLI is used, Codex first. Switching provider invalidates reusable vacancy facts, so they are re-extracted once.
+
+### Model selection
+
+Each CLI uses its own default model unless told otherwise. Search and profile setup can use different models:
+
+| Work | Model | How to change |
+| --- | --- | --- |
+| Vacancy annotation during search (batches of up to five listings) | `JSF_SEARCH_MODEL`, else the CLI default | Set `JSF_SEARCH_MODEL` before starting the app |
+| CV interpretation and profile setup | The CLI default | The CLI's own configuration, for example `ANTHROPIC_MODEL` for Claude Code |
+
+Search extracts quoted facts from short postings, so a faster model usually works well. Python still validates every quote and decides fit; an invalid quote stops the search at that batch instead of being saved, and earlier batches remain saved. Profile setup turns return the complete profile and benefit from a stronger model.
+
+`JSF_SEARCH_MODEL` is passed to the selected CLI as `--model`. Use a model name that CLI accepts: Claude Code aliases such as `sonnet`, or full IDs. On Amazon Bedrock, aliases may resolve to older models, so prefer full IDs such as `us.anthropic.claude-sonnet-5-5`:
+
+```sh
+JSF_SEARCH_MODEL=us.anthropic.claude-sonnet-5-5 \
+CLAUDE_CODE_USE_BEDROCK=1 AWS_PROFILE=your-profile AWS_REGION=us-west-2 \
+  .venv/bin/python3 app/server.py --ai-provider claude --claude-auth bedrock
+```
+
+Changing the search model changes the reusable-fact cache version, so the next search re-extracts facts for listings it inspects again. Restart the app after changing any of these variables.
 
 The skills also work inside Claude Code: `CLAUDE.md` imports `AGENTS.md`, and `.claude/skills` links to `.agents/skills`.
 

@@ -23,13 +23,13 @@ SYSTEM_PROMPT = ('You interpret job-search documents for a local Python applicat
                  'Follow the instructions in the user message and answer only with the requested structured output.')
 
 
-def command(schema):
+def command(schema, model=None):
     """Print mode without tools, MCP servers, skills, settings files or saved sessions."""
     run = ['claude', '-p', '--output-format', 'json', '--json-schema', json.dumps(schema),
            '--system-prompt', SYSTEM_PROMPT, '--tools', '', '--strict-mcp-config', '--setting-sources', '',
            '--disable-slash-commands', '--no-session-persistence']
-    if os.environ.get('JSF_SEARCH_MODEL'):
-        run.extend(['--model', os.environ['JSF_SEARCH_MODEL']])
+    if model:
+        run.extend(['--model', model])
     return run
 
 
@@ -114,7 +114,7 @@ def interpret_batch(criteria, records, expertise=None):
     error = 'Claude Code could not complete this batch. Check claude auth login, your subscription limits and connection.'
     with tempfile.TemporaryDirectory(prefix='jsf-claude-') as temp:
         try:
-            run = subprocess.run(command(ANNOTATION_SCHEMA), input=prompt, capture_output=True, text=True,
+            run = subprocess.run(command(ANNOTATION_SCHEMA, os.environ.get('JSF_SEARCH_MODEL')), input=prompt, capture_output=True, text=True,
                                  env=environment(), cwd=temp, timeout=TIMEOUT)
         except subprocess.TimeoutExpired:
             raise ValueError('Claude Code timed out. Earlier completed batches remain saved; retry the search.') from None
