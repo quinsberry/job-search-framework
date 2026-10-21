@@ -41,6 +41,8 @@ Use the returned raw descriptions to populate evidence-backed `facts` for the re
 
 Evaluate after each interpreted batch. Continue acquisition using the **current-search** snapshot until the qualifying target is reached, the budget is exhausted, or sources are exhausted/failed. Choose batch size no greater than the remaining target when practical. Pending cards and pagination cursors survive checkpoints. A failed or inaccessible description cannot count as a confirmed match. Unknowns and rejections consume inspection budget; duplicates do not count toward the target. Do not weaken criteria to fill a shortfall.
 
+Exchange rates are dated inputs. `conversions.fx: nbp` is resolved to current NBP table A rates by the caller through `jsf_search.nbp` (see contracts); left unresolved, currency comparisons need clarification.
+
 For replay, run `evaluate` on the supplied snapshot without fetching, reinterpreting, consulting the clock or accessing history. Identical criteria, snapshot and conversion inputs produce identical results. Live discovery is externally dependent and can return the same vacancies on another run.
 
 ## Helpers and output

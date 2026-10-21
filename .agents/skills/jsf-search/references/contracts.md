@@ -47,7 +47,11 @@ Optional conversions:
 }
 ```
 
-These are illustrative values, not market rates. Rates are units of each currency per one unit of the base currency. Annual fixed cash / 12 produces monthly pay. Hourly pay × supplied hours/month produces monthly pay. Same-currency, same-period comparisons need no FX or hours. Missing conversion inputs produce clarification, not invented defaults. Contract minima use `b2b/before_vat` and `uop/gross`; other bases must be clarified, never tax-converted.
+These are illustrative values, not market rates. Rates are units of each currency per one unit of the base currency. Annual fixed cash / 12 produces monthly pay. Hourly pay × supplied hours/month produces monthly pay. Same-currency, same-period comparisons need no FX or hours. Missing conversion inputs produce clarification, not invented defaults.
+
+`"fx": "nbp"` asks the caller to resolve current National Bank of Poland table A mid rates before evaluation. `jsf_search.nbp.resolve(cache_dir, today=None, fetcher=nbp.fetch)` reads `https://api.nbp.pl/api/exchangerates/tables/a/`, the latest published table, so weekends and holidays return the last working day's table instead of the 404 that the `/today/` and dated endpoints give for days without a table. It returns `{schema_version, status, fx, table, date[, error]}`. `fx` uses `base: pln` and `1 / mid` per currency (EUR, USD), dated with NBP's `effectiveDate` and sourced with the table number; `status` is `fetched`, `cached` (a cached table for today in Warsaw, without a request), `cached_fallback` (NBP unreachable or invalid; newest cached table) or `unavailable` (`fx: null`). The cache keeps the raw response and fetch time as `<cache_dir>/<effectiveDate>.json`; published tables never change, so entries are kept and never overwritten. A cache write failure does not discard fetched rates. An unresolved `nbp` marker evaluates like missing FX. Conversions are excluded from extraction cache keys, so resolved rates reevaluate reusable facts without AI.
+
+Contract minima use `b2b/before_vat` and `uop/gross`; other bases must be clarified, never tax-converted.
 
 ## Vacancy snapshot and observations
 

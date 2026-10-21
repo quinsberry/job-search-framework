@@ -24,7 +24,7 @@ These optional fallbacks were explicitly accepted during design. They are shown 
 
 Compensation contains one minimum per contract type, with currency (PLN/EUR/USD), period (month/year/hour), and basis (`b2b/before_vat`, `uop/gross`). It is a search minimum, not an application's asking range. Office locations describe acceptable offices; country/city describe residence. Required/preferred/excluded vacancy types use product/outsource/outstaff.
 
-FX has date, source, base and rates. A wholly unfinished object is omitted. If any FX value is filled, finish the whole object or remove it; partially filled FX blocks export. Quote dates. Unknown conversions do not block otherwise valid criteria, but conversion-dependent vacancies need clarification in search. No rate freshness is fabricated by this skill.
+FX is either `nbp`, meaning current NBP table A rates fetched by the search coordinator at each search, or a manual object with date, source, base and rates. A wholly unfinished object is omitted. If any FX value is filled, finish the whole object or remove it; partially filled FX blocks export. Quote dates. Unknown conversions do not block otherwise valid criteria, but conversion-dependent vacancies need clarification in search. No rate freshness is fabricated by this skill.
 
 ## Python operations
 

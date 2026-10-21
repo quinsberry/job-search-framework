@@ -57,7 +57,8 @@ criteria:
   conversions:
     # Fill only when known. Example: 160. No guessed working-hour assumption.
     hours_per_month: __FILL_ME__
-    # Fill this complete object only when a currency conversion is needed.
+    # Fill this complete object only when a currency conversion is needed,
+    # or replace the whole object with `fx: nbp` to fetch current National Bank of Poland rates at each search.
     # A wholly unfilled FX object is omitted; a partly filled object blocks export.
     fx:
       # Fill this field. Example: '2026-10-12'. Quote dates to keep them strings.
