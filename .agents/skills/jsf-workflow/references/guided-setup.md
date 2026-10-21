@@ -20,7 +20,7 @@ Profile review uses an editable Markdown textarea. Existing profiles open direct
 
 All writes retain local Host, same-origin and session-token checks. Only source upload has a larger (15 MB JSON) request limit; other requests remain below 1 MB. Files are never served through an arbitrary-path endpoint. The browser uses native dialog/forms and text rendering; models do not supply executable HTML.
 
-Profile AI calls use a separate `ai.guided_profile` structured-output operation (Codex with ChatGPT authentication, or Claude Code with Claude subscription authentication), isolated temporary cwd, read-only sandbox, no-tool prompt, cancellation and a five-minute deadline. Each user submission drives one bounded turn. The model proposes facts/questions; Python validates and persists. The vacancy-only interpretation contract remains unchanged. Provider login remains owned by the installed CLI, outside this app.
+Profile AI calls use a separate `ai.guided_profile` structured-output operation (Codex with ChatGPT authentication, or Claude Code with Claude subscription authentication), isolated temporary cwd, read-only sandbox, no-tool prompt, cancellation and a 15-minute deadline (`JSF_PROFILE_TIMEOUT` seconds overrides it). Each turn returns the complete accumulated profile, so a detailed CV can take several minutes on a strong model; vacancy annotation batches keep five minutes. Each user submission drives one bounded turn. The model proposes facts/questions; Python validates and persists. The vacancy-only interpretation contract remains unchanged. Provider login remains owned by the installed CLI, outside this app.
 
 ## Checks
 

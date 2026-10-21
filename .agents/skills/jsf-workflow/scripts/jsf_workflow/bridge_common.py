@@ -8,7 +8,10 @@ import time
 
 
 CONTRACT = Path(__file__).resolve().parents[3] / 'jsf-search/references/annotation-contract.md'
-TIMEOUT = 300
+TIMEOUT = 300  # One vacancy annotation batch.
+# A guided profile turn returns the complete accumulated profile with quoted evidence; a detailed CV can take
+# several minutes on a strong model (about 8 minutes measured for a 29 KB Markdown CV), so it gets more room.
+PROFILE_TIMEOUT = 900
 
 _QUESTION = {'type': 'object', 'additionalProperties': False,
              'required': ['id', 'label', 'help', 'type', 'required', 'options'], 'properties': {
@@ -49,11 +52,22 @@ def without(keys):
     return env
 
 
+def profile_timeout():
+    """Seconds allowed for one guided profile turn; JSF_PROFILE_TIMEOUT overrides the default."""
+    value = os.environ.get('JSF_PROFILE_TIMEOUT', '').strip()
+    if not value:
+        return PROFILE_TIMEOUT
+    if not value.isdigit() or int(value) < 1:
+        raise ValueError('JSF_PROFILE_TIMEOUT must be a positive number of seconds')
+    return int(value)
+
+
 def run_cancellable(command, prompt, env, cwd, cancel, provider):
-    """Run one CLI turn, terminating its process group on cancellation or the deadline. Returns (returncode, stdout)."""
+    """Run one guided profile turn, terminating its process group on cancellation or the deadline. Returns (returncode, stdout)."""
+    timeout = profile_timeout()
     with subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                           text=True, env=env, cwd=cwd, start_new_session=True) as process:
-        deadline, first, stdout = time.monotonic() + TIMEOUT, True, ''
+        deadline, first, stdout = time.monotonic() + timeout, True, ''
         try:
             while True:
                 if cancel is not None and cancel.is_set():

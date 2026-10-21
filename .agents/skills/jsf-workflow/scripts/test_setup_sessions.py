@@ -255,6 +255,25 @@ class SetupTests(unittest.TestCase):
                 self.assertIsNotNone(processes[0].poll())
                 self.assertIn('cancelled',errors[0])
 
+    def test_guided_turn_deadline_is_configurable_and_terminates_the_subprocess(self):
+        from jsf_workflow import bridge_common
+        with patch.dict('os.environ',{'JSF_PROFILE_TIMEOUT':''}):
+            self.assertEqual(bridge_common.profile_timeout(),bridge_common.PROFILE_TIMEOUT)
+        self.assertGreater(bridge_common.PROFILE_TIMEOUT,bridge_common.TIMEOUT)
+        for invalid in ('0','-5','soon'):
+            with patch.dict('os.environ',{'JSF_PROFILE_TIMEOUT':invalid}),self.assertRaisesRegex(ValueError,'JSF_PROFILE_TIMEOUT'):
+                bridge_common.profile_timeout()
+        real_popen=subprocess.Popen;processes=[]
+        def sleeping_process(command,**kwargs):
+            process=real_popen([sys.executable,'-c','import sys,time; sys.stdin.read(); time.sleep(30)'],**kwargs)
+            processes.append(process);return process
+        started=time.monotonic()
+        with patch.dict('os.environ',{'JSF_PROFILE_TIMEOUT':'1'}),patch.object(claude_bridge,'status',return_value={'ready':True}),patch('jsf_workflow.bridge_common.subprocess.Popen',side_effect=sleeping_process):
+            with self.assertRaisesRegex(ValueError,'timed out'):
+                claude_bridge.guided_profile('Fictional CV')
+        self.assertLess(time.monotonic()-started,10)
+        self.assertIsNotNone(processes[0].poll())
+
     def test_guided_claude_turn_returns_only_validated_structured_output(self):
         answer={'message':'Thanks','questions':[],'changes_json':'{}'}
         class Process:
