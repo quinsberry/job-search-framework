@@ -1,0 +1,24 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Install every skill's requirements
+        run: for r in .agents/skills/*/scripts/requirements.txt; do python -m pip install -r "$r"; done
+      - name: Run every skill, app and independence suite
+        run: |
+          for t in .agents/skills/*/scripts/test_*.py app/test_server.py tests/test_skill_independence.py; do
+            echo "::group::$t"
+            python "$t" || exit 1
+            echo "::endgroup::"
+          done
