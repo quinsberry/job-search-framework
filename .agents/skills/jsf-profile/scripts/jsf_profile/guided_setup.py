@@ -31,7 +31,7 @@ GROUPS = [
      ('posting_age_days', 'Maximum posting age in days', 'number', False, True, [], 'Leave unrestricted to accept any posting age.'),
      ('discovery_budget', 'Maximum listings to inspect', 'number', False, True, [], 'Automatic: ten times the requested job count.'),
      ('conversions.hours_per_month', 'Known working hours per month', 'decimal', False, True, [], 'Only needed for hourly/monthly comparisons; leave unknown rather than guess.'),
-     ('conversions.fx', 'Known currency conversion rates', 'fx', False, True, [], 'Optional. Supply a dated source and actual rates, or leave unknown. No rates are invented.')],
+     ('conversions.fx', 'Known currency conversion rates', 'fx', False, True, [], 'Optional. Fetch current NBP table A rates automatically at each search, supply a dated source and actual rates, or leave unknown. No rates are invented.')],
 ]
 GROUP_TITLES = ['Roles and work arrangement', 'Location and eligibility', 'Compensation and technical fit', 'Other preferences']
 
@@ -115,7 +115,7 @@ def accept_config_answers(original, previous, stage, answers):
             for row in value:
                 pay(row, True)
         elif q['type'] == 'fx':
-            candidate.require(isinstance(value, dict), 'Currency conversion rates must include a date, source, base and rates')
+            candidate.require(value == 'nbp' or isinstance(value, dict), 'Currency conversion rates must be fetched from NBP or include a date, source, base and rates')
         result[q['id']] = value
     return result
 
@@ -180,6 +180,8 @@ def config_review(proposal):
                 display = '; '.join(f"{row['contract'].upper()}: {row['minimum']} {row['currency'].upper()}/{row['period']} ({row['basis'].replace('_', ' ')})" for row in value)
             elif isinstance(value, list):
                 display = '; '.join(value) or 'None'
+            elif kind == 'fx' and value == 'nbp':
+                display = 'Fetched from the National Bank of Poland (table A) when each search starts'
             elif kind == 'fx':
                 display = f"{value['date']}, base {value['base'].upper()}, source {value['source']}; rates: " + ', '.join(f'{c.upper()}: {rate}' for c, rate in value['rates'].items())
             else:

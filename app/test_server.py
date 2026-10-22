@@ -120,6 +120,22 @@ class HTTPTests(unittest.TestCase):
             self.assertEqual(self.request('/api/edit', self.edit(field='notes', value='During search'))[0], 200)
             release.set()
 
+    def test_search_completion_reports_the_nbp_table_used(self):
+        import time
+        from urllib.parse import quote
+        for fx, expected in [({'schema_version': 1, 'status': 'cached_fallback', 'table': '204/A/NBP/2026', 'date': '2026-10-20', 'error': 'offline'},
+                              'Using NBP exchange rates: table 204/A/NBP/2026 (2026-10-20, cached; NBP unreachable).'),
+                             ({'schema_version': 1, 'status': 'unavailable', 'error': 'offline'}, 'NBP exchange rates are unavailable')]:
+            result = {'requested': 1, 'found': 0, 'shortfall': 1, 'coverage': {'stopping_reason': 'source_exhausted'}, 'fx': fx}
+            with patch('server.codex_bridge.status', return_value={'ready': True}), patch('server.workflow.find_jobs', return_value=result):
+                self.assertEqual(self.request('/api/find', {'workspace': self.workspace, 'count': 1})[0], 202)
+                deadline = time.monotonic() + 2
+                while True:
+                    _, data = self.request('/api/workspace?path=' + quote(self.workspace))
+                    if data['job']['state'] != 'running' or time.monotonic() >= deadline: break
+            self.assertEqual(data['job']['state'], 'complete')
+            self.assertIn(expected, data['job']['message'])
+
     def test_search_finishes_and_explains_inspection_limit_shortfall(self):
         import time
         from urllib.parse import quote

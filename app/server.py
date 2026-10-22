@@ -164,7 +164,8 @@ class Handler(BaseHTTPRequestHandler):
                                 usage_message += f" Reported tokens: {counts} ({usage['calls_with_token_usage']}/{usage['ai_calls']} calls reported)."
                             else:
                                 usage_message += ' Token counts were not reported.' if usage['ai_calls'] else ' No AI tokens used.'
-                        job.update(state='complete', message=f"Search finished. Added {result['found']} of {result['requested']} new matching jobs. {explanation}{usage_message}".strip(), result=result)
+                        fx_message = ' ' + workflow.fx_message(result['fx']) if result.get('fx') else ''
+                        job.update(state='complete', message=f"Search finished. Added {result['found']} of {result['requested']} new matching jobs. {explanation}{usage_message}{fx_message}".strip(), result=result)
                     except Exception as exc:
                         job.update(state='failed', message=str(exc))
                 threading.Thread(target=run, daemon=True).start()

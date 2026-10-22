@@ -107,6 +107,25 @@ class SearchConfigTests(unittest.TestCase):
         self.path.write_text(yaml.safe_dump(data))
         self.assertEqual(export(self.workspace)['conversions']['hours_per_month'], '160')
 
+    def test_nbp_fx_is_accepted_from_yaml_and_the_preferences_form(self):
+        from jsf_profile import guided_setup
+        initialize(self.workspace)
+        data = self.fill_required()
+        data['criteria']['conversions'] = {'fx': 'nbp'}
+        self.path.write_text(yaml.safe_dump(data))
+        self.assertEqual(export(self.workspace)['conversions']['fx'], 'nbp')
+        original = self.path.read_text()
+        stage = next(i for i, group in enumerate(guided_setup.GROUPS) if any(row[0] == 'conversions.fx' for row in group))
+        questions = guided_setup.config_questions(original, {}, stage)
+        self.assertEqual(next(q for q in questions if q['id'] == 'conversions.fx')['value'], 'nbp')
+        answers = {q['id']: q['value'] for q in questions}
+        self.assertEqual(guided_setup.accept_config_answers(original, {}, stage, answers)['conversions.fx'], 'nbp')
+        with self.assertRaises(ValidationError):
+            guided_setup.accept_config_answers(original, {}, stage, {**answers, 'conversions.fx': 'ecb'})
+        proposal = guided_setup.config_plan(original, {'conversions.fx': 'nbp'})
+        self.assertEqual(yaml.safe_load(proposal['text'])['criteria']['conversions']['fx'], 'nbp')
+        self.assertIn('National Bank of Poland', guided_setup.config_review(proposal))
+
     def test_invalid_or_unsafe_config_never_overwritten(self):
         initialize(self.workspace)
         for text in ('schema_version: 1\nschema_version: 2\n', '!!python/object/apply:os.system ["touch never"]',
