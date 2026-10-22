@@ -59,8 +59,10 @@ export async function* runSearch(input: RunInput, deps: RunDeps, signal: AbortSi
 		for (;;) {
 			if (signal.aborted) return yield done('cancelled');
 			if (totals.matched >= maxJobsToMatch) return yield done('match-budget');
-			if (totals.processed >= maxJobsToProcess || pulled >= PULL_FACTOR * maxJobsToProcess)
-				return yield done('process-budget');
+			if (totals.processed >= maxJobsToProcess) return yield done('process-budget');
+			// The pull cap with nothing processed means everything near the top of the results is already known.
+			if (pulled >= PULL_FACTOR * maxJobsToProcess)
+				return yield done(totals.processed ? 'process-budget' : 'no-new');
 			if (!active.length) return yield done('exhausted');
 			turn %= active.length;
 			const run = active[turn];

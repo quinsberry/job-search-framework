@@ -1,5 +1,11 @@
 import { z } from 'zod';
-import { jobDetailSchema, jobRefSchema, sourceFailureSchema, sourceIdSchema } from '@/shared/search-sources/contracts';
+import {
+	jobDetailSchema,
+	jobRefSchema,
+	sourceDescriptorSchema,
+	sourceFailureSchema,
+	sourceIdSchema,
+} from '@/shared/search-sources/contracts';
 
 // Mirrors Search's MatchResult; modules share no runtime schemas, so `workflow.ts` type-checks that they stay in step.
 export const matchSchema = z.strictObject({
@@ -77,7 +83,7 @@ export const runEventSchema = z.discriminatedUnion('type', [
 	}),
 	z.strictObject({
 		type: z.literal('done'),
-		reason: z.enum(['match-budget', 'process-budget', 'exhausted', 'cancelled', 'failed']),
+		reason: z.enum(['match-budget', 'process-budget', 'no-new', 'exhausted', 'cancelled', 'failed']),
 		totals: z.strictObject(counts),
 		costUsd: z.number().nonnegative(),
 		unpricedCalls: z.number().int().nonnegative(),
@@ -95,4 +101,7 @@ export const loadRequestSchema = z.strictObject({
 export const runRequestSchema = z.strictObject({ workspace: z.string() });
 export const loadResultSchema = z.strictObject({
 	applications: z.array(applicationSchema),
+	// Source names come from the search service so the table holds no source list of its own.
+	sources: z.array(sourceDescriptorSchema),
 });
+export type LoadResult = z.output<typeof loadResultSchema>;

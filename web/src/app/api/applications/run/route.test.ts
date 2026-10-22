@@ -95,7 +95,10 @@ test('one run per workspace; load works during a run; cancelling the stream abor
 
 	expect((await post(POST, { workspace })).status).toBe(409);
 	const listed = await post(load, { action: 'load', workspace });
-	expect(await listed.json()).toEqual({ applications: [] });
+	expect(await listed.json()).toEqual({
+		applications: [],
+		sources: [{ id: 'linkedin', name: 'LinkedIn', supportedFilters: ['location', 'publishedAfter'] }],
+	});
 
 	await reader.cancel();
 	expect(aborted.length).toBeGreaterThan(0);

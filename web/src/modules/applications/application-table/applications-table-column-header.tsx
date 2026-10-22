@@ -13,16 +13,19 @@ import {
 
 import { type ApplicationsTableFeatures } from './applications-table-features';
 
-interface AplicationsTableColumnHeaderProps<TData extends RowData, TValue> extends React.HTMLAttributes<HTMLDivElement> {
+interface ApplicationsTableColumnHeaderProps<
+	TData extends RowData,
+	TValue,
+> extends React.HTMLAttributes<HTMLDivElement> {
 	column: Column<ApplicationsTableFeatures, TData, TValue>;
 	title: string;
 }
 
-export function AplicationsTableColumnHeader<TData extends RowData, TValue>({
+export function ApplicationsTableColumnHeader<TData extends RowData, TValue>({
 	column,
 	title,
 	className,
-}: AplicationsTableColumnHeaderProps<TData, TValue>) {
+}: ApplicationsTableColumnHeaderProps<TData, TValue>) {
 	if (!column.getCanSort()) {
 		return <div className={cn(className)}>{title}</div>;
 	}

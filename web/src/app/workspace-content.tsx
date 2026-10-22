@@ -11,6 +11,7 @@ import type { SessionHandle } from '@/shared/drafts/recovery-session';
 import { preferencesOptions } from '@/modules/search/client/queries';
 import { profileOptions } from '@/modules/profile/client/queries';
 import { SearchPreferencesSection } from '@/modules/search/search-preferences-section';
+import { ApplicationsSection } from '@/modules/applications/applications-section';
 
 export function WorkspaceContent() {
 	const client = useQueryClient();
@@ -70,6 +71,10 @@ export function WorkspaceContent() {
 				loaded={session.loaded}
 				switching={loading}
 				onSession={attachPreferences}
+			/>
+			<ApplicationsSection
+				key={'applications-' + (session.loaded?.sessionId ?? 'empty')}
+				loaded={session.loaded}
 			/>
 		</AgentSession>
 	);

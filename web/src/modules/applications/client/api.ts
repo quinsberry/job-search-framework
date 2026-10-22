@@ -2,8 +2,8 @@ import { z } from 'zod';
 import { request, RequestError } from '@/shared/http/client';
 import { loadResultSchema, runEventSchema, type RunEvent } from '../model/contracts';
 
-export const loadApplications = async (workspace: string, signal?: AbortSignal) =>
-	(await request('/api/applications', { action: 'load', workspace }, loadResultSchema, signal)).applications;
+export const loadApplications = (workspace: string, signal?: AbortSignal) =>
+	request('/api/applications', { action: 'load', workspace }, loadResultSchema, signal);
 
 // Yields validated events from an NDJSON body; chunks may split or join lines arbitrarily.
 export async function* readEvents(body: ReadableStream<Uint8Array>): AsyncGenerator<RunEvent> {

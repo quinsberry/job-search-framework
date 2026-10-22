@@ -1,6 +1,7 @@
 import { localRequest } from '@/shared/http/server';
 import { loadRequestSchema } from '@/modules/applications/model/contracts';
 import { ApplicationStore } from '@/modules/applications/server/store';
+import { listSearchSources } from '@/shared/search-sources/server/search.service';
 
 export async function POST(request: Request) {
 	return localRequest(request, async (body) => {
@@ -8,6 +9,7 @@ export async function POST(request: Request) {
 		// No lock: runs replace applications.json atomically, so reads never see a partial file.
 		return {
 			applications: await (await ApplicationStore.open(input.workspace)).list(),
+			sources: listSearchSources(),
 		};
 	});
 }

@@ -1,14 +1,12 @@
 import {
-	columnFilteringFeature,
 	columnVisibilityFeature,
-	createFilteredRowModel,
 	createPaginatedRowModel,
 	createSortedRowModel,
-	filterFn_includesString,
+	rowExpandingFeature,
 	rowPaginationFeature,
-	rowSelectionFeature,
 	rowSortingFeature,
 	sortFn_alphanumeric,
+	sortFn_datetime,
 	sortFn_text,
 	tableFeatures,
 } from '@tanstack/react-table';
@@ -16,16 +14,13 @@ import {
 // New in v9: declare the features this table uses — anything you don't
 // register is tree-shaken out of the bundle.
 export const applicationsTableFeatures = tableFeatures({
-	columnFilteringFeature,
 	columnVisibilityFeature,
+	rowExpandingFeature,
 	rowPaginationFeature,
-	rowSelectionFeature,
 	rowSortingFeature,
-	filteredRowModel: createFilteredRowModel(),
 	paginatedRowModel: createPaginatedRowModel(),
 	sortedRowModel: createSortedRowModel(),
-	filterFns: { includesString: filterFn_includesString },
-	sortFns: { alphanumeric: sortFn_alphanumeric, text: sortFn_text },
+	sortFns: { alphanumeric: sortFn_alphanumeric, datetime: sortFn_datetime, text: sortFn_text },
 });
 
 // Pass this as the first generic argument to `ColumnDef`, `Column`, `Table`,

@@ -252,7 +252,7 @@ test('closed vacancies are recorded without matching', async () => {
 	expect(index).toContain('"failed":["availability"]');
 });
 
-test('reruns skip known vacancies without detail fetches and stop at the pull cap', async () => {
+test('reruns skip known vacancies without detail fetches and stop at the pull cap with no-new', async () => {
 	const jobs = Array.from({ length: 30 }, (_, index) => job(String(index)));
 	const outcomes = Object.fromEntries(
 		jobs.map((item, index) => [item.sourceJobId, result(index % 2 ? 'no-match' : 'match')]),
@@ -272,8 +272,13 @@ test('reruns skip known vacancies without detail fetches and stop at the pull ca
 	const many = Array.from({ length: 40 }, (_, index) => job(String(index)));
 	const capped = harness({ Engineer: { jobs: many } }, outcomes);
 	const second = await run(preferences({ maxJobsToProcess: 2, maxJobsToMatch: 2 }), capped);
-	expect(second.done.reason).toBe('process-budget');
+	expect(second.done.reason).toBe('no-new');
 	expect(second.done.totals.skipped).toBe(10);
+
+	// Something new before the cap is still a process-budget stop.
+	const mixed = harness({ Engineer: { jobs: [job('new'), ...many] } }, outcomes);
+	const third = await run(preferences({ maxJobsToProcess: 2, maxJobsToMatch: 2 }), mixed);
+	expect(third.done).toMatchObject({ reason: 'process-budget', totals: { processed: 1, skipped: 9 } });
 });
 
 test('changed criteria and age re-inspect rejections but never applications', async () => {
