@@ -2,7 +2,7 @@
 
 import { createColumnHelper } from '@tanstack/react-table';
 
-import { type DataTableFeatures } from './data-table-features';
+import { type ApplicationsTableFeatures } from './applications-table-features';
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -15,7 +15,7 @@ import {
 import { MoreHorizontal } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { Checkbox } from '@/shared/components/ui/checkbox';
-import { DataTableColumnHeader } from './data-table-column-header';
+import { AplicationsTableColumnHeader } from './applications-table-column-header';
 
 // This type is used to define the shape of our data.
 // You can use a Zod schema here if you want.
@@ -27,9 +27,9 @@ export type Payment = {
 };
 
 // Use `accessor` for data columns and `display` for columns without one.
-const columnHelper = createColumnHelper<DataTableFeatures, Payment>();
+const columnHelper = createColumnHelper<ApplicationsTableFeatures, Payment>();
 
-export const columns = columnHelper.columns([
+export const applicationColumns = columnHelper.columns([
 	columnHelper.display({
 		id: 'select',
 		header: ({ table }) => (
@@ -54,7 +54,7 @@ export const columns = columnHelper.columns([
 		header: 'Status',
 	}),
 	columnHelper.accessor('email', {
-		header: ({ column }) => <DataTableColumnHeader column={column} title="Email" />,
+		header: ({ column }) => <AplicationsTableColumnHeader column={column} title="Email" />,
 	}),
 	columnHelper.accessor('amount', {
 		header: () => <div className="text-right">Amount</div>,

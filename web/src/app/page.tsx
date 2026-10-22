@@ -1,5 +1,5 @@
-import { DataTable } from '@/modules/applications/application-table';
-import { columns, Payment } from '@/modules/applications/application-table/columns';
+import { AplicationsTable } from '@/modules/applications/application-table';
+import { applicationColumns, Payment } from '@/modules/applications/application-table/applications-columns';
 import { WorkspaceContent } from './workspace-content';
 import { Providers } from './providers';
 
@@ -41,7 +41,7 @@ export default async function Home() {
 			<Providers>
 				<WorkspaceContent />
 			</Providers>
-			<DataTable columns={columns} data={data} />
+			<AplicationsTable columns={applicationColumns} data={data} />
 		</div>
 	);
 }

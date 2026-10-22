@@ -11,18 +11,18 @@ import {
 	DropdownMenuTrigger,
 } from '@/shared/components/ui/dropdown-menu';
 
-import { type DataTableFeatures } from './data-table-features';
+import { type ApplicationsTableFeatures } from './applications-table-features';
 
-interface DataTableColumnHeaderProps<TData extends RowData, TValue> extends React.HTMLAttributes<HTMLDivElement> {
-	column: Column<DataTableFeatures, TData, TValue>;
+interface AplicationsTableColumnHeaderProps<TData extends RowData, TValue> extends React.HTMLAttributes<HTMLDivElement> {
+	column: Column<ApplicationsTableFeatures, TData, TValue>;
 	title: string;
 }
 
-export function DataTableColumnHeader<TData extends RowData, TValue>({
+export function AplicationsTableColumnHeader<TData extends RowData, TValue>({
 	column,
 	title,
 	className,
-}: DataTableColumnHeaderProps<TData, TValue>) {
+}: AplicationsTableColumnHeaderProps<TData, TValue>) {
 	if (!column.getCanSort()) {
 		return <div className={cn(className)}>{title}</div>;
 	}

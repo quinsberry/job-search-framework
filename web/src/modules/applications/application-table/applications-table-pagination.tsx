@@ -4,13 +4,13 @@ import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-r
 import { Button } from '@/shared/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 
-import { type DataTableFeatures } from './data-table-features';
+import { type ApplicationsTableFeatures } from './applications-table-features';
 
-interface DataTablePaginationProps<TData extends RowData> {
-	table: ReactTable<DataTableFeatures, TData>;
+interface ApplicationsTablePaginationProps<TData extends RowData> {
+	table: ReactTable<ApplicationsTableFeatures, TData>;
 }
 
-export function DataTablePagination<TData extends RowData>({ table }: DataTablePaginationProps<TData>) {
+export function ApplicationsTablePagination<TData extends RowData>({ table }: ApplicationsTablePaginationProps<TData>) {
 	return (
 		<div className="flex items-center justify-between px-2">
 			<div className="flex-1 text-sm text-muted-foreground">
