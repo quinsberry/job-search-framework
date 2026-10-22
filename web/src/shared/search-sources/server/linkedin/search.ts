@@ -27,15 +27,13 @@ export function discoveryRequest(query: DiscoveryQuery, start: number, now = Dat
 			message: 'LinkedIn interprets the workplace location hint',
 		});
 	}
-	if (query.workArrangements) {
-		const flags = { 'on-site': '1', remote: '2', hybrid: '3' };
-		params.set('f_WT', query.workArrangements.map((item) => flags[item]).join(','));
+	// The guest endpoint returns identical results for every f_WT value (checked 2026-10-23), so it is not sent.
+	if (query.workArrangements)
 		filters.push({
 			filter: 'workArrangements',
-			application: 'applied',
-			message: 'Requested arrangements mapped to LinkedIn workplace flags',
+			application: 'unsupported',
+			message: 'LinkedIn guest search ignores workplace filters; matching checks arrangements',
 		});
-	}
 	if (query.publishedAfter) {
 		params.set('f_TPR', `r${Math.max(1, Math.ceil((now - Date.parse(query.publishedAfter)) / 1000))}`);
 		filters.push({

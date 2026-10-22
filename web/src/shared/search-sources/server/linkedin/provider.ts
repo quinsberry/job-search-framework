@@ -6,7 +6,7 @@ export const linkedinProvider = {
 	descriptor: {
 		id: 'linkedin',
 		name: 'LinkedIn',
-		supportedFilters: ['location', 'workArrangements', 'publishedAfter'],
+		supportedFilters: ['location', 'publishedAfter'],
 	},
 	search: runSearch,
 	getDetail: runDetail,

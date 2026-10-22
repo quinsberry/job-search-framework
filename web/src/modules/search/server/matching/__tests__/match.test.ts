@@ -155,6 +155,39 @@ test('different structured city asks the model; remote-only results discard spec
 	expect(knownRemote.requests[0].questions.location).toBeUndefined();
 });
 
+test('a workplace elsewhere fails location unless the vacancy is confirmed remote', async () => {
+	const { job, ...criteria } = fixture();
+	criteria.preferences.targetPosition.workArrangements = ['remote', 'hybrid', 'on-site'];
+	criteria.preferences.targetPosition.location = { city: 'Warsaw', country: 'Poland' };
+	job.locations = [{ label: 'Kraków', city: 'Kraków', country: 'Poland' }];
+	const location = (result: Awaited<ReturnType<typeof matchJob>>) =>
+		result.criteria.find((item) => item.criterion === 'location');
+	const unknownArrangement = await matchJob(
+		job,
+		criteria,
+		fake({ location: { probability: 0.01 }, workArrangement: choice(arrangements, { unknown: 1 }) }),
+		signal(),
+	);
+	expect(location(unknownArrangement)?.result).toBe('failed');
+	expect(unknownArrangement.outcome).toBe('no-match');
+	const hybrid = await matchJob(
+		job,
+		criteria,
+		fake({ location: { probability: 0.01 }, workArrangement: choice(arrangements, { hybrid: 1 }) }),
+		signal(),
+	);
+	expect(hybrid.criteria.find((item) => item.criterion === 'workArrangement')?.detail).toContain(
+		'most likely: hybrid',
+	);
+	const remote = await matchJob(
+		job,
+		criteria,
+		fake({ location: { probability: 0.01 }, workArrangement: choice(arrangements, { remote: 0.9, unknown: 0.1 }) }),
+		signal(),
+	);
+	expect(location(remote)).toBeUndefined();
+});
+
 test('skills scale excludes nice-to-haves and applies its threshold band', async () => {
 	const { job, ...criteria } = fixture();
 	criteria.preferences.settings.minSkillMatch = 50;

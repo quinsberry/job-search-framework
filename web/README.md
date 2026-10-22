@@ -22,6 +22,7 @@ The app writes only its own namespaces in the selected workspace:
 ```text
 candidate-profile/   profile.yaml, draft.yaml, sources/<sha256>.*, conversions/<sha256>/
 search-preferences/  config.yaml, draft.yaml
+applications/        inspected.jsonl, applications.json
 ```
 
 - YAML is validated on every read/save; unknown fields or versions error rather than lose values. Save may rewrite comments/formatting.
@@ -49,11 +50,13 @@ Server-only entry points: `listSearchSources` and `SearchRun` in `shared/search-
 
 **Adding a source**: implement `SearchSourceAdapter` under `server/<source>/`, add its ID to `sourceIdSchema` and its adapter to the private registry in `server/search.service.ts` (checked for enum coverage). Validate cursors and external payloads, preserve overflow and source-owned IDs, never fetch arbitrary reference URLs, and add fixtures for parsing, access failures, pagination and cancellation. Adapters import only the portable contracts.
 
-LinkedIn uses public guest HTML endpoints; upstream HTML changes can require parser updates.
+LinkedIn uses public guest HTML endpoints; upstream HTML changes can require parser updates. Its guest search ignores workplace filters and its pages omit the workplace type, so the adapter reports `workArrangements` as unsupported and leaves the arrangement to matching.
 
 ## Matching
 
 `modules/search/server/matching/match.ts` exports `matchJob(detail, { preferences, skills }, { model }, signal)`. It runs structured checks first, then one decision request for unresolved criteria, and returns strict `match`, `no-match` or `needs-clarification` results with criterion evidence and reported cost. Evaluation/transport failures reject with `MatchError`; they never become rejection decisions. Salary is compared only from structured advertised pay in matching contract, currency and period units, never inferred from description text or converted between units.
+
+A workplace outside the residence city fails location unless the vacancy is confirmed remote; LinkedIn's public pages do not state the workplace type, so this relies on the title and description.
 
 The optional **Minimum skill match (%)** field accepts 1–100; empty skips the skills criterion. Older configs and recovery drafts remain valid. Required skill names compare after lowercasing/removing non-alphanumerics; no alias table is supplied. Structured lists currently count as must-have. With a threshold but no candidate skills, matching rejects with “Add skills to your profile or clear the skill match threshold”. The future workflow must check that before starting acquisition.
 
@@ -61,4 +64,12 @@ Production callers supply `new DecisionModelClient()` from `decision-model.ts`. 
 
 All questions for a job share one context. The client allows 28,000 UTF-8 bytes for the neutral request, reserving space below the 32,000-byte wire budget. Oversized criteria reject before calling the model; descriptions are truncated to fit, making all model-derived criteria unknown. Probability bands are fixed at 0.2/0.8; model skill coverage uses a ±10-point band around the threshold. These rules have deterministic fake-model tests, but real matching accuracy and threshold calibration have not been measured. HTTP retries stop after three attempts, cap Retry-After waits at two seconds, bound response bodies and obey cancellation/deadlines.
 
-This adds no search loop, result persistence, matching endpoint or results UI. Tests use fake decision models and mocked HTTP; no live model calls are needed.
+Tests use fake decision models and mocked HTTP; no live model calls are needed.
+
+## Search workflow
+
+`POST /api/applications/run` `{ workspace }` runs a search and streams NDJSON `RunEvent`s (`started`, `progress`, `application`, `job-failed`, `source-failed`, then `done` with reason, totals, reported `costUsd` and `unpricedCalls`). Missing preferences, a skill threshold without profile skills, a missing `OPENROUTER_API_KEY` or a run already in progress (409) fail before streaming. Cancelling the request or the stream aborts the run. `POST /api/applications` `{ action: 'load', workspace }` returns stored applications and works during a run. On the client, use `useApplications` and `useSearchRun` from `modules/applications/client/queries.ts`.
+
+`modules/applications/server/workflow.ts` owns the loop and receives acquisition, matching and storage as dependencies; `app/api/applications/run/route.ts` wires the real ones. It makes one query per position title (narrowed by country when remote is accepted, otherwise by city), alternates between titles and fetches and matches one vacancy at a time. It stops at `maxJobsToMatch` applications, `maxJobsToProcess` new vacancies, five times that many pulled summaries, or when sources run out.
+
+Reruns skip known vacancies before fetching details. A vacancy's fingerprint is normalised company + title + first city (else country, else `remote`), or the source ID without a company; there are no alias tables. `inspected.jsonl` holds rejected and closed vacancies with their failed criterion names and the digest of the criteria that judged them; it is pruned at run start when that digest changes or entries pass 60 days. The digest includes `MATCHING_RULES_VERSION` from `match.ts`; bump it when a matching change could alter earlier outcomes. `applications.json` holds match and needs-clarification results without job descriptions; they are never pruned. Model outages and rate limits stop a run; other per-vacancy failures are reported and retried next run.

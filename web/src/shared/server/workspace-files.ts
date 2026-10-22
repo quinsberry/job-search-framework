@@ -1,5 +1,5 @@
 import { YAML } from 'bun';
-import { lstat, mkdir, realpath, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { appendFile, lstat, mkdir, realpath, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, relative, sep } from 'node:path';
 
 export const digest = (value: string | Uint8Array) => new Bun.CryptoHasher('sha256').update(value).digest('hex');
@@ -76,6 +76,9 @@ export class WorkspaceFiles {
 		} finally {
 			await rm(temporary, { force: true });
 		}
+	}
+	async append(name: string, text: string) {
+		await appendFile(await this.path(name), text, { mode: 0o600 });
 	}
 	async readBytes(name: string) {
 		return new Uint8Array(await Bun.file(await this.path(name)).arrayBuffer());

@@ -126,7 +126,10 @@ export function modelResults(
 			result = probabilityResult(probability);
 			// An explicit unknown option is missing evidence, not evidence against the criterion.
 			if (result === 'failed' && 1 - probability - unknown < ACCEPT - 0.0001) result = 'unknown';
-			detail = `Probability of an accepted option: ${probability.toFixed(3)}; unknown: ${unknown.toFixed(3)}`;
+			const likely = Object.entries(answer.probabilities).reduce((best, entry) =>
+				entry[1] > best[1] ? entry : best,
+			);
+			detail = `Probability of an accepted option: ${probability.toFixed(3)}; unknown: ${unknown.toFixed(3)}; most likely: ${likely[0]}`;
 		} else {
 			const threshold = criteria.preferences.settings.minSkillMatch!;
 			result = scaleResult(answer.value, threshold);

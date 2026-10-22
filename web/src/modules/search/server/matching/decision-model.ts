@@ -307,7 +307,9 @@ export class DecisionModelClient implements DecisionModel {
 			if (error instanceof APIError)
 				throw new MatchError(
 					error.status === 429 ? 'rate-limited' : 'unavailable',
-					'Decision model request failed',
+					error.status === 401 || error.status === 403
+						? `Decision model rejected the API key (HTTP ${error.status}); OPENROUTER_API_KEY must be a regular OpenRouter key, not a management key`
+						: `Decision model request failed (HTTP ${error.status})`,
 				);
 			throw new MatchError('unavailable', 'Decision model failed');
 		}

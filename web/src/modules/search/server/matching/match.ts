@@ -6,6 +6,8 @@ import { buildQuestions, fitRequest, modelResults } from './questions';
 import { criterionResultSchema, structuredChecks, type MatchCriteria } from './structured';
 
 export { MatchError } from './decision-model';
+// Part of the search workflow's criteria digest: bump it when a rule change could alter earlier outcomes.
+export const MATCHING_RULES_VERSION = 1;
 export const matchResultSchema = z.strictObject({
 	outcome: z.enum(['match', 'no-match', 'needs-clarification']),
 	criteria: z

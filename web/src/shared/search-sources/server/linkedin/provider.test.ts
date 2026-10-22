@@ -20,7 +20,7 @@ function respond(body: string, status = 200, headers?: HeadersInit) {
 	return () => calls;
 }
 
-test('discovery maps all arrangements and reports approximate hints', () => {
+test('discovery reports hints honestly and does not send the ignored workplace filter', () => {
 	const result = discoveryRequest(
 		{
 			query: 'engineer',
@@ -32,10 +32,10 @@ test('discovery maps all arrangements and reports approximate hints', () => {
 		Date.parse('2026-10-02T00:00:00Z'),
 	);
 	const params = new URL(result.url).searchParams;
-	expect(params.get('f_WT')).toBe('2,1');
+	expect(params.has('f_WT')).toBe(false);
 	expect(params.get('f_TPR')).toBe('r86400');
 	expect(params.get('start')).toBe('20');
-	expect(result.filters.map((item) => item.application)).toEqual(['approximate', 'applied', 'approximate']);
+	expect(result.filters.map((item) => item.application)).toEqual(['approximate', 'unsupported', 'approximate']);
 });
 
 test('native overflow survives small limits without another fetch', async () => {
