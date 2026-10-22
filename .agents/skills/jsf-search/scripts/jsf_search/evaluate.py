@@ -149,7 +149,9 @@ def criteria(data):
         raise ValidationError("conversions supports hours_per_month and fx")
     if "hours_per_month" in conv:
         conv["hours_per_month"] = str(number(conv["hours_per_month"], "hours_per_month"))
-    if "fx" in conv:
+    if isinstance(conv.get("fx"), str) and text(conv["fx"]) == "nbp":
+        conv["fx"] = "nbp"  # Resolved to dated NBP table A rates by the caller; left unresolved, comparisons stay unknown.
+    elif "fx" in conv:
         fx = conv["fx"]
         if not isinstance(fx, dict) or not isinstance(fx.get("source"), str) or not fx["source"].strip():
             raise ValidationError("fx.source is required")
@@ -303,7 +305,8 @@ def compensation(v, c):
                 high = monthly(str(high), row["period"], c["conversions"])
                 floor = monthly(str(floor), req["period"], c["conversions"])
             if row["currency"] != req["currency"]:
-                rates = c["conversions"].get("fx", {}).get("rates", {})
+                fx = c["conversions"].get("fx")
+                rates = fx.get("rates", {}) if isinstance(fx, dict) else {}
                 if row["currency"] not in rates or req["currency"] not in rates:
                     low = high = None
                 elif high is not None:

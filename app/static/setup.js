@@ -147,10 +147,16 @@ function questionControl(q,wrap) {
     const add=node('button','Add contract minimum','secondary');add.type='button';add.addEventListener('click',()=>addPay());controls.append(add);
     get=()=>[...rows.children].map(r=>r.readValue());
   } else if(q.type==='fx') {
-    const date=inputControl('date',value?.date,'Rate date'),source=inputControl('url',value?.source,'Rate source URL'),base=selectControl(['EUR','PLN','USD'],(value?.base||'EUR').toUpperCase(),'Base currency');
-    source.placeholder='Dated rate source URL';controls.append(node('label','Rate date'),date,node('label','Rate source URL'),source,node('label','Base currency'),base);
-    const rates={};for(const c of ['EUR','PLN','USD']){rates[c]=inputControl('number',value?.rates?.[c]??value?.rates?.[c.toLowerCase()],c+' per unit of base currency');rates[c].step='any';rates[c].min='0.000001';controls.append(node('label',c+' per unit of base currency'),rates[c]);}
-    get=()=>({date:date.value,source:source.value,base:base.value,rates:Object.fromEntries(Object.entries(rates).filter(([,input])=>input.value!=='').map(([c,input])=>[c,input.value]))});
+    const auto=value==='nbp',manualValue=auto?null:value;
+    const how=selectControl([['nbp','Fetch from NBP automatically'],['manual','Enter rates manually']],auto||!manualValue?'nbp':'manual','Rate source');
+    controls.append(node('label','Rate source'),how,node('p','NBP table A rates are fetched when each search starts and cached in your workspace per table date.','question-help'));
+    const manual=node('div');
+    const date=inputControl('date',manualValue?.date,'Rate date'),source=inputControl('url',manualValue?.source,'Rate source URL'),base=selectControl(['EUR','PLN','USD'],(manualValue?.base||'EUR').toUpperCase(),'Base currency');
+    source.placeholder='Dated rate source URL';manual.append(node('label','Rate date'),date,node('label','Rate source URL'),source,node('label','Base currency'),base);
+    const rates={};for(const c of ['EUR','PLN','USD']){rates[c]=inputControl('number',manualValue?.rates?.[c]??manualValue?.rates?.[c.toLowerCase()],c+' per unit of base currency');rates[c].step='any';rates[c].min='0.000001';manual.append(node('label',c+' per unit of base currency'),rates[c]);}
+    controls.append(manual);
+    const switchSource=()=>{manual.hidden=how.value!=='manual';};how.addEventListener('change',switchSource);switchSource();
+    get=()=>how.value==='nbp'?'nbp':({date:date.value,source:source.value,base:base.value,rates:Object.fromEntries(Object.entries(rates).filter(([,input])=>input.value!=='').map(([c,input])=>[c,input.value]))});
   } else if(q.type==='multi') {
     const choices=[];
     for(const option of q.options){const label=node('label',undefined,'choice');const input=inputControl('checkbox','',q.label+' · '+option);input.checked=Array.isArray(value)&&value.includes(option);label.append(input,node('span',option));choices.push([option,input]);controls.append(label);}

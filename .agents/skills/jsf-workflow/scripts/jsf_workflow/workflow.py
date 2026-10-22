@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 import threading
 
-from .modules import evaluate, search, vacancies, search_config, tracking, extraction
+from .modules import evaluate, search, vacancies, search_config, tracking, extraction, nbp
 from . import ai, claude_bridge
 
 
@@ -120,7 +120,27 @@ def edit_row(workspace, identifier, field, value, expected_revision, application
         return next(r for r in table(workspace)['rows'] if r['vacancy_id'] == identifier)
 
 
-def find_jobs(workspace, count, progress=lambda message: None, interpreter=None, adapters=None, delay=2.0, max_ai_calls=5, cache_version=None):
+def resolve_fx(workspace, c, fetcher):
+    """Replace conversions.fx: nbp with dated NBP table A rates; without any rates, comparisons stay unknown."""
+    if c.get('conversions', {}).get('fx') != nbp.MARKER:
+        return None
+    fx = nbp.resolve(workspace / 'fx' / 'nbp-a', fetcher=fetcher)
+    if fx['fx']:
+        c['conversions']['fx'] = fx['fx']
+    else:
+        c['conversions'].pop('fx')
+    return fx
+
+
+def fx_message(fx):
+    """Describe a resolve_fx result or its saved summary (which omits the rates themselves)."""
+    if fx['status'] == 'unavailable':
+        return 'NBP exchange rates are unavailable; pay advertised in a currency other than your minimum needs clarification.'
+    note = {'fetched': '', 'cached': ', cached', 'cached_fallback': ', cached; NBP unreachable'}[fx['status']]
+    return f"Using NBP exchange rates: table {fx['table']} ({fx['date']}{note})."
+
+
+def find_jobs(workspace, count, progress=lambda message: None, interpreter=None, adapters=None, delay=2.0, max_ai_calls=5, cache_version=None, fx_fetcher=nbp.fetch):
     workspace = workspace_path(str(workspace))
     if type(count) is not int or count < 1:
         raise ValueError('Number of new jobs must be a positive integer')
@@ -134,6 +154,9 @@ def find_jobs(workspace, count, progress=lambda message: None, interpreter=None,
     # still receives a valid target, and the coordinator reports the shortfall.
     c['target_count'] = min(count, c['discovery_budget'])
     # A requested N overrides only this run. Never silently exceed the configured effort budget.
+    fx = resolve_fx(workspace, c, fx_fetcher)
+    if fx:
+        progress(fx_message(fx))
     c = evaluate.criteria(c)
     if interpreter is None:
         interpreter = ai.interpret_batch
@@ -224,6 +247,8 @@ def find_jobs(workspace, count, progress=lambda message: None, interpreter=None,
                'shortfall': max(0, count - len(qualified)), 'vacancy_ids': [r['vacancy_id'] for r in qualified[:count]],
                'coverage': result['coverage']}
     outcome['ai_usage'] = usage
+    if fx:
+        outcome['fx'] = {key: value for key, value in fx.items() if key != 'fx'}
     outcome['coverage']['inspection_limit'] = c['discovery_budget']
     outcome['coverage']['stopping_reason'] = 'target_met' if len(qualified) >= count else 'ai_limit' if ai_limited else snapshot['coverage']['stopping_reason']
     with LOCK:

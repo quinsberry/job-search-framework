@@ -224,6 +224,35 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(self.row()['fit'], 'match')
         self.assertEqual((self.workspace / 'search-config.yml').read_bytes(), before)
 
+    def test_nbp_rates_are_resolved_at_search_start_and_reported(self):
+        from test_nbp import Fetcher, response
+        from urllib.error import URLError
+        c = config()
+        c['compensation'] = [{'contract': 'b2b', 'minimum': 7000, 'currency': 'USD', 'period': 'month', 'basis': 'before_vat'}]
+        c['conversions'] = {'fx': 'nbp'}
+        self.write_config(c)
+        class Adapter:
+            page_size = 10
+            def __init__(self, delay=0): pass
+            def queries(self, c): return [{}]
+            def page(self, q, offset): return [vacancy()] if offset == 0 else []
+            def detail(self, v): return {**v, 'facts': {}}
+        interpret = lambda c, records, expertise: [vacancy()['facts'] for r in records]
+        messages = []
+        result = workflow.find_jobs(self.workspace, 1, progress=messages.append, interpreter=interpret, adapters={'linkedin': Adapter}, delay=0, fx_fetcher=Fetcher(response()))
+        self.assertEqual(result['found'], 1)  # 28000 PLN ≈ 7200 USD meets the 7000 USD minimum.
+        self.assertEqual({k: result['fx'][k] for k in ('status', 'table', 'date')}, {'status': 'fetched', 'table': '205/A/NBP/2026', 'date': '2026-10-21'})
+        self.assertNotIn('fx', result['fx'])
+        self.assertIn('Using NBP exchange rates: table 205/A/NBP/2026 (2026-10-21).', messages)
+        self.assertTrue(list((self.workspace / 'fx' / 'nbp-a').glob('2026-10-21.json')))
+        self.assertEqual(yaml.safe_load((self.workspace / 'search-config.yml').read_text())['criteria']['conversions']['fx'], 'nbp')
+        (self.workspace / 'fx').rename(self.workspace / 'fx-moved')
+        workflow.remove_rows(self.workspace, [{'vacancy_id': 'linkedin:1', 'revision': self.row()['revision']}])
+        result = workflow.find_jobs(self.workspace, 1, interpreter=interpret, adapters={'linkedin': Adapter}, delay=0, fx_fetcher=Fetcher(URLError('offline')))
+        self.assertEqual((result['found'], result['fx']['status']), (0, 'unavailable'))
+        self.assertEqual(self.row()['fit'], 'needs_clarification')
+        self.assertIn('unavailable', workflow.fx_message(result['fx']))
+
     def test_ten_jobs_stops_at_target_or_inspection_limit_and_reports_both(self):
         for qualifying in (True, False):
             with self.subTest(qualifying=qualifying):
