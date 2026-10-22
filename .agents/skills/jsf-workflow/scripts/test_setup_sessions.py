@@ -10,6 +10,7 @@ import unittest
 from unittest.mock import patch
 
 from jsf_workflow import setup_sessions as sessions
+from jsf_workflow import claude_bridge, codex_bridge
 from jsf_profile import guided_setup as owner
 from jsf_workflow.modules import candidate, search_config
 import test_workflow as fixtures
@@ -108,7 +109,7 @@ class SetupTests(unittest.TestCase):
         before = (self.workspace / 'candidate/profile.md').read_bytes()
         session = self.call('import_cv', sessions.start(self.workspace, 'profile'))
         source = session['existing_sources'][0]['id']
-        with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile', side_effect=self.completed_profile):
+        with patch('jsf_workflow.setup_sessions.ai.guided_profile', side_effect=self.completed_profile):
             self.call('choose_source', session, source_id=source)
             review = self.wait()
         self.assertEqual(review['state'], 'review')
@@ -132,7 +133,7 @@ class SetupTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             self.workspace=Path(root)
             session=sessions.start(self.workspace,'profile')
-            with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile',side_effect=interpret):
+            with patch('jsf_workflow.setup_sessions.ai.guided_profile',side_effect=interpret):
                 self.call('choose_source',session,upload=dict(name='CV.md',data=base64.b64encode(raw).decode()))
                 questions=self.wait()
                 self.assertEqual(questions['state'],'questions')
@@ -151,12 +152,12 @@ class SetupTests(unittest.TestCase):
             return dict(message='Review',questions=[],changes_json=json.dumps(dict(schema_version=1,sources=[],records=[dict(id='identity',section='identity',facts={'full_name':dict(value='Invented',evidence=[dict(source_id='0'*64,page=1,quote='Invented')])})])))
         before=(self.workspace/'candidate/profile.md').read_bytes()
         session=self.call('import_cv', sessions.start(self.workspace,'profile'))
-        with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile',side_effect=bad):
+        with patch('jsf_workflow.setup_sessions.ai.guided_profile',side_effect=bad):
             self.call('choose_source',session,source_id=session['existing_sources'][0]['id'])
             failed=self.wait()
         self.assertEqual(failed['state'],'failed')
         self.assertEqual((self.workspace/'candidate/profile.md').read_bytes(),before)
-        with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile',side_effect=self.completed_profile):
+        with patch('jsf_workflow.setup_sessions.ai.guided_profile',side_effect=self.completed_profile):
             self.call('retry',failed)
             self.assertEqual(self.wait()['state'],'review')
 
@@ -166,7 +167,7 @@ class SetupTests(unittest.TestCase):
             started.set();release.wait(2)
             return self.completed_profile(prompt)
         session=self.call('import_cv', sessions.start(self.workspace,'profile'))
-        with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile',side_effect=slow):
+        with patch('jsf_workflow.setup_sessions.ai.guided_profile',side_effect=slow):
             processing=self.call('choose_source',session,upload={'name':'CV.md','data':base64.b64encode(b'Ada Example').decode()})
             self.assertTrue(started.wait(1))
             cancelled=self.call('cancel',processing)
@@ -221,7 +222,7 @@ class SetupTests(unittest.TestCase):
 
     def test_cancelling_after_interrupted_save_keeps_referenced_source(self):
         session=self.call('import_cv', sessions.start(self.workspace,'profile'))
-        with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile',side_effect=self.completed_profile):
+        with patch('jsf_workflow.setup_sessions.ai.guided_profile',side_effect=self.completed_profile):
             self.call('choose_source',session,upload={'name':'Updated.md','data':base64.b64encode(b'Ada Example. Updated CV.').decode()})
             review=self.wait()
         real_write=candidate.atomic_write
@@ -234,26 +235,68 @@ class SetupTests(unittest.TestCase):
         source=next(s for s in candidate.sources(self.workspace) if s['name']=='Updated.md')
         self.assertTrue(Path(source['path']).exists())
 
-    def test_guided_codex_cancellation_terminates_the_subprocess(self):
-        event,started=threading.Event(),threading.Event()
-        real_popen=subprocess.Popen
-        processes=[];errors=[]
+    def test_guided_cancellation_terminates_the_subprocess_for_each_provider(self):
+        for bridge in (codex_bridge,claude_bridge):
+            with self.subTest(provider=bridge.CLI):
+                event,started=threading.Event(),threading.Event()
+                real_popen=subprocess.Popen
+                processes=[];errors=[]
+                def sleeping_process(command,**kwargs):
+                    self.assertEqual(command[0],bridge.CLI)
+                    process=real_popen([sys.executable,'-c','import sys,time; sys.stdin.read(); time.sleep(30)'],**kwargs)
+                    processes.append(process);started.set();return process
+                def invoke():
+                    try:bridge.guided_profile('Fictional CV',event)
+                    except ValueError as exc:errors.append(str(exc))
+                with patch.object(bridge,'status',return_value={'ready':True}),patch('jsf_workflow.bridge_common.subprocess.Popen',side_effect=sleeping_process):
+                    worker=threading.Thread(target=invoke)
+                    worker.start();self.assertTrue(started.wait(1));event.set();worker.join(5)
+                self.assertFalse(worker.is_alive())
+                self.assertIsNotNone(processes[0].poll())
+                self.assertIn('cancelled',errors[0])
+
+    def test_guided_turn_deadline_is_configurable_and_terminates_the_subprocess(self):
+        from jsf_workflow import bridge_common
+        with patch.dict('os.environ',{'JSF_PROFILE_TIMEOUT':''}):
+            self.assertEqual(bridge_common.profile_timeout(),bridge_common.PROFILE_TIMEOUT)
+        self.assertGreater(bridge_common.PROFILE_TIMEOUT,bridge_common.TIMEOUT)
+        for invalid in ('0','-5','soon'):
+            with patch.dict('os.environ',{'JSF_PROFILE_TIMEOUT':invalid}),self.assertRaisesRegex(ValueError,'JSF_PROFILE_TIMEOUT'):
+                bridge_common.profile_timeout()
+        real_popen=subprocess.Popen;processes=[]
         def sleeping_process(command,**kwargs):
             process=real_popen([sys.executable,'-c','import sys,time; sys.stdin.read(); time.sleep(30)'],**kwargs)
-            processes.append(process);started.set();return process
-        def invoke():
-            try:sessions.codex_bridge.guided_profile('Fictional CV',event)
-            except ValueError as exc:errors.append(str(exc))
-        with patch('jsf_workflow.codex_bridge.status',return_value={'ready':True}),patch('jsf_workflow.codex_bridge.subprocess.Popen',side_effect=sleeping_process):
-            worker=threading.Thread(target=invoke)
-            worker.start();self.assertTrue(started.wait(1));event.set();worker.join(5)
-        self.assertFalse(worker.is_alive())
+            processes.append(process);return process
+        started=time.monotonic()
+        with patch.dict('os.environ',{'JSF_PROFILE_TIMEOUT':'1'}),patch.object(claude_bridge,'status',return_value={'ready':True}),patch('jsf_workflow.bridge_common.subprocess.Popen',side_effect=sleeping_process):
+            with self.assertRaisesRegex(ValueError,'timed out'):
+                claude_bridge.guided_profile('Fictional CV')
+        self.assertLess(time.monotonic()-started,10)
         self.assertIsNotNone(processes[0].poll())
-        self.assertIn('cancelled',errors[0])
+
+    def test_guided_claude_turn_returns_only_validated_structured_output(self):
+        answer={'message':'Thanks','questions':[],'changes_json':'{}'}
+        class Process:
+            def __init__(self,stdout,code):self.stdout,self.returncode,self.pid=stdout,code,0
+            def __enter__(self):return self
+            def __exit__(self,*exc):return False
+            def communicate(self,input=None,timeout=None):return self.stdout,''
+        outputs=[(json.dumps({'type':'result','is_error':False,'structured_output':answer}),0),
+                 (json.dumps({'type':'result','is_error':False,'result':'I cannot help'}),0),('not json',1)]
+        def popen(command,**kwargs):
+            self.assertIn('--json-schema',command)
+            self.assertEqual(command[command.index('--tools')+1],'')
+            self.assertNotIn('ANTHROPIC_API_KEY',kwargs['env'])
+            return Process(*outputs.pop(0))
+        with patch.dict('os.environ',{'ANTHROPIC_API_KEY':'test'}),patch.object(claude_bridge,'status',return_value={'ready':True}),patch('jsf_workflow.bridge_common.subprocess.Popen',side_effect=popen):
+            self.assertEqual(claude_bridge.guided_profile('Fictional CV'),answer)
+            for _ in range(2):
+                with self.assertRaisesRegex(ValueError,'Claude Code could not complete setup'):
+                    claude_bridge.guided_profile('Fictional CV')
 
     def test_saved_profile_opens_directly_and_manual_save_needs_no_codex(self):
         before=(self.workspace/'candidate/profile.md').read_bytes()
-        with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile',side_effect=AssertionError('No AI for editing')):
+        with patch('jsf_workflow.setup_sessions.ai.guided_profile',side_effect=AssertionError('No AI for editing')):
             review=sessions.start(self.workspace,'profile')
             self.assertEqual(review['state'],'review')
             edited=review['review'].replace('**Full Name:** Ada Example','**Full Name:** Ada Updated')
@@ -274,7 +317,7 @@ class SetupTests(unittest.TestCase):
 
     def test_existing_revision_question_resumes_as_an_editable_review(self):
         session=self.call('import_cv', sessions.start(self.workspace,'profile'))
-        with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile',side_effect=self.completed_profile):
+        with patch('jsf_workflow.setup_sessions.ai.guided_profile',side_effect=self.completed_profile):
             self.call('choose_source',session,source_id=session['existing_sources'][0]['id'])
             review=self.wait()
         legacy=sessions.read(self.workspace)
@@ -288,7 +331,7 @@ class SetupTests(unittest.TestCase):
     def test_cancelled_cv_upload_remains_reusable_without_changing_profile(self):
         before=candidate.load(self.workspace)
         session=self.call('import_cv',sessions.start(self.workspace,'profile'))
-        with patch('jsf_workflow.setup_sessions.codex_bridge.guided_profile',side_effect=self.completed_profile):
+        with patch('jsf_workflow.setup_sessions.ai.guided_profile',side_effect=self.completed_profile):
             self.call('choose_source',session,upload=dict(name='Reusable.md',data=base64.b64encode(b'Reusable CV text').decode()))
             review=self.wait()
         self.call('cancel',review)
@@ -318,7 +361,7 @@ class SetupTests(unittest.TestCase):
             return real_import(*args)
         session=self.call('import_cv',sessions.start(self.workspace,'profile'))
         original=candidate.load(self.workspace)
-        with patch.object(candidate,'import_source',side_effect=slow_import),patch.object(sessions.codex_bridge,'guided_profile',side_effect=AssertionError('Cancelled import must not call AI')):
+        with patch.object(candidate,'import_source',side_effect=slow_import),patch.object(sessions.ai,'guided_profile',side_effect=AssertionError('Cancelled import must not call AI')):
             processing=self.call('choose_source',session,upload=dict(name='CV.md',data=base64.b64encode(b'Example CV').decode()))
             self.assertTrue(started.wait(1))
             self.assertEqual(processing['phase'],'reading')
@@ -342,7 +385,7 @@ class SetupTests(unittest.TestCase):
             validation_started.set();validation_release.wait(2);return real_plan(*args)
         session=self.call('import_cv',sessions.start(self.workspace,'profile'))
         before=candidate.load(self.workspace)
-        with patch.object(sessions.codex_bridge,'guided_profile',side_effect=ai),patch.object(owner,'profile_plan',side_effect=validate):
+        with patch.object(sessions.ai,'guided_profile',side_effect=ai),patch.object(owner,'profile_plan',side_effect=validate):
             processing=self.call('choose_source',session,source_id=session['existing_sources'][0]['id'])
             self.assertTrue(ai_started.wait(1))
             self.assertEqual(sessions.current(self.workspace,'profile')['phase'],'preparing')
@@ -361,7 +404,7 @@ class SetupTests(unittest.TestCase):
     def test_timeout_retains_inputs_and_only_explicit_retry_starts_another_turn(self):
         session=self.call('import_cv',sessions.start(self.workspace,'profile'))
         before=candidate.load(self.workspace)
-        with patch.object(sessions.codex_bridge,'guided_profile',side_effect=ValueError('Codex timed out.')) as ai:
+        with patch.object(sessions.ai,'guided_profile',side_effect=ValueError('Codex timed out.')) as ai:
             self.call('choose_source',session,source_id=session['existing_sources'][0]['id'])
             failed=self.wait()
             self.assertEqual(failed['state'],'failed')
@@ -372,7 +415,7 @@ class SetupTests(unittest.TestCase):
             self.assertEqual(ai.call_count,1)
         stored=sessions.read(self.workspace,'profile')
         self.assertTrue(stored['sources'])
-        with patch.object(sessions.codex_bridge,'guided_profile',side_effect=self.completed_profile):
+        with patch.object(sessions.ai,'guided_profile',side_effect=self.completed_profile):
             self.call('retry',failed)
             review=self.wait()
         self.assertEqual(review['state'],'review')
@@ -385,7 +428,7 @@ class SetupTests(unittest.TestCase):
         failed=self.wait()
         self.assertEqual(failed['state'],'failed')
         self.assertIn('pending_upload',sessions.read(self.workspace,'profile'))
-        with patch.object(sessions.codex_bridge,'guided_profile',side_effect=self.completed_profile):
+        with patch.object(sessions.ai,'guided_profile',side_effect=self.completed_profile):
             self.call('choose_source',failed,source_id=session['existing_sources'][0]['id'])
             self.assertEqual(self.wait()['state'],'review')
         self.assertNotIn('pending_upload',sessions.read(self.workspace,'profile'))

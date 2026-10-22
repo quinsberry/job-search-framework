@@ -1,7 +1,8 @@
-"""Local job-search UI. Run: python3 app/server.py [--workspace /your/workspace]."""
+"""Local job-search UI. Run: python3 app/server.py [--workspace /your/workspace] [--ai-provider codex|claude] [--claude-auth subscription|bedrock]."""
 import argparse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import os
 from pathlib import Path
 import secrets
 import sys
@@ -9,7 +10,7 @@ import threading
 from urllib.parse import parse_qs, urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / '.agents/skills/jsf-workflow/scripts'))
-from jsf_workflow import workflow, codex_bridge, setup_sessions
+from jsf_workflow import workflow, ai, claude_bridge, setup_sessions
 from jsf_workflow.modules import candidate, search_config, tracking
 import readiness
 import folders
@@ -59,7 +60,7 @@ class Handler(BaseHTTPRequestHandler):
             if url.path in {'/app.js', '/setup.js', '/style.css'}:
                 return self.send(200, (STATIC / url.path[1:]).read_bytes(), 'text/javascript' if url.path.endswith('.js') else 'text/css')
             if url.path == '/api/session':
-                return self.send(200, {'workspace': self.server.initial_workspace, 'codex': codex_bridge.status()})
+                return self.send(200, {'workspace': self.server.initial_workspace, 'ai': ai.status()})
             if url.path == '/api/readiness':
                 return self.send(200, readiness.inspect(parse_qs(url.query).get('path', [''])[0]))
             if url.path == '/api/profile-template':
@@ -137,7 +138,7 @@ class Handler(BaseHTTPRequestHandler):
                 if type(max_ai_calls) is not int or max_ai_calls < 0:
                     raise ValueError('Maximum AI calls must be a nonnegative integer')
                 search_config.export(workspace)  # Fail synchronously for missing setup.
-                connection = codex_bridge.status() if max_ai_calls else {'ready': True}
+                connection = ai.status() if max_ai_calls else {'ready': True}
                 if not connection['ready']:
                     raise ValueError(connection['message'])
                 key = str(workspace)
@@ -181,7 +182,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--workspace', default='', help='Initial workspace; can also be chosen in the UI')
     parser.add_argument('--port', type=int, default=8765)
+    parser.add_argument('--ai-provider', choices=sorted(ai.PROVIDERS),
+                        help='AI CLI for CV interpretation and search (default: JSF_AI_PROVIDER, else the first installed)')
+    parser.add_argument('--claude-auth', choices=claude_bridge.AUTH_MODES,
+                        help='Claude Code access: subscription (default) or bedrock, using CLAUDE_CODE_USE_BEDROCK and AWS_* variables')
     args = parser.parse_args()
+    if args.ai_provider:
+        os.environ['JSF_AI_PROVIDER'] = args.ai_provider
+    if args.claude_auth:
+        os.environ['JSF_CLAUDE_AUTH'] = args.claude_auth
     server = LocalServer(('127.0.0.1', args.port), args.workspace)
     print(f'Job Search Framework: http://127.0.0.1:{server.server_port}', flush=True)
     try:

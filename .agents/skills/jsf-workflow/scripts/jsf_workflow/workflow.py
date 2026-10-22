@@ -4,11 +4,12 @@ from copy import deepcopy
 from datetime import datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
 import threading
 
-from .modules import evaluate, search, vacancies, candidate, search_config, tracking, extraction, nbp
-from . import codex_bridge
+from .modules import evaluate, search, vacancies, search_config, tracking, extraction, nbp
+from . import ai, claude_bridge
 
 
 LOCK = threading.RLock()
@@ -139,7 +140,7 @@ def fx_message(fx):
     return f"Using NBP exchange rates: table {fx['table']} ({fx['date']}{note})."
 
 
-def find_jobs(workspace, count, progress=lambda message: None, interpreter=codex_bridge.interpret_batch, adapters=None, delay=2.0, max_ai_calls=5, cache_version=None, fx_fetcher=nbp.fetch):
+def find_jobs(workspace, count, progress=lambda message: None, interpreter=None, adapters=None, delay=2.0, max_ai_calls=5, cache_version=None, fx_fetcher=nbp.fetch):
     workspace = workspace_path(str(workspace))
     if type(count) is not int or count < 1:
         raise ValueError('Number of new jobs must be a positive integer')
@@ -157,8 +158,10 @@ def find_jobs(workspace, count, progress=lambda message: None, interpreter=codex
     if fx:
         progress(fx_message(fx))
     c = evaluate.criteria(c)
-    if cache_version is None and interpreter is codex_bridge.interpret_batch:
-        cache_version = codex_bridge.cache_version()
+    if interpreter is None:
+        interpreter = ai.interpret_batch
+        if cache_version is None:
+            cache_version = ai.cache_version()
     usage = dict(ai_calls=0, max_ai_calls=max_ai_calls, ai_listings=0, reused=0, scripted=0, known_skipped=0, deferred=0, prompt_characters=0, reported_tokens={}, calls_with_token_usage=0)
     with LOCK:
         identities = vacancies.known_identities(workspace)
@@ -207,7 +210,7 @@ def find_jobs(workspace, count, progress=lambda message: None, interpreter=codex
         elif needed:
             usage['ai_calls'] += 1
             usage['ai_listings'] += len(needed)
-            report_progress(f'Codex is assessing {len(needed)} unresolved listings…')
+            report_progress(f'{ai.label()} is assessing {len(needed)} unresolved listings…')
             reply = interpreter(c, deepcopy(needed), None)
             facts = reply.get('facts') if isinstance(reply, dict) else reply
             if not isinstance(facts, list) or len(facts) != len(needed) or any(not isinstance(f, dict) for f in facts):
@@ -265,7 +268,14 @@ def main():
     parser.add_argument('--workspace', required=True)
     parser.add_argument('--count', type=int)
     parser.add_argument('--max-ai-calls', type=int, default=5, help='Maximum AI batches; 0 uses scripts/cache only')
+    parser.add_argument('--ai-provider', choices=sorted(ai.PROVIDERS), help='AI CLI (default: JSF_AI_PROVIDER, else the first installed)')
+    parser.add_argument('--claude-auth', choices=claude_bridge.AUTH_MODES,
+                        help='Claude Code access: subscription (default) or bedrock, using CLAUDE_CODE_USE_BEDROCK and AWS_* variables')
     args = parser.parse_args()
+    if args.ai_provider:
+        os.environ['JSF_AI_PROVIDER'] = args.ai_provider
+    if args.claude_auth:
+        os.environ['JSF_CLAUDE_AUTH'] = args.claude_auth
     try:
         result = table(args.workspace) if args.command == 'list' else find_jobs(args.workspace, args.count, max_ai_calls=args.max_ai_calls)
         print(json.dumps(result, ensure_ascii=False))

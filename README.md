@@ -9,17 +9,55 @@ See [the app's manual run guide](app/README.md) for first-time setup, workspace 
 ```sh
 python3 -m venv .venv
 .venv/bin/python3 -m pip install -r .agents/skills/jsf-profile/scripts/requirements.txt
-codex login
+codex login              # or: claude auth login
 .venv/bin/python3 app/server.py
 ```
 
-Open **http://127.0.0.1:8765** and enter your job-search workspace folder. Alternatively, pass `--workspace /absolute/path` at startup. Choose ChatGPT when signing into Codex; this app doesn't use API-key billing. Codex must be installed separately. It uses the official CLI's non-interactive structured-output mode: [official documentation](https://learn.chatgpt.com/docs/non-interactive-mode).
+Open **http://127.0.0.1:8765** and enter your job-search workspace folder. Alternatively, pass `--workspace /absolute/path` at startup.
+
+AI interpretation runs through a locally installed, subscription-backed CLI — **Codex** or **Claude Code**; install either separately. The app never uses API-key billing:
+
+- **Codex**: sign in with ChatGPT (`codex login`). Uses the CLI's non-interactive structured-output mode: [official documentation](https://learn.chatgpt.com/docs/non-interactive-mode).
+- **Claude Code**: sign in with your Claude Pro/Max/Team/Enterprise subscription (`claude auth login`). Uses print mode with `--json-schema` structured output, no tools, MCP servers or settings files: [official documentation](https://code.claude.com/docs/en/headless). `ANTHROPIC_API_KEY`, gateway and Bedrock/Vertex/Foundry variables are removed before each call.
+- **Claude Code on Amazon Bedrock** (opt-in, billed to your AWS account): start the app with `--claude-auth bedrock` (or `JSF_CLAUDE_AUTH=bedrock`) and the usual Claude Code Bedrock variables in its environment:
+
+  ```sh
+  CLAUDE_CODE_USE_BEDROCK=1 AWS_PROFILE=your-profile AWS_REGION=us-west-2 \
+    .venv/bin/python3 app/server.py --ai-provider claude --claude-auth bedrock
+  ```
+
+  Only the Bedrock switch is kept; API keys, gateways and other cloud providers are still removed. Settings files are not loaded, so Bedrock must be configured through environment variables (a wrapper script that exports them works). Model selection is described below.
+
+Choose one with `--ai-provider codex|claude` (or `JSF_AI_PROVIDER`); otherwise the first installed CLI is used, Codex first. Switching provider invalidates reusable vacancy facts, so they are re-extracted once.
+
+### Model selection
+
+Each CLI uses its own default model unless told otherwise. Search and profile setup can use different models:
+
+| Work | Model | How to change |
+| --- | --- | --- |
+| Vacancy annotation during search (batches of up to five listings) | `JSF_SEARCH_MODEL`, else the CLI default | Set `JSF_SEARCH_MODEL` before starting the app |
+| CV interpretation and profile setup | The CLI default | The CLI's own configuration, for example `ANTHROPIC_MODEL` for Claude Code |
+
+Search extracts quoted facts from short postings, so a faster model usually works well. Python still validates every quote and decides fit; an invalid quote stops the search at that batch instead of being saved, and earlier batches remain saved. Profile setup turns return the complete profile and benefit from a stronger model.
+
+`JSF_SEARCH_MODEL` is passed to the selected CLI as `--model`. Use a model name that CLI accepts: Claude Code aliases such as `sonnet`, or full IDs. On Amazon Bedrock, aliases may resolve to older models, so prefer full IDs such as `us.anthropic.claude-sonnet-5-5`:
+
+```sh
+JSF_SEARCH_MODEL=us.anthropic.claude-sonnet-5-5 \
+CLAUDE_CODE_USE_BEDROCK=1 AWS_PROFILE=your-profile AWS_REGION=us-west-2 \
+  .venv/bin/python3 app/server.py --ai-provider claude --claude-auth bedrock
+```
+
+Changing the search model changes the reusable-fact cache version, so the next search re-extracts facts for listings it inspects again. Restart the app after changing any of these variables.
+
+The skills also work inside Claude Code: `CLAUDE.md` imports `AGENTS.md`, and `.claude/skills` links to `.agents/skills`.
 
 Set up the workspace first with `jsf-profile`: import your PDF/Markdown CV and complete the required choices in `search-config.yml`. You can ask the agent: “Set up my job-search profile from `/path/CV.pdf` in `/path/workspace`.”
 
-The Search setup checklist explains what is ready or blocking search. Click **Set up profile** to choose a PDF/Markdown CV or reuse an imported one. Click **Set search preferences** to answer the search-choice forms. CV import shows a loader, confirmed stages and elapsed time. The dialog collects answers, shows a draft for review, and changes active files only when you click **Save profile/preferences**. Amber profile warnings permit search; red blockers must be resolved. Recheck setup also refreshes Codex login status.
+The Search setup checklist explains what is ready or blocking search. Click **Set up profile** to choose a PDF/Markdown CV or reuse an imported one. Click **Set search preferences** to answer the search-choice forms. CV import shows a loader, confirmed stages and elapsed time. A detailed CV can take several minutes per step; each profile AI step may run up to 15 minutes (`JSF_PROFILE_TIMEOUT` seconds overrides this). The dialog collects answers, shows a draft for review, and changes active files only when you click **Save profile/preferences**. Amber profile warnings permit search; red blockers must be resolved. Recheck setup also refreshes the AI CLI login status.
 
-Close the dialog to browse your jobs, then return through **View progress**, **Answer questions** or **Review profile** on its setup card. Submitted answers survive refreshes and server restarts; interrupted AI steps offer Retry. Back/Revise let you change answers. Cancel discards the draft. Profile and preferences have independent drafts. Uploaded CVs must be under 10 MB and have readable text; OCR is not included. CV interpretation uses your connected Codex subscription; preference forms run in Python without an AI call. Setup completion refreshes readiness and does not automatically search.
+Close the dialog to browse your jobs, then return through **View progress**, **Answer questions** or **Review profile** on its setup card. Submitted answers survive refreshes and server restarts; interrupted AI steps offer Retry. Back/Revise let you change answers. Cancel discards the draft. Profile and preferences have independent drafts. Uploaded CVs must be under 10 MB and have readable text; OCR is not included. CV interpretation uses your connected Codex or Claude subscription; preference forms run in Python without an AI call. Setup completion refreshes readiness and does not automatically search.
 
 You can open an existing profile with **Edit profile** and edit its Markdown directly. **Save profile** validates and applies manual edits without AI or a separate revision question. Save edits before refreshing the page to preserve them across restarts.
 
@@ -27,13 +65,13 @@ A saved profile can still be amber when expected details such as employment date
 
 The app keeps one cumulative table. Edit a field and leave it to save; choose Application status to record your own submission. Date, salary and interview details can remain unknown. Use All / Not applied / Applied filters and expand Details for longer fields and original evidence. The UI reports failed saves and retains the edit for retry.
 
-“Find N” aims to add N **new qualifying** jobs, excluding currently tracked identities and application records, including ones not yet submitted, except vacancies explicitly removed for rediscovery. Search can return fewer when LinkedIn access, required evidence, Codex usage limits or the discovery budget prevent reaching N. The target counts matching jobs, not every row added to the table. Progress shows matches, checked listings, the inspection limit and rejected/uncertain counts throughout each batch. Searches finish at the target or the inspection/source limit; the final message explains a shortfall. Rejected/uncertain inspected listings are retained too, with their fit labels. Original evidence and assessed fit stay separate from your corrections. Existing application-only records can be explicitly brought into the editable table with its import button.
+“Find N” aims to add N **new qualifying** jobs, excluding currently tracked identities and application records, including ones not yet submitted, except vacancies explicitly removed for rediscovery. Search can return fewer when LinkedIn access, required evidence, AI subscription usage limits or the discovery budget prevent reaching N. The target counts matching jobs, not every row added to the table. Progress shows matches, checked listings, the inspection limit and rejected/uncertain counts throughout each batch. Searches finish at the target or the inspection/source limit; the final message explains a shortfall. Rejected/uncertain inspected listings are retained too, with their fit labels. Original evidence and assessed fit stay separate from your corrections. Existing application-only records can be explicitly brought into the editable table with its import button.
 
 Currency conversion rates can be fetched automatically: in **Set search preferences**, choose **Fetch from NBP automatically** under *Known currency conversion rates* (`conversions.fx: nbp` in `search-config.yml`). Each search then uses the National Bank of Poland's latest published table A, cached per table date in `fx/nbp-a/` in the workspace; on weekends and holidays that is the last working day's table. Progress and the finished-search message name the table. If NBP is unreachable the newest cached table is used; with none, pay advertised in a currency other than your minimum needs clarification. Manually entered rates still work.
 
 Data stays in the chosen workspace: profile Markdown with supporting evidence, search-config YAML, vacancy history JSON and application CSV. There is no saved profile JSON cache. Legacy profiles migrate with backups on the first successful save. Existing application tables require an explicit upgrade confirmation and get a backup before adding stable vacancy links/submission flags. Run one writer per workspace; keep a backup of your workspace.
 
-The app runs locally and makes external requests to LinkedIn and Codex when searching. It never submits applications or contacts recruiters. Hosted multi-user service, Claude integration and OCR are deferred.
+The app runs locally and makes external requests to LinkedIn and the selected AI CLI (Codex or Claude Code) when searching. It never submits applications or contacts recruiters. Hosted multi-user service and OCR are deferred.
 
 ## Checks
 

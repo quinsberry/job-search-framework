@@ -246,6 +246,6 @@ def profile_prompt(existing, sources, transcript):
 
 def profile_plan(existing, sources, changes_json):
     changes = json.loads(changes_json)
-    candidate.require(isinstance(changes, dict), 'Codex returned invalid profile changes')
+    candidate.require(isinstance(changes, dict), 'The AI returned invalid profile changes')
     changes['sources'] = sources
     return candidate.plan(existing, changes)

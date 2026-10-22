@@ -5,7 +5,7 @@ from pathlib import Path
 import shutil
 from uuid import uuid4
 
-from .applications import COLUMNS, BUSINESS, STATUSES, read_table, validate_record, write_table
+from .applications import COLUMNS, BUSINESS, read_table, validate_record, write_table
 from .search_contract import canonical_url
 
 

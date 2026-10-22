@@ -1,6 +1,13 @@
 """Read-only setup checks composed from the owning skills' validators."""
-from jsf_workflow import codex_bridge, workflow
+from jsf_workflow import ai, workflow
 from jsf_workflow.modules import candidate, search_config
+
+
+CONNECT_REQUESTS = {
+    'codex': 'Help me connect the local job-search app to the Codex CLI using my ChatGPT subscription. Check CLI installation and login; keep credentials in the CLI account store.',
+    'claude': 'Help me connect the local job-search app to the Claude Code CLI using my Claude subscription. Check CLI installation and claude auth login; keep credentials in the CLI account store.',
+    None: 'Help me choose the local AI CLI for the job-search app: set JSF_AI_PROVIDER to codex or claude, then sign in to that CLI with its subscription.',
+}
 
 
 def missing_choices(fields):
@@ -79,12 +86,13 @@ def inspect(value):
                 'We couldn’t read your saved preferences. Open them to check what needs fixing.', config_request)
             if not missing:
                 checks[-1]['diagnostics'] = [str(exc)]
-    connection = codex_bridge.status()
-    add('codex', 'Codex connected', 'ready' if connection['ready'] else 'blocked', connection['message'],
-        '' if connection['ready'] else 'Help me connect the local job-search app to the Codex CLI using my ChatGPT subscription. Check CLI installation and login; keep credentials in the CLI account store.')
-    order = ['workspace', 'codex', 'profile', 'config']
+    connection = ai.status()
+    provider = connection.get('label', 'AI')
+    add('ai', provider + ' connected', 'ready' if connection['ready'] else 'blocked', connection['message'],
+        '' if connection['ready'] else CONNECT_REQUESTS.get(connection.get('provider'), CONNECT_REQUESTS[None]))
+    order = ['workspace', 'ai', 'profile', 'config']
     checks.sort(key=lambda check: order.index(check['key']))
     for check in checks:
-        check['label'] = {'workspace': 'Workspace opened', 'codex': 'Codex connected',
+        check['label'] = {'workspace': 'Workspace opened', 'ai': provider + ' connected',
                           'profile': 'Candidate profile', 'config': 'Search preferences'}[check['key']]
     return {'checks': checks, 'ready': all(c['state'] in {'ready', 'warning'} for c in checks)}
