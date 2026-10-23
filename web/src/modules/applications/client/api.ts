@@ -1,9 +1,23 @@
 import { z } from 'zod';
 import { request, RequestError } from '@/shared/http/client';
-import { loadResultSchema, runEventSchema, type RunEvent } from '../model/contracts';
+import {
+	emptyResultSchema,
+	loadResultSchema,
+	rowResultSchema,
+	runEventSchema,
+	type ApplicationChanges,
+	type ManualInput,
+	type RunEvent,
+} from '../model/contracts';
 
 export const loadApplications = (workspace: string, signal?: AbortSignal) =>
 	request('/api/applications', { action: 'load', workspace }, loadResultSchema, signal);
+export const addApplication = async (workspace: string, row: ManualInput) =>
+	(await request('/api/applications', { action: 'add', workspace, row }, rowResultSchema)).row;
+export const updateApplication = async (workspace: string, fingerprint: string, changes: ApplicationChanges) =>
+	(await request('/api/applications', { action: 'update', workspace, fingerprint, changes }, rowResultSchema)).row;
+export const deleteApplication = (workspace: string, fingerprint: string) =>
+	request('/api/applications', { action: 'delete', workspace, fingerprint }, emptyResultSchema);
 
 // Yields validated events from an NDJSON body; chunks may split or join lines arbitrarily.
 export async function* readEvents(body: ReadableStream<Uint8Array>): AsyncGenerator<RunEvent> {

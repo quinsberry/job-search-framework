@@ -406,8 +406,8 @@ test('cancellation stops acquisition and matching and leaves files valid', async
 	expect((await list.list()).length).toBe(1);
 });
 
-test('deleted rows stay gone and manual rows are skipped', async () => {
-	const jobs = [job('kept'), job('deleted'), job('manual')];
+test('deleted rows stay gone, whoever added them, and manual rows are skipped', async () => {
+	const jobs = [job('kept'), job('deleted'), job('manual'), job('manual-deleted')];
 	const first = await run(preferences(), harness({ Engineer: { jobs: jobs.slice(0, 2) } }));
 	await first.list.remove(fingerprint(jobs[1]));
 	// A manual row with the same company, title and city as a vacancy the search would find.
@@ -420,11 +420,21 @@ test('deleted rows stay gone and manual rows are skipped', async () => {
 		},
 		NOW,
 	);
+	const removed = await first.list.addManual(
+		{
+			url: 'https://example.com/gone',
+			title: 'Engineer manual-deleted',
+			company: 'Company manual-deleted',
+			location: 'Warsaw',
+		},
+		NOW,
+	);
+	await first.list.remove(removed.fingerprint);
 
 	const fake = harness({ Engineer: { jobs } });
 	const { done } = await run(preferences(), fake, { digest: 'f'.repeat(64) });
 	expect(fake.calls.details).toEqual([]);
-	expect(done.totals).toMatchObject({ processed: 0, skipped: 3 });
+	expect(done.totals).toMatchObject({ processed: 0, skipped: 4 });
 	expect((await listed()).map((item) => item.job.sourceJobId)).toEqual(['kept']);
 	const memory = await readFile(indexPath(), 'utf8');
 	expect(memory.match(/"outcome":"accepted"/g)).toHaveLength(2);

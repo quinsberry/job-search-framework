@@ -11,6 +11,39 @@ mock.module('./application-table/applications-table-pagination', () => ({ Applic
 mock.module('./application-table/applications-table-column-header', () => ({
 	ApplicationsTableColumnHeader: ({ title }: { title: string }) => title,
 }));
+// The dialogs and the status select are Base UI too; the stubs expose their props so the tests can drive them.
+type Props = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+let statusSelect: Props = {};
+let dialog: Props = {};
+let deleteDialog: Props = {};
+mock.module('./application-table/status-select', () => ({
+	statusOptions: [],
+	statusFilterOptions: [],
+	OptionSelect: (props: Props) => {
+		if (String(props.label).startsWith('Status of')) statusSelect = props;
+		return null;
+	},
+}));
+mock.module('./application-table/row-actions', () => ({
+	RowActions: ({ title, onEdit, onDelete }: Props) => (
+		<>
+			<button aria-label={`Edit ${title}`} onClick={onEdit} />
+			<button aria-label={`Delete ${title}`} onClick={onDelete} />
+		</>
+	),
+}));
+mock.module('./application-table/application-dialog', () => ({
+	ApplicationDialog: (props: Props) => {
+		dialog = props;
+		return null;
+	},
+}));
+mock.module('./application-table/delete-dialog', () => ({
+	DeleteDialog: (props: Props) => {
+		deleteDialog = props;
+		return null;
+	},
+}));
 const { ApplicationsSection } = await import('./applications-section');
 
 const originalFetch = globalThis.fetch;
@@ -91,12 +124,13 @@ test('asks for a workspace when none is open', async () => {
 	expect(text(tree)).toContain('Open a workspace to see applications.');
 });
 
-test('renders stored applications with source names and a muted unadvertised salary', async () => {
+test('renders stored applications with a muted unadvertised salary', async () => {
 	const tree = await render(() => json({ applications: [application], sources }));
 	await waitFor(tree, 'Senior Angular Developer');
 	const rendered = text(tree);
 	expect(rendered).toContain('Senior Angular Developer');
-	expect(rendered).toContain('LinkedIn');
+	// Source is hidden by default until there is a second one; its name mapping is covered in rows.test.ts.
+	expect(rendered).not.toContain('LinkedIn');
 	expect(rendered).toContain('salary not advertised');
 	expect(rendered).toContain('Needs clarification');
 	await act(async () => button(tree, 'Show criteria').props.onClick());
@@ -155,3 +189,82 @@ test('search streams progress, can be cancelled, and reports preflight errors in
 	await act(async () => button(tree, 'Search').props.onClick());
 	await waitFor(tree, 'A search is already running');
 });
+
+test('status changes, add, edit and delete call the list actions and handle errors', async () => {
+	const calls: Record<string, unknown>[] = [];
+	let rows: Application[] = [application];
+	let gone = false;
+	const tree = await render((url, init) => {
+		const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+		if (body.action === 'load') return json({ applications: rows, sources });
+		calls.push(body);
+		if (body.action === 'add' && (body.row as { title: string }).title === 'Duplicate')
+			return json({ error: 'This vacancy is already in your applications.', code: 'conflict' }, 409);
+		if (body.action === 'update' && gone)
+			return json({ error: 'This application no longer exists.', code: 'not-found' }, 404);
+		if (body.action === 'update') {
+			rows = [{ ...application, ...(body.changes as object) }];
+			return json({ row: rows[0] });
+		}
+		if (body.action === 'delete') {
+			rows = [];
+			return json({});
+		}
+		return json({ row: { ...manualRow, ...(body.row as object) } });
+	});
+	await waitFor(tree, 'Senior Angular Developer');
+
+	// Inline status change saves at once and refetches.
+	await act(async () => statusSelect.onChange('applied'));
+	await waitFor(tree, '"Senior Angular Developer"');
+	expect(calls.at(-1)).toMatchObject({
+		action: 'update',
+		fingerprint: application.fingerprint,
+		changes: { status: 'applied' },
+	});
+	await waitForValue(() => statusSelect.value === 'applied');
+
+	// Adding: a duplicate keeps the dialog open with the message; a new vacancy closes it.
+	await act(async () => button(tree, 'Add application').props.onClick());
+	expect(dialog.target).toBe('new');
+	await act(async () => dialog.onSubmit({ url: 'https://example.com', title: 'Duplicate', status: 'new' }));
+	await waitForValue(() => dialog.error === 'This vacancy is already in your applications.');
+	expect(dialog.target).toBe('new');
+	await act(async () => dialog.onSubmit({ url: 'https://example.com', title: 'Fresh role', status: 'new' }));
+	await waitForValue(() => dialog.target === null);
+	expect(calls.at(-1)).toMatchObject({ action: 'add', row: { title: 'Fresh role' } });
+
+	// Saving an edit to a row deleted meanwhile closes the dialog.
+	await act(async () => button(tree, 'Edit Senior Angular Developer').props.onClick());
+	expect(dialog.target.title).toBe('Senior Angular Developer');
+	gone = true;
+	await act(async () => dialog.onSubmit({ status: 'offer', expectedSalary: null }));
+	await waitForValue(() => dialog.target === null);
+	gone = false;
+
+	// Deleting asks first, then removes the row.
+	await act(async () => button(tree, 'Delete Senior Angular Developer').props.onClick());
+	expect(deleteDialog.row.title).toBe('Senior Angular Developer');
+	await act(async () => deleteDialog.onConfirm(deleteDialog.row));
+	await waitForValue(() => deleteDialog.row === null);
+	expect(calls.at(-1)).toEqual({ action: 'delete', workspace: '/w', fingerprint: application.fingerprint });
+	await waitFor(tree, 'No applications yet.');
+});
+
+const manualRow = {
+	origin: 'manual',
+	fingerprint: 'b'.repeat(64),
+	status: 'new',
+	expectedSalary: null,
+	addedAt: '2026-10-23T00:00:00Z',
+	url: 'https://example.com',
+	title: 'Fresh role',
+	company: null,
+	location: null,
+	salary: null,
+};
+async function waitForValue(check: () => boolean) {
+	for (let attempt = 0; attempt < 300 && !check(); attempt++)
+		await act(() => new Promise((resolve) => setTimeout(resolve, 10)));
+	expect(check()).toBe(true);
+}

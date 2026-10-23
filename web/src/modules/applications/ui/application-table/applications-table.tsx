@@ -12,25 +12,32 @@ import {
 import { Input } from '@/shared/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/components/ui/table';
 import { ApplicationCriteria } from './application-criteria';
-import { applicationColumns } from './applications-columns';
+import { applicationColumns, type RowActionHandlers } from './applications-columns';
 import { applicationsTableFeatures } from './applications-table-features';
 import { ApplicationsTablePagination } from './applications-table-pagination';
 import { ApplicationsTableViewOptions } from './applications-table-view-options';
-import { filterRows, type ApplicationRow } from './rows';
+import { filterRows, type ApplicationRow, type StatusFilter } from './rows';
+import { OptionSelect, statusFilterOptions } from './status-select';
 
-export function ApplicationsTable({ rows }: { rows: ApplicationRow[] }) {
+export function ApplicationsTable({ rows, actions }: { rows: ApplicationRow[]; actions: RowActionHandlers }) {
 	const [filter, setFilter] = useState('');
+	const [status, setStatus] = useState<StatusFilter>('active');
 	// Empty sorting keeps the default order `toRows` already applied.
 	const [sorting, setSorting] = useState<SortingState>([]);
-	const [columnVisibility, setColumnVisibility] = useState<ColumnVisibilityState>({});
+	// One source so far, and Found already says how fresh a row is.
+	const [columnVisibility, setColumnVisibility] = useState<ColumnVisibilityState>({
+		source: false,
+		published: false,
+	});
 	const [expanded, setExpanded] = useState<ExpandedState>({});
 	const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 20 });
-	const data = useMemo(() => filterRows(rows, filter), [rows, filter]);
+	const data = useMemo(() => filterRows(rows, filter, status), [rows, filter, status]);
+	const columns = useMemo(() => applicationColumns(actions), [actions]);
 
 	const table = useTable({
 		features: applicationsTableFeatures,
 		data,
-		columns: applicationColumns,
+		columns,
 		// Fingerprints keep expansion and paging stable while a run refreshes the rows.
 		getRowId: (row) => row.id,
 		getRowCanExpand: () => true,
@@ -45,7 +52,7 @@ export function ApplicationsTable({ rows }: { rows: ApplicationRow[] }) {
 
 	return (
 		<div>
-			<div className="flex items-center justify-between gap-2 pb-4">
+			<div className="flex items-center gap-2 pb-4">
 				<Input
 					placeholder="Filter by title or company"
 					aria-label="Filter by title or company"
@@ -55,6 +62,16 @@ export function ApplicationsTable({ rows }: { rows: ApplicationRow[] }) {
 						table.setPageIndex(0);
 					}}
 					className="max-w-sm"
+				/>
+				<OptionSelect
+					value={status}
+					options={statusFilterOptions}
+					label="Filter by status"
+					className="w-40"
+					onChange={(value) => {
+						setStatus(value);
+						table.setPageIndex(0);
+					}}
 				/>
 				<ApplicationsTableViewOptions table={table} />
 			</div>
@@ -100,7 +117,7 @@ export function ApplicationsTable({ rows }: { rows: ApplicationRow[] }) {
 						) : (
 							<TableRow>
 								<TableCell colSpan={table.getVisibleLeafColumns().length} className="h-24 text-center">
-									No applications match the filter.
+									No applications match the filters.
 								</TableCell>
 							</TableRow>
 						)}

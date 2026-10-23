@@ -7,6 +7,8 @@ export const httpUrlSchema = z
 	.url()
 	.max(4000)
 	.refine((value) => {
+		// Refinements still run after the URL check fails, so a non-URL must not reach the constructor.
+		if (!URL.canParse(value)) return false;
 		const url = new URL(value);
 		return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password;
 	}, 'Expected an HTTP(S) URL without credentials');

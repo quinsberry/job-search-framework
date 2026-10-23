@@ -5,6 +5,7 @@ import {
 	manualInputSchema,
 	type Application,
 	type FoundApplication,
+	type ListState,
 	type ManualInput,
 } from '../model/contracts';
 import { manualFingerprint } from './fingerprint';
@@ -20,19 +21,24 @@ export class ApplicationList {
 	static async open(workspace: string) {
 		return new ApplicationList(await WorkspaceFiles.open(workspace, 'applications'));
 	}
-	async list(): Promise<Application[]> {
+	async #read(): Promise<ListState> {
 		const text = await this.files.read(LIST);
-		return text === null ? [] : applicationsFileSchema.parse(JSON.parse(text)).applications;
+		return text === null ? { applications: [], deleted: [] } : applicationsFileSchema.parse(JSON.parse(text));
 	}
+	async list(): Promise<Application[]> {
+		return (await this.#read()).applications;
+	}
+	// Deleted rows count as known, so the workflow skips them like listed ones.
 	async has(fingerprint: string) {
-		return (await this.list()).some((row) => row.fingerprint === fingerprint);
+		const { applications, deleted } = await this.#read();
+		return deleted.includes(fingerprint) || applications.some((row) => row.fingerprint === fingerprint);
 	}
-	async #change<T>(apply: (rows: Application[]) => { rows: Application[]; result: T }): Promise<T> {
+	async #change<T>(apply: (state: ListState) => { state: ListState; result: T }): Promise<T> {
 		return this.files.lock(async () => {
-			const { rows, result } = apply(await this.list());
+			const { state, result } = apply(await this.#read());
 			await this.files.writeBytes(
 				LIST,
-				JSON.stringify(applicationsFileSchema.parse({ schemaVersion: 2, applications: rows }), null, 2),
+				JSON.stringify(applicationsFileSchema.parse({ schemaVersion: 2, ...state }), null, 2),
 			);
 			return result;
 		});
@@ -41,7 +47,7 @@ export class ApplicationList {
 	add(found: FoundApplication) {
 		return this.#insert({ origin: 'search', status: 'new', expectedSalary: null, ...found });
 	}
-	addManual(value: ManualInput, now: Date) {
+	async addManual(value: ManualInput, now: Date) {
 		const input = manualInputSchema.parse(value);
 		return this.#insert({
 			origin: 'manual',
@@ -50,26 +56,42 @@ export class ApplicationList {
 			addedAt: now.toISOString(),
 		});
 	}
+	// Adding a deleted vacancy back by hand undoes its deletion.
 	#insert<T extends Application>(row: T) {
-		return this.#change((rows) => {
-			if (rows.some((item) => item.fingerprint === row.fingerprint)) throw duplicate();
-			return { rows: [...rows, row], result: row };
+		return this.#change(({ applications, deleted }) => {
+			if (applications.some((item) => item.fingerprint === row.fingerprint)) throw duplicate();
+			return {
+				state: {
+					applications: [...applications, row],
+					deleted: deleted.filter((id) => id !== row.fingerprint),
+				},
+				result: row,
+			};
 		});
 	}
 	update(fingerprint: string, changes: unknown) {
-		return this.#change((rows) => {
-			const current = rows.find((row) => row.fingerprint === fingerprint);
+		return this.#change(({ applications, deleted }) => {
+			const current = applications.find((row) => row.fingerprint === fingerprint);
 			if (!current) throw notFound();
 			const next = { ...current, ...changesSchemas[current.origin].parse(changes) } as Application;
 			if (next.origin === 'manual') next.fingerprint = manualFingerprint(next);
-			if (rows.some((row) => row !== current && row.fingerprint === next.fingerprint)) throw duplicate();
-			return { rows: rows.map((row) => (row === current ? next : row)), result: next };
+			if (applications.some((row) => row !== current && row.fingerprint === next.fingerprint)) throw duplicate();
+			return {
+				state: { applications: applications.map((row) => (row === current ? next : row)), deleted },
+				result: next,
+			};
 		});
 	}
 	remove(fingerprint: string) {
-		return this.#change((rows) => {
-			if (!rows.some((row) => row.fingerprint === fingerprint)) throw notFound();
-			return { rows: rows.filter((row) => row.fingerprint !== fingerprint), result: undefined };
+		return this.#change(({ applications, deleted }) => {
+			if (!applications.some((row) => row.fingerprint === fingerprint)) throw notFound();
+			return {
+				state: {
+					applications: applications.filter((row) => row.fingerprint !== fingerprint),
+					deleted: [...deleted, fingerprint],
+				},
+				result: undefined,
+			};
 		});
 	}
 }

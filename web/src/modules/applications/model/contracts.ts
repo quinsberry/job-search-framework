@@ -57,8 +57,8 @@ const searchFound = {
 	match: matchSchema,
 };
 const manualFields = {
-	url: httpUrlSchema,
-	title: z.string().trim().min(1).max(300),
+	url: z.string().trim().min(1, 'Paste the link to the posting').pipe(httpUrlSchema),
+	title: z.string().trim().min(1, 'Enter the job title').max(300),
 	company: note,
 	location: note,
 	// The salary as advertised, typed by the job seeker.
@@ -73,7 +73,11 @@ export type ManualApplication = z.output<typeof manualApplicationSchema>;
 export const applicationsFileSchema = z.strictObject({
 	schemaVersion: z.literal(2),
 	applications: z.array(applicationSchema),
+	// Fingerprints of deleted rows of any origin, so a search never brings them back.
+	deleted: z.array(fingerprint).default([]),
 });
+type ApplicationsFile = z.output<typeof applicationsFileSchema>;
+export type ListState = Omit<ApplicationsFile, 'schemaVersion'>;
 // The first file format, kept only so old workspaces can be migrated.
 export const applicationsFileV1Schema = z.strictObject({
 	schemaVersion: z.literal(1),

@@ -52,7 +52,7 @@ _Avoid_: lead, result
 Where the job seeker stands with an application: new (found, not applied yet), applied, interviewing, offer, rejected (by the employer) or dismissed (by the job seeker).
 
 **Search memory**:
-The search workflow's record of every inspected vacancy, accepted ones included. Deleting an application does not touch it, so the search never finds a deleted application again.
+The search workflow's record of every inspected vacancy, accepted ones included. Deleting an application does not touch it; the application list remembers deletions itself, so the search never finds a deleted application again.
 
 **Inspected vacancy**:
 A vacancy the search workflow has already evaluated, identified by its company, title and place rather than by one publisher's ID, and kept in search memory. Rejected vacancies are evaluated again after the search criteria change or after 60 days; accepted ones never are. An inspected vacancy is not necessarily a qualifying vacancy.

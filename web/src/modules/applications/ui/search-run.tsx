@@ -2,7 +2,7 @@
 import { LoaderCircle, Search } from 'lucide-react';
 import { cn } from 'cn';
 import { Button } from '@/shared/components/ui/button';
-import { runStatusLine, type RunState } from '../application-table/rows';
+import { runStatusLine, type RunState } from './run-status';
 
 export function SearchRunButton({
 	status,

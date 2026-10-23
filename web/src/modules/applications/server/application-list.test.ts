@@ -87,3 +87,22 @@ test('writes from two stores re-read the file, so none is lost', async () => {
 	await Promise.all([list.add(found), other.addManual(manual, NOW)]);
 	expect(await list.list()).toHaveLength(2);
 });
+
+test('deleted rows of any origin stay known until added back by hand', async () => {
+	await list.add(found);
+	const manualRow = await list.addManual(manual, NOW);
+	await list.remove(found.fingerprint);
+	await list.remove(manualRow.fingerprint);
+	expect(await list.list()).toEqual([]);
+	expect([await list.has(found.fingerprint), await list.has(manualRow.fingerprint)]).toEqual([true, true]);
+
+	await list.addManual(manual, NOW);
+	await list.remove(manualRow.fingerprint);
+	await list.addManual(manual, NOW);
+	expect(await list.list()).toHaveLength(1);
+});
+
+test('an empty or malformed link is a validation error, not a crash', async () => {
+	for (const url of ['', 'not a url'])
+		await expect(list.addManual({ ...manual, url }, NOW)).rejects.toMatchObject({ name: 'ZodError' });
+});

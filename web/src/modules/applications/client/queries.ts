@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { queryOptions, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { DoneEvent, RunEvent, RunProgress } from '../model/contracts';
+import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { ApplicationChanges, DoneEvent, ManualInput, RunEvent, RunProgress } from '../model/contracts';
 import * as api from './api';
 
 export const applicationsOptions = (workspace: string) =>
@@ -12,6 +12,24 @@ export const applicationsOptions = (workspace: string) =>
 		retry: 1,
 	});
 export const useApplications = (workspace: string) => useQuery(applicationsOptions(workspace));
+
+// Every change refetches the list, success or not, so the table always shows what is stored.
+export function useApplicationMutations(workspace: string) {
+	const client = useQueryClient();
+	const onSettled = () => client.invalidateQueries({ queryKey: applicationsOptions(workspace).queryKey });
+	return {
+		add: useMutation({ mutationFn: (row: ManualInput) => api.addApplication(workspace, row), onSettled }),
+		update: useMutation({
+			mutationFn: ({ fingerprint, changes }: { fingerprint: string; changes: ApplicationChanges }) =>
+				api.updateApplication(workspace, fingerprint, changes),
+			onSettled,
+		}),
+		remove: useMutation({
+			mutationFn: (fingerprint: string) => api.deleteApplication(workspace, fingerprint),
+			onSettled,
+		}),
+	};
+}
 
 export type SearchRunStatus = 'idle' | 'running' | 'done' | 'cancelled' | 'failed';
 export type RunBudgets = Extract<RunEvent, { type: 'started' }>['budgets'];

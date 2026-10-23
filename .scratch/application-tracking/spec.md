@@ -54,7 +54,7 @@ type InspectedEntry = {
 
 ## Application list
 
-`applications.json` becomes `{ schemaVersion: 2, applications: Row[] }`:
+`applications.json` becomes `{ schemaVersion: 2, applications: Row[], deleted: string[] }` (`deleted` defaults to `[]`):
 
 ```ts
 type Status = 'new' | 'applied' | 'interviewing' | 'offer' | 'rejected' | 'dismissed';
@@ -77,8 +77,8 @@ type ManualRow = Common & {
   - search rows: `status`, `expectedSalary`;
   - manual rows: those plus `url`, `title`, `company`, `location`, `salary`; changing title, company or location recomputes the fingerprint.
   - never: `fingerprint`, `origin`, `addedAt`, `job`, `match`.
-- `remove` deletes from the list only; search memory keeps the fingerprint.
-- Re-adding a manual row for a vacancy that was deleted earlier is allowed: it is not in the list.
+- `remove` deletes the row and adds its fingerprint to the list's `deleted` array (any origin), in the same write. `has` answers true for deleted fingerprints, so searches never bring a deleted row back, whoever added it.
+- Adding a manual row for a deleted vacancy is allowed and removes its fingerprint from `deleted` (undo by re-adding).
 
 ## Migration (first open, under both locks)
 

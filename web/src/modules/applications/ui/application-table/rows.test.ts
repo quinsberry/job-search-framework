@@ -1,15 +1,6 @@
 import { expect, test } from 'bun:test';
-import type { DoneEvent, SearchApplication } from '../model/contracts';
-import {
-	filterRows,
-	relativeDate,
-	runStatusLine,
-	salaryOf,
-	toRow,
-	toRows,
-	type Criterion,
-	type RunState,
-} from './rows';
+import type { SearchApplication } from '../model/contracts';
+import { filterRows, relativeDate, salaryOf, toRow, toRows, type Criterion } from './rows';
 
 const criterion = (name: Criterion['criterion'], result: Criterion['result'], detail = 'detail'): Criterion => ({
 	criterion: name,
@@ -139,42 +130,6 @@ test('relative dates', () => {
 	expect(relativeDate('2026-06-01', now)).toBe('5 months ago');
 });
 
-test('run status line for every state and stop reason', () => {
-	const base: RunState = {
-		status: 'running',
-		progress: { processed: 12, matched: 3, skipped: 40 },
-		budgets: null,
-		failures: { jobs: 0, sources: 0 },
-		lastDone: null,
-		error: null,
-	};
-	const done = (reason: DoneEvent['reason'], extra: Partial<DoneEvent> = {}): RunState => ({
-		...base,
-		status: 'done',
-		lastDone: { type: 'done', reason, totals: base.progress, costUsd: 0.001738, unpricedCalls: 0, ...extra },
-	});
-	expect(runStatusLine({ ...base, status: 'idle' })).toBeNull();
-	expect(runStatusLine(base)?.text).toBe('Starting…');
-	expect(runStatusLine({ ...base, budgets: { process: 50, match: 10 } })?.text).toBe(
-		'Inspected 12 / 50 · Found 3 / 10 · Skipped 40',
-	);
-	expect(runStatusLine(done('match-budget'))?.text).toBe(
-		'Found 3 applications (limit reached) · 12 inspected · 40 skipped · $0.001738',
-	);
-	expect(runStatusLine(done('process-budget'))?.text).toStartWith('Inspected 12 vacancies (limit reached)');
-	expect(runStatusLine(done('no-new'))?.text).toStartWith('No new vacancies near the top of the results');
-	expect(runStatusLine(done('exhausted'))?.text).toStartWith('Searched all results');
-	expect(runStatusLine(done('cancelled'))?.text).toStartWith('Search cancelled');
-	expect(runStatusLine({ ...done('exhausted', { unpricedCalls: 2 }), failures: { jobs: 1, sources: 2 } })?.text).toBe(
-		'Searched all results · 12 inspected · 40 skipped · $0.001738 + 2 unpriced · 1 job failed · 2 sources failed',
-	);
-	expect(runStatusLine({ ...base, status: 'cancelled' })?.text).toBe('Search cancelled · 12 inspected · 40 skipped');
-	expect(runStatusLine({ ...base, status: 'failed', error: 'Decision model unavailable' })).toEqual({
-		text: 'Decision model unavailable',
-		tone: 'error',
-	});
-});
-
 test('manual rows show their typed facts and sort with matches', () => {
 	const manual = {
 		origin: 'manual' as const,
@@ -200,4 +155,19 @@ test('manual rows show their typed facts and sort with matches', () => {
 	});
 	const rows = toRows({ sources, applications: [application('a'), manual] });
 	expect(rows.map((item) => item.title)).toEqual(['Manual role', 'Engineer a']);
+});
+
+test('the status filter shows active rows by default and never loses the rest', () => {
+	const rows = toRows({
+		sources,
+		applications: (['new', 'applied', 'interviewing', 'offer', 'rejected', 'dismissed'] as const).map((status) => ({
+			...application(status),
+			status,
+		})),
+	});
+	const titles = (filter: Parameters<typeof filterRows>[2]) => filterRows(rows, '', filter).map((row) => row.status);
+	expect(titles('active').sort()).toEqual(['applied', 'interviewing', 'new', 'offer']);
+	expect(titles('all')).toHaveLength(6);
+	expect(titles('dismissed')).toEqual(['dismissed']);
+	expect(filterRows(rows, 'engineer rejected', 'active')).toEqual([]);
 });
