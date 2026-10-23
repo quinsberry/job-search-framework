@@ -4,6 +4,7 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { emptyState } from '@/modules/profile/model/contracts';
 import type { ProfileHandle } from '@/modules/profile/profile-section';
+let onPreferencesPublished: (workspace: string) => void;
 let section: { workspace: string | null; workspaceError: string; loadWorkspace: (path: string) => Promise<void> };
 let sessionId: string | undefined;
 let failFlush = false;
@@ -48,10 +49,13 @@ mock.module('@/modules/search/search-preferences-section', () => ({
 	SearchPreferencesSection: ({
 		loaded,
 		onSession,
+		onPublished,
 	}: {
 		loaded: { sessionId: string } | null;
 		onSession: (handle: ProfileHandle | null) => void;
+		onPublished: (workspace: string) => void;
 	}) => {
+		onPreferencesPublished = onPublished;
 		useEffect(() => {
 			if (loaded)
 				onSession({
@@ -184,4 +188,21 @@ test('a preferences flush or target preferences load failure retains both editor
 	expect(section.workspace).toBe('/second');
 	expect(disposals).toBe(1);
 	expect(preferenceDisposals).toBe(1);
+});
+
+test('published preferences invalidate only applications in the same workspace through app composition', async () => {
+	await act(async () => {
+		renderer = create(
+			<QueryClientProvider client={client}>
+				<WorkspaceContent />
+			</QueryClientProvider>,
+		);
+	});
+	client.setQueryData(['applications', '/first'], { applications: [], sources: [] });
+	client.setQueryData(['applications', '/second'], { applications: [], sources: [] });
+	await act(async () => {
+		onPreferencesPublished('/first');
+	});
+	expect(client.getQueryState(['applications', '/first'])?.isInvalidated).toBe(true);
+	expect(client.getQueryState(['applications', '/second'])?.isInvalidated).toBe(false);
 });

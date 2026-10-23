@@ -2,6 +2,8 @@
 
 Status: ready-for-agent. Tracked as `issues/01-storage-split.md` then `issues/02-tracking-ui.md`.
 
+Follow-up: [manual application resolution](../manual-application-resolution/spec.md) defines the reviewed changes to arrangement corrections, structured Expected salary, effective assessments and default Salary visibility. The behavior below describes the original tracking implementation.
+
 ## Objective and scope
 
 Let the job seeker track applications: give every row a status, record the salary they expect, add vacancies found elsewhere, edit and delete rows. Everything already stored survives, and deleting a row never makes the next search find it again.

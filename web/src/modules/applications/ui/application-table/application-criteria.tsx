@@ -24,9 +24,16 @@ export function ApplicationCriteria({ criteria, manual }: { criteria: Criterion[
 							{criterionLabel[item.criterion]}
 						</span>
 						<span className="min-w-0 whitespace-normal text-muted-foreground">{item.detail}</span>
-						{item.evidence === 'model' ? (
-							<Badge variant="outline" title="Judged by the decision model">
-								AI
+						{item.evidence === 'model' || item.evidence === 'manual' ? (
+							<Badge
+								variant="outline"
+								title={
+									item.evidence === 'manual'
+										? 'Resolved with manual input'
+										: 'Judged by the decision model'
+								}
+							>
+								{item.evidence === 'manual' ? 'Manual' : 'AI'}
 							</Badge>
 						) : null}
 					</li>

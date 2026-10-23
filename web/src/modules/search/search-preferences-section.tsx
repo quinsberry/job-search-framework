@@ -11,10 +11,12 @@ export function SearchPreferencesSection({
 	loaded,
 	switching,
 	onSession,
+	onPublished,
 }: {
 	loaded: LoadedWorkspace | null;
 	switching: boolean;
 	onSession: (handle: SessionHandle | null) => void;
+	onPublished?: (workspace: string) => void;
 }) {
 	return (
 		<Card>
@@ -26,7 +28,12 @@ export function SearchPreferencesSection({
 			</CardHeader>
 			<CardContent>
 				{loaded ? (
-					<LoadedPreferences {...loaded} switching={switching} onSession={onSession} />
+					<LoadedPreferences
+						{...loaded}
+						switching={switching}
+						onSession={onSession}
+						onPublished={onPublished}
+					/>
 				) : (
 					<FieldDescription>Load a workspace to manage your search preferences.</FieldDescription>
 				)}
@@ -35,7 +42,11 @@ export function SearchPreferencesSection({
 	);
 }
 function LoadedPreferences(
-	props: LoadedWorkspace & { switching: boolean; onSession: (handle: SessionHandle | null) => void },
+	props: LoadedWorkspace & {
+		switching: boolean;
+		onSession: (handle: SessionHandle | null) => void;
+		onPublished?: (workspace: string) => void;
+	},
 ) {
 	const { data, error } = useQuery(preferencesOptions(props.workspace, props.sessionId));
 	return (

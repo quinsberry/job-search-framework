@@ -26,6 +26,7 @@ export function OptionSelect<T extends string>({
 	disabled,
 	id,
 	className,
+	invalid,
 }: {
 	value: T;
 	options: Option<T>[];
@@ -34,18 +35,19 @@ export function OptionSelect<T extends string>({
 	disabled?: boolean;
 	id?: string;
 	className?: string;
+	invalid?: boolean;
 }) {
 	return (
 		<Select
-			value={value}
+			value={value || null}
 			disabled={disabled}
 			items={options}
 			onValueChange={(next) => {
 				if (next && next !== value) onChange(next as T);
 			}}
 		>
-			<SelectTrigger id={id} aria-label={label} className={className}>
-				<SelectValue />
+			<SelectTrigger id={id} aria-label={label} aria-invalid={invalid} className={className}>
+				<SelectValue placeholder="Choose an option" />
 			</SelectTrigger>
 			<SelectContent>
 				<SelectGroup>

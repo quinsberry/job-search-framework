@@ -1,14 +1,17 @@
 import { afterEach, beforeEach, expect, mock, test } from 'bun:test';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { assessApplication } from './model/manual-assessment';
 import type { Application, RunEvent } from './model/contracts';
 
 // Base UI menus and selects need a DOM document, which react-test-renderer lacks; the table itself stays real.
-mock.module('./application-table/applications-table-view-options', () => ({
+mock.module('./ui/application-table/applications-table-view-options', () => ({
 	ApplicationsTableViewOptions: () => null,
 }));
-mock.module('./application-table/applications-table-pagination', () => ({ ApplicationsTablePagination: () => null }));
-mock.module('./application-table/applications-table-column-header', () => ({
+mock.module('./ui/application-table/applications-table-pagination', () => ({
+	ApplicationsTablePagination: () => null,
+}));
+mock.module('./ui/application-table/applications-table-column-header', () => ({
 	ApplicationsTableColumnHeader: ({ title }: { title: string }) => title,
 }));
 // The dialogs and the status select are Base UI too; the stubs expose their props so the tests can drive them.
@@ -16,7 +19,7 @@ type Props = Record<string, any>; // eslint-disable-line @typescript-eslint/no-e
 let statusSelect: Props = {};
 let dialog: Props = {};
 let deleteDialog: Props = {};
-mock.module('./application-table/status-select', () => ({
+mock.module('./ui/application-table/status-select', () => ({
 	statusOptions: [],
 	statusFilterOptions: [],
 	OptionSelect: (props: Props) => {
@@ -24,7 +27,7 @@ mock.module('./application-table/status-select', () => ({
 		return null;
 	},
 }));
-mock.module('./application-table/row-actions', () => ({
+mock.module('./ui/application-table/row-actions', () => ({
 	RowActions: ({ title, onEdit, onDelete }: Props) => (
 		<>
 			<button aria-label={`Edit ${title}`} onClick={onEdit} />
@@ -32,13 +35,13 @@ mock.module('./application-table/row-actions', () => ({
 		</>
 	),
 }));
-mock.module('./application-table/application-dialog', () => ({
+mock.module('./ui/application-table/application-dialog', () => ({
 	ApplicationDialog: (props: Props) => {
 		dialog = props;
 		return null;
 	},
 }));
-mock.module('./application-table/delete-dialog', () => ({
+mock.module('./ui/application-table/delete-dialog', () => ({
 	DeleteDialog: (props: Props) => {
 		deleteDialog = props;
 		return null;
@@ -84,8 +87,18 @@ const application: Application = {
 	expectedSalary: null,
 };
 const sources = [{ id: 'linkedin', name: 'LinkedIn', supportedFilters: [] }];
-const json = (body: unknown, status = 200) =>
-	new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+const json = (body: unknown, status = 200) => {
+	if (body && typeof body === 'object' && 'applications' in body) {
+		const data = body as { applications: Application[]; sources: unknown[] };
+		body = {
+			...data,
+			applications: data.applications.map((row) =>
+				row.origin === 'search' ? { ...row, assessment: assessApplication(row, []) } : row,
+			),
+		};
+	}
+	return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+};
 
 type Route = (url: string, init?: RequestInit) => Response | Promise<Response>;
 async function render(

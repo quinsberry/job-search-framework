@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import {
 	httpUrlSchema,
+	compensationSchema,
+	workArrangementSchema,
 	jobDetailSchema,
 	jobRefSchema,
 	sourceDescriptorSchema,
@@ -45,11 +47,34 @@ const note = z.preprocess(
 	z.string().trim().max(300).nullable(),
 );
 
+export const structuredSalarySchema = z.strictObject({
+	amount: z.number({ error: 'Enter a valid amount' }).positive('Amount must be positive'),
+	currency: compensationSchema.shape.currency,
+	period: compensationSchema.shape.period.exclude(['unknown']),
+	contractType: compensationSchema.shape.contractType.exclude(['unknown']),
+});
+export const expectedSalarySchema = z.union([structuredSalarySchema, note]);
+export type ExpectedSalary = z.output<typeof expectedSalarySchema>;
+const arrangementOverrideSchema = z
+	.array(workArrangementSchema)
+	.min(1, 'Select at least one arrangement or reset to original')
+	.max(3)
+	.refine((items) => new Set(items).size === items.length, 'Duplicate arrangements')
+	.nullable();
+const effectiveCriterionSchema = matchSchema.shape.criteria.element.extend({
+	evidence: z.enum(['structured', 'model', 'manual']),
+});
+export const assessmentSchema = z.strictObject({
+	match: matchSchema.extend({ criteria: z.array(effectiveCriterionSchema).max(8) }),
+	workArrangements: z.array(workArrangementSchema).nullable(),
+});
+export type Assessment = z.output<typeof assessmentSchema>;
+
 // Fields the job seeker owns on every row; the workflow never sets them beyond their defaults.
 const tracked = {
 	fingerprint,
 	status: statusSchema,
-	expectedSalary: note,
+	expectedSalary: expectedSalarySchema,
 	addedAt: timestamp,
 };
 const searchFound = {
@@ -64,14 +89,19 @@ const manualFields = {
 	// The salary as advertised, typed by the job seeker.
 	salary: note,
 };
-export const searchApplicationSchema = z.strictObject({ origin: z.literal('search'), ...tracked, ...searchFound });
+export const searchApplicationSchema = z.strictObject({
+	origin: z.literal('search'),
+	...tracked,
+	...searchFound,
+	workArrangementOverride: arrangementOverrideSchema.optional(),
+});
 export const manualApplicationSchema = z.strictObject({ origin: z.literal('manual'), ...tracked, ...manualFields });
 export const applicationSchema = z.discriminatedUnion('origin', [searchApplicationSchema, manualApplicationSchema]);
 export type Application = z.output<typeof applicationSchema>;
 export type SearchApplication = z.output<typeof searchApplicationSchema>;
 export type ManualApplication = z.output<typeof manualApplicationSchema>;
 export const applicationsFileSchema = z.strictObject({
-	schemaVersion: z.literal(2),
+	schemaVersion: z.union([z.literal(2), z.literal(3)]),
 	applications: z.array(applicationSchema),
 	// Fingerprints of deleted rows of any origin, so a search never brings them back.
 	deleted: z.array(fingerprint).default([]),
@@ -92,15 +122,22 @@ export const manualInputSchema = z.strictObject({
 	location: note.default(null),
 	salary: note.default(null),
 	status: statusSchema.default('new'),
-	expectedSalary: note.default(null),
+	expectedSalary: expectedSalarySchema.default(null),
 });
 export type ManualInput = z.input<typeof manualInputSchema>;
 // Which fields each kind of row may change; read-only fields are rejected, not ignored.
 export const changesSchemas = {
-	search: z.strictObject({ status: statusSchema, expectedSalary: note }).partial(),
-	manual: z.strictObject({ status: statusSchema, expectedSalary: note, ...manualFields }).partial(),
+	search: z
+		.strictObject({
+			status: statusSchema,
+			expectedSalary: expectedSalarySchema,
+			workArrangementOverride: arrangementOverrideSchema,
+		})
+		.partial(),
+	manual: z.strictObject({ status: statusSchema, expectedSalary: expectedSalarySchema, ...manualFields }).partial(),
 };
-export type ApplicationChanges = z.input<(typeof changesSchemas)['manual']>;
+export type ApplicationChanges = z.input<(typeof changesSchemas)['manual']> &
+	z.input<(typeof changesSchemas)['search']>;
 
 export const inspectedEntrySchema = z.strictObject({
 	fingerprint,
@@ -168,7 +205,12 @@ export const applicationsRequestSchema = z.discriminatedUnion('action', [
 export type ApplicationsRequest = z.input<typeof applicationsRequestSchema>;
 export const runRequestSchema = z.strictObject({ workspace: z.string() });
 export const loadResultSchema = z.strictObject({
-	applications: z.array(applicationSchema),
+	applications: z.array(
+		z.discriminatedUnion('origin', [
+			searchApplicationSchema.extend({ assessment: assessmentSchema }),
+			manualApplicationSchema,
+		]),
+	),
 	// Source names come from the search service so the table holds no source list of its own.
 	sources: z.array(sourceDescriptorSchema),
 });

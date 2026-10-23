@@ -1,11 +1,10 @@
 import { z } from 'zod';
+import { contractTypes, currencies, payPeriods } from '@/shared/compensation';
+export { contractTypes, currencies, payPeriods } from '@/shared/compensation';
 
 export const seniorities = ['junior', 'middle', 'senior', 'staff'] as const;
 export const positionTypes = ['full-time', 'part-time', 'contract', 'internship'] as const;
 export const workArrangements = ['remote', 'on-site', 'hybrid'] as const;
-export const contractTypes = ['permanent', 'B2B'] as const;
-export const currencies = ['USD', 'EUR', 'PLN'] as const;
-export const payPeriods = ['annual', 'month', 'hourly'] as const;
 const text = z.string().max(20_000);
 const required = text.trim().min(1, 'Required');
 const optionalText = text

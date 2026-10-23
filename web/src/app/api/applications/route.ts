@@ -1,3 +1,5 @@
+import { PreferencesRepository } from '@/modules/search/server/persistence';
+import { assessApplication } from '@/modules/applications/model/manual-assessment';
 import { localRequest } from '@/shared/http/server';
 import { listSearchSources } from '@/shared/search-sources/server/search.service';
 import { applicationsRequestSchema } from '@/modules/applications/model/contracts';
@@ -11,8 +13,19 @@ export async function POST(request: Request) {
 		const list = await ApplicationList.open(input.workspace);
 		switch (input.action) {
 			// No lock: every write replaces applications.json atomically, so reads never see a partial file.
-			case 'load':
-				return { applications: await list.list(), sources: listSearchSources() };
+			case 'load': {
+				const [applications, preferences] = await Promise.all([
+					list.list(),
+					PreferencesRepository.open(input.workspace).then((repo) => repo.published()),
+				]);
+				const bands = preferences?.targetPosition.salaryRange ?? [];
+				return {
+					applications: applications.map((row) =>
+						row.origin === 'search' ? { ...row, assessment: assessApplication(row, bands) } : row,
+					),
+					sources: listSearchSources(),
+				};
+			}
 			case 'add':
 				return { row: await list.addManual(input.row, new Date()) };
 			case 'update':

@@ -29,6 +29,11 @@ export class PreferencesRepository {
 	load() {
 		return this.files.lock(() => this.snapshot());
 	}
+	// Published preferences only, so a broken recovery draft cannot block readers that ignore drafts.
+	async published() {
+		const text = await this.files.read('config.yaml');
+		return text === null ? null : configFileSchema.parse(YAML.parse(text)).preferences;
+	}
 	private async change(expected: string, operation: (current: PreferencesSnapshot) => Promise<void>) {
 		return this.files.lock(async () => {
 			const current = await this.snapshot();

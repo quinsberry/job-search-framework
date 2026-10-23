@@ -11,6 +11,7 @@ import type { SessionHandle } from '@/shared/drafts/recovery-session';
 import { preferencesOptions } from '@/modules/search/client/queries';
 import { profileOptions } from '@/modules/profile/client/queries';
 import { SearchPreferencesSection } from '@/modules/search/search-preferences-section';
+import { applicationsOptions } from '@/modules/applications/client/queries';
 import { ApplicationsSection } from '@/modules/applications/applications-section';
 
 export function WorkspaceContent() {
@@ -51,6 +52,12 @@ export function WorkspaceContent() {
 	const attachPreferences = useCallback((handle: SessionHandle | null) => {
 		preferences.current = handle;
 	}, []);
+	const preferencesPublished = useCallback(
+		(workspace: string) => {
+			void client.invalidateQueries({ queryKey: applicationsOptions(workspace).queryKey });
+		},
+		[client],
+	);
 	return (
 		<AgentSession>
 			<WorkspaceSection
@@ -71,6 +78,7 @@ export function WorkspaceContent() {
 				loaded={session.loaded}
 				switching={loading}
 				onSession={attachPreferences}
+				onPublished={preferencesPublished}
 			/>
 			<ApplicationsSection
 				key={'applications-' + (session.loaded?.sessionId ?? 'empty')}

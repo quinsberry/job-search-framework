@@ -7,7 +7,7 @@ import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { type ApplicationsTableFeatures } from './applications-table-features';
 import { ApplicationsTableColumnHeader } from './applications-table-column-header';
-import type { ApplicationStatus } from '../model/contracts';
+import type { ApplicationStatus } from '../../model/contracts';
 import { RowActions } from './row-actions';
 import { relativeDate, type ApplicationRow } from './rows';
 import { OptionSelect, statusOptions } from './status-select';
@@ -119,7 +119,7 @@ export const applicationColumns = (actions: RowActionHandlers) =>
 			cell: ({ getValue }) => getValue() ?? muted('Not advertised'),
 			enableSorting: false,
 		}),
-		columnHelper.accessor((row) => row.expectedSalary ?? undefined, {
+		columnHelper.accessor((row) => row.expectedSalaryLabel ?? undefined, {
 			id: 'expected salary',
 			header: 'Expected salary',
 			cell: ({ getValue }) => {

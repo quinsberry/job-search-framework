@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { matchOutcome } from '@/shared/match-outcome';
 import { jobDetailSchema, type JobDetail } from '@/shared/search-sources/contracts';
 import { searchPreferencesSchema } from '../../model/schema';
 import { checkSignal, MatchError, validateAnswers, withCancellation, type DecisionModel } from './decision-model';
@@ -23,11 +24,7 @@ const criteriaSchema = z.strictObject({
 });
 function finish(criteria: MatchResult['criteria'], costUsd: number | null): MatchResult {
 	return matchResultSchema.parse({
-		outcome: criteria.some((item) => item.result === 'failed')
-			? 'no-match'
-			: criteria.some((item) => item.result === 'unknown')
-				? 'needs-clarification'
-				: 'match',
+		outcome: matchOutcome(criteria),
 		criteria,
 		costUsd,
 	});

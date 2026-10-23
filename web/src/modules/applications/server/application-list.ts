@@ -38,7 +38,7 @@ export class ApplicationList {
 			const { state, result } = apply(await this.#read());
 			await this.files.writeBytes(
 				LIST,
-				JSON.stringify(applicationsFileSchema.parse({ schemaVersion: 2, ...state }), null, 2),
+				JSON.stringify(applicationsFileSchema.parse({ schemaVersion: 3, ...state }), null, 2),
 			);
 			return result;
 		});

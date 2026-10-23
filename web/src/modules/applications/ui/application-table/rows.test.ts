@@ -1,6 +1,9 @@
 import { expect, test } from 'bun:test';
-import type { SearchApplication } from '../model/contracts';
-import { filterRows, relativeDate, salaryOf, toRow, toRows, type Criterion } from './rows';
+import type { SearchApplication } from '../../model/contracts';
+import { assessApplication } from '../../model/manual-assessment';
+import { filterRows, relativeDate, salaryOf, toRow, toRows } from './rows';
+
+type Criterion = SearchApplication['match']['criteria'][number];
 
 const criterion = (name: Criterion['criterion'], result: Criterion['result'], detail = 'detail'): Criterion => ({
 	criterion: name,
@@ -12,7 +15,7 @@ function application(
 	id: string,
 	{
 		outcome = 'needs-clarification',
-		criteria = [],
+		criteria = [criterion('salary', 'unknown')],
 		addedAt = '2026-10-22T00:00:00Z',
 		job = {},
 	}: {
@@ -21,8 +24,8 @@ function application(
 		addedAt?: string;
 		job?: Partial<SearchApplication['job']>;
 	} = {},
-): SearchApplication {
-	return {
+) {
+	const row: SearchApplication = {
 		origin: 'search',
 		status: 'new',
 		expectedSalary: null,
@@ -42,6 +45,7 @@ function application(
 		match: { outcome, criteria, costUsd: null },
 		addedAt,
 	};
+	return { ...row, assessment: assessApplication(row, []) };
 }
 const sources = [{ id: 'linkedin' as const, name: 'LinkedIn', supportedFilters: [] }];
 const facts = (compensation: NonNullable<SearchApplication['job']['advertisedFacts']>['compensation']) => ({
@@ -101,7 +105,7 @@ test('default order puts matches first, then fewer open questions, then newest',
 		applications: [
 			application('a', { criteria: [criterion('seniority', 'unknown')] }),
 			application('b', { addedAt: '2026-10-23T00:00:00Z' }),
-			application('c', { outcome: 'match', addedAt: '2026-10-01T00:00:00Z' }),
+			application('c', { outcome: 'match', criteria: [], addedAt: '2026-10-01T00:00:00Z' }),
 			application('d', { criteria: [criterion('salary', 'unknown')] }),
 		],
 	});

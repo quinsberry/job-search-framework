@@ -19,7 +19,11 @@ const listeners = new Map<string, () => void>();
 const originalFetch = globalThis.fetch;
 const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
 const originalAct = Object.getOwnPropertyDescriptor(globalThis, 'IS_REACT_ACT_ENVIRONMENT');
+const published: string[] = [];
 const attach = () => {};
+const onPublished = (workspace: string) => {
+	published.push(workspace);
+};
 function Probe({ initial }: { initial: PreferencesSnapshot }) {
 	const current = useForm<PreferencesDraft>({ defaultValues: toDraft(initial.preferences) });
 	const { data = initial } = useQuery({
@@ -34,6 +38,7 @@ function Probe({ initial }: { initial: PreferencesSnapshot }) {
 		snapshot: data,
 		form: current,
 		onSession: attach,
+		onPublished,
 	});
 	useEffect(() => {
 		form = current;
@@ -66,6 +71,7 @@ beforeEach(() => {
 		}),
 	};
 	requests.length = 0;
+	published.length = 0;
 	globalThis.fetch = mock(async (_url, options) => {
 		const input = JSON.parse(String(options?.body));
 		requests.push(input);
@@ -113,6 +119,7 @@ test('unfinished numeric text is acknowledged without changing the form or activ
 	expect(form.getValues('settings.maxJobsToProcess')).toBe('unfinished');
 	expect(server.draft?.values.settings.maxJobsToProcess).toBe('unfinished');
 	expect(server.preferences?.settings.maxJobsToProcess).toBe(100);
+	expect(published).toEqual([]);
 	expect(editing.session.getState().status).toBe('clean');
 });
 test('Save and Discard reconcile revisions and baseline before further edits', async () => {
@@ -125,6 +132,7 @@ test('Save and Discard reconcile revisions and baseline before further edits', a
 		await new Promise((resolve) => setTimeout(resolve, 10));
 	});
 	expect(server.preferences?.targetPosition.positionTitles).toEqual(['Saved']);
+	expect(published).toEqual(['/fixture']);
 	expect(editing.session.getState().baseline?.targetPosition.positionTitles).toEqual(['Saved']);
 	await act(async () => {
 		form.setValue('targetPosition.positionTitles', ['Discard me']);
@@ -134,6 +142,7 @@ test('Save and Discard reconcile revisions and baseline before further edits', a
 		await new Promise((resolve) => setTimeout(resolve, 10));
 	});
 	expect(form.getValues('targetPosition.positionTitles')).toEqual(['Saved']);
+	expect(published).toEqual(['/fixture']);
 	const accepted = server.revision;
 	await act(async () => {
 		form.setValue('targetPosition.positionTitles', ['Next']);
@@ -170,4 +179,16 @@ test('focus refetch exposes external changes without resetting edits; explicit r
 		await editing.session.flush();
 	});
 	expect(requests.at(-1)?.revision).toBe('external');
+	expect(published).toEqual([]);
+});
+
+test('failed publication never notifies applications', async () => {
+	await mount();
+	server = { ...server, revision: 'external' };
+	await act(async () => {
+		editing.act('publish');
+		await new Promise((resolve) => setTimeout(resolve, 10));
+	});
+	expect(editing.error).toBeTruthy();
+	expect(published).toEqual([]);
 });

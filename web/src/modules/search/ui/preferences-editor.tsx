@@ -31,10 +31,12 @@ export function PreferencesEditor({
 	snapshot,
 	switching,
 	onSession,
+	onPublished,
 }: LoadedWorkspace & {
 	snapshot: PreferencesSnapshot;
 	switching: boolean;
 	onSession: (handle: SessionHandle | null) => void;
+	onPublished?: (workspace: string) => void;
 }) {
 	const [initial] = useState(snapshot);
 	const form = useForm<PreferencesDraft>({
@@ -48,6 +50,7 @@ export function PreferencesEditor({
 		snapshot,
 		form,
 		onSession,
+		onPublished,
 	});
 	const recovery = useSyncExternalStore(session.subscribe, session.getState, session.getState);
 	const [open, setOpen] = useState(!initial.preferences || !!initial.draft);

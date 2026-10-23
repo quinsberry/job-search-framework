@@ -28,6 +28,7 @@ export function ApplicationsTable({ rows, actions }: { rows: ApplicationRow[]; a
 	const [columnVisibility, setColumnVisibility] = useState<ColumnVisibilityState>({
 		source: false,
 		published: false,
+		salary: false,
 	});
 	const [expanded, setExpanded] = useState<ExpandedState>({});
 	const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 20 });

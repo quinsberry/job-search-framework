@@ -1,6 +1,13 @@
-import type { Application, ApplicationStatus, LoadResult, SearchApplication } from '../../model/contracts';
+import type {
+	Application,
+	ApplicationStatus,
+	LoadResult,
+	SearchApplication,
+	Assessment,
+	ExpectedSalary,
+} from '../../model/contracts';
 
-export type Criterion = SearchApplication['match']['criteria'][number];
+export type Criterion = Assessment['match']['criteria'][number];
 type Job = SearchApplication['job'];
 
 // Display rules live here so the components only render; columns never read MatchResult internals.
@@ -8,7 +15,9 @@ export type ApplicationRow = {
 	id: string;
 	origin: Application['origin'];
 	status: ApplicationStatus;
-	expectedSalary: string | null;
+	expectedSalary: ExpectedSalary;
+	expectedSalaryLabel: string | null;
+	workArrangementOverride: SearchApplication['workArrangementOverride'];
 	title: string;
 	url: string;
 	company: string | null;
@@ -37,17 +46,14 @@ export const criterionLabel: Record<Criterion['criterion'], string> = {
 
 const more = (count: number) => (count > 1 ? ` +${count - 1}` : '');
 
-export function arrangementOf(application: SearchApplication): string | null {
-	const advertised = application.job.advertisedFacts?.workArrangements;
-	if (advertised?.length) return advertised.join(' / ');
-	const detail = application.match.criteria.find((item) => item.criterion === 'workArrangement')?.detail;
-	// shortcut: reads the "most likely: X" suffix Search's matcher writes; give MatchResult a structured field if that wording changes.
-	const likely = detail?.match(/most likely: ([a-z-]+)/)?.[1];
-	return likely && likely !== 'unknown' ? likely : null;
-}
-
 const periods = { annual: ' / year', month: ' / month', hourly: ' / hour', unknown: '' };
 const money = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+const expectedMoney = new Intl.NumberFormat('en-US', { maximumFractionDigits: 20 });
+export function expectedSalaryLabel(value: ExpectedSalary): string | null {
+	return value === null || typeof value === 'string'
+		? value
+		: `${expectedMoney.format(value.amount)} ${value.currency}${periods[value.period]} ${value.contractType}`;
+}
 export function salaryOf(job: Job): string | null {
 	const all = job.advertisedFacts?.compensation ?? [];
 	const first = all[0];
@@ -66,12 +72,14 @@ export function salaryOf(job: Job): string | null {
 	return (range === null ? first.rawText : `${range} ${first.currency}${periods[first.period]}`) + more(all.length);
 }
 
-export function toRow(application: Application, sources: LoadResult['sources']): ApplicationRow {
+export function toRow(application: LoadResult['applications'][number], sources: LoadResult['sources']): ApplicationRow {
 	const tracked = {
 		id: application.fingerprint,
 		origin: application.origin,
 		status: application.status,
 		expectedSalary: application.expectedSalary,
+		expectedSalaryLabel: expectedSalaryLabel(application.expectedSalary),
+		workArrangementOverride: application.origin === 'search' ? application.workArrangementOverride : undefined,
 		addedAt: application.addedAt,
 	};
 	if (application.origin === 'manual')
@@ -90,7 +98,8 @@ export function toRow(application: Application, sources: LoadResult['sources']):
 			publishedAt: null,
 			criteria: [],
 		};
-	const { job, match } = application;
+	const { job, assessment } = application;
+	const { match } = assessment;
 	const salary = salaryOf(job);
 	const unknown = match.criteria.filter((item) => item.result === 'unknown');
 	// An unadvertised salary is expected on most sources, so it is not counted as an open question.
@@ -101,7 +110,7 @@ export function toRow(application: Application, sources: LoadResult['sources']):
 		url: job.url,
 		company: job.company?.name ?? null,
 		location: job.locations[0] ? job.locations[0].label + more(job.locations.length) : null,
-		arrangement: arrangementOf(application),
+		arrangement: assessment.workArrangements?.join(' / ') ?? null,
 		salary,
 		outcome: match.outcome,
 		openQuestions: unknown

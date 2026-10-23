@@ -17,6 +17,7 @@ export function usePreferencesSession({
 	snapshot,
 	form,
 	onSession,
+	onPublished,
 }: {
 	workspace: string;
 	sessionId: string;
@@ -24,6 +25,7 @@ export function usePreferencesSession({
 	snapshot: PreferencesSnapshot;
 	form: UseFormReturn<PreferencesDraft>;
 	onSession: (handle: SessionHandle | null) => void;
+	onPublished?: (workspace: string) => void;
 }) {
 	const client = useQueryClient();
 	const { getValues, reset, subscribe } = form;
@@ -85,6 +87,7 @@ export function usePreferencesSession({
 					return api.readSnapshot(workspace);
 				}),
 			);
+			if (kind === 'publish') onPublished?.(workspace);
 			if (result.replacement) {
 				resetting.current = true;
 				reset(result.replacement);
