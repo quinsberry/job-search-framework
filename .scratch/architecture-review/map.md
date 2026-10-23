@@ -64,6 +64,7 @@ Draft editors first (22 unblocks 23 and 24), then the independent items.
 
 - [02 — Interrupted run and conversion feedback](issues/02-interrupted-run-feedback.md)
 - [04 — Live source check](issues/04-live-source-check.md)
+- [34 — Remove the v1 applications migration](issues/34-remove-v1-applications-migration.md)
 
 ### Closed
 
@@ -74,3 +75,5 @@ Draft editors first (22 unblocks 23 and 24), then the independent items.
 Resolved tickets add a one-line summary here and link back.
 
 - [16](issues/16-ci-checks.md) (ready-for-agent): replace the Python `tests` workflow with `web / checks` (typecheck, lint, test, build in one job); push to `main`, PRs and manual dispatch; skip non-code-only changes; no pre-push hook; done on the PR that merges `next-migration`.
+- [19](issues/19-stored-format-fixtures.md) (ready-for-agent): per-module golden fixtures for applications v2/v3, profile, preferences and search memory; byte-identical round trip for current formats; pin the criteria digest (the conversion cache key is already pinned); no v1. Spec: [stored-format-fixtures](../stored-format-fixtures/spec.md).
+- [14](issues/14-decision-model-identity-in-criteria-digest.md) (ready-for-agent, blocked by 19): decision model port gets a readable identity (model ID, input budget, client format version) passed into the criteria digest; one-off re-judge of stored rejections accepted; rules version covers matching only; ADR 0009 amended with the code. Glossary updated: Inspected vacancy, Decision model. Spec: [decision-model-identity](../decision-model-identity/spec.md).

@@ -44,6 +44,9 @@ The share of a vacancy's must-have skills the candidate has, compared to the job
 **Match outcome**:
 The result of evaluating vacancy evidence against the candidate's criteria: match, no-match or needs-clarification. Failures to evaluate are errors rather than match outcomes.
 
+**Decision model**:
+The AI model that answers the matching questions structured checks cannot settle. Changing it changes how vacancies are judged.
+
 **Application**:
 A row in the job seeker's application list: a vacancy whose match outcome is match or needs-clarification, or one the job seeker added by hand. Being an application does not mean the job seeker has applied; its application status says that.
 _Avoid_: lead, result
@@ -55,7 +58,7 @@ Where the job seeker stands with an application: new (found, not applied yet), a
 The search workflow's record of every inspected vacancy, accepted ones included. Deleting an application does not touch it; the application list remembers deletions itself, so the search never finds a deleted application again.
 
 **Inspected vacancy**:
-A vacancy the search workflow has already evaluated, identified by its company, title and place rather than by one publisher's ID, and kept in search memory. Rejected vacancies are evaluated again after the search criteria change or after 60 days; accepted ones never are. An inspected vacancy is not necessarily a qualifying vacancy.
+A vacancy the search workflow has already evaluated, identified by its company, title and place rather than by one publisher's ID, and kept in search memory. Rejected vacancies are evaluated again after the search criteria, the matching rules or the decision model change, or after 60 days; accepted ones never are. An inspected vacancy is not necessarily a qualifying vacancy.
 
 **Advertised compensation**:
 The employer's published fixed-cash pay amount or range for a vacancy, with its contract type, currency, pay period and original text. A vacancy may advertise several. It is distinct from the candidate's baseline and target salary and from an employer offer.
