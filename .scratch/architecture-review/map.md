@@ -71,4 +71,6 @@ Draft editors first (22 unblocks 23 and 24), then the independent items.
 
 ## Decisions so far
 
-None yet. Resolved tickets add a one-line summary here and link back.
+Resolved tickets add a one-line summary here and link back.
+
+- [16](issues/16-ci-checks.md) (ready-for-agent): replace the Python `tests` workflow with `web / checks` (typecheck, lint, test, build in one job); push to `main`, PRs and manual dispatch; skip non-code-only changes; no pre-push hook; done on the PR that merges `next-migration`.
