@@ -8,7 +8,9 @@ const results = {
 	failed: { icon: X, label: 'Failed', className: 'text-destructive' },
 };
 
-export function ApplicationCriteria({ criteria }: { criteria: Criterion[] }) {
+export function ApplicationCriteria({ criteria, manual }: { criteria: Criterion[]; manual: boolean }) {
+	if (manual)
+		return <p className="text-sm text-muted-foreground">Added manually; not matched against your preferences.</p>;
 	if (!criteria.length) return <p className="text-sm text-muted-foreground">No criteria were evaluated.</p>;
 	return (
 		<ul className="space-y-1.5 text-sm">

@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import type { Application, DoneEvent } from '../model/contracts';
+import type { DoneEvent, SearchApplication } from '../model/contracts';
 import {
 	filterRows,
 	relativeDate,
@@ -22,16 +22,19 @@ function application(
 	{
 		outcome = 'needs-clarification',
 		criteria = [],
-		matchedAt = '2026-10-22T00:00:00Z',
+		addedAt = '2026-10-22T00:00:00Z',
 		job = {},
 	}: {
-		outcome?: Application['match']['outcome'];
+		outcome?: SearchApplication['match']['outcome'];
 		criteria?: Criterion[];
-		matchedAt?: string;
-		job?: Partial<Application['job']>;
+		addedAt?: string;
+		job?: Partial<SearchApplication['job']>;
 	} = {},
-): Application {
+): SearchApplication {
 	return {
+		origin: 'search',
+		status: 'new',
+		expectedSalary: null,
 		fingerprint: id.padStart(64, '0'),
 		job: {
 			sourceId: 'linkedin',
@@ -46,11 +49,11 @@ function application(
 			...job,
 		},
 		match: { outcome, criteria, costUsd: null },
-		matchedAt,
+		addedAt,
 	};
 }
 const sources = [{ id: 'linkedin' as const, name: 'LinkedIn', supportedFilters: [] }];
-const facts = (compensation: NonNullable<Application['job']['advertisedFacts']>['compensation']) => ({
+const facts = (compensation: NonNullable<SearchApplication['job']['advertisedFacts']>['compensation']) => ({
 	advertisedFacts: {
 		workArrangements: null,
 		workArrangementsText: null,
@@ -106,8 +109,8 @@ test('default order puts matches first, then fewer open questions, then newest',
 		sources,
 		applications: [
 			application('a', { criteria: [criterion('seniority', 'unknown')] }),
-			application('b', { matchedAt: '2026-10-23T00:00:00Z' }),
-			application('c', { outcome: 'match', matchedAt: '2026-10-01T00:00:00Z' }),
+			application('b', { addedAt: '2026-10-23T00:00:00Z' }),
+			application('c', { outcome: 'match', addedAt: '2026-10-01T00:00:00Z' }),
 			application('d', { criteria: [criterion('salary', 'unknown')] }),
 		],
 	});
@@ -170,4 +173,31 @@ test('run status line for every state and stop reason', () => {
 		text: 'Decision model unavailable',
 		tone: 'error',
 	});
+});
+
+test('manual rows show their typed facts and sort with matches', () => {
+	const manual = {
+		origin: 'manual' as const,
+		fingerprint: 'f'.repeat(64),
+		status: 'applied' as const,
+		expectedSalary: '25k PLN',
+		addedAt: '2026-10-21T00:00:00Z',
+		url: 'https://example.com/job',
+		title: 'Manual role',
+		company: 'Acme',
+		location: 'Warsaw',
+		salary: '20–24k PLN',
+	};
+	const row = toRow(manual, sources);
+	expect(row).toMatchObject({
+		outcome: 'manual',
+		source: 'Manual',
+		salary: '20–24k PLN',
+		status: 'applied',
+		expectedSalary: '25k PLN',
+		openQuestions: [],
+		criteria: [],
+	});
+	const rows = toRows({ sources, applications: [application('a'), manual] });
+	expect(rows.map((item) => item.title)).toEqual(['Manual role', 'Engineer a']);
 });

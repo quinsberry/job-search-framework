@@ -86,7 +86,7 @@ test('an empty source streams valid events ending in done', async () => {
 	expect(events.at(-1)).toMatchObject({ type: 'done', reason: 'exhausted' });
 });
 
-test('one run per workspace; load works during a run; cancelling the stream aborts and releases the run', async () => {
+test('one run per workspace; load and edits work during a run; cancelling the stream aborts and releases the run', async () => {
 	await savePreferences();
 	const aborted = hangingSources();
 	const first = await post(POST, { workspace });
@@ -99,6 +99,13 @@ test('one run per workspace; load works during a run; cancelling the stream abor
 		applications: [],
 		sources: [{ id: 'linkedin', name: 'LinkedIn', supportedFilters: ['location', 'publishedAfter'] }],
 	});
+	// The run locks only search memory, so the job seeker can still change the list.
+	const added = await post(load, {
+		action: 'add',
+		workspace,
+		row: { url: 'https://example.com/job', title: 'Manual role' },
+	});
+	expect(added.status).toBe(200);
 
 	await reader.cancel();
 	expect(aborted.length).toBeGreaterThan(0);

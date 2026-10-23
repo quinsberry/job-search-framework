@@ -2,7 +2,9 @@ import { errorResponse, readLocalBody } from '@/shared/http/server';
 import { listSearchSources, SearchRun } from '@/shared/search-sources/server/search.service';
 import { runRequestSchema } from '@/modules/applications/model/contracts';
 import { criteriaDigest } from '@/modules/applications/server/fingerprint';
-import { ApplicationStore } from '@/modules/applications/server/store';
+import { ApplicationList } from '@/modules/applications/server/application-list';
+import { migrateWorkspace } from '@/modules/applications/server/migration';
+import { SearchMemory } from '@/modules/applications/server/search-memory';
 import { runSearch } from '@/modules/applications/server/workflow';
 import { PreferencesRepository } from '@/modules/search/server/persistence';
 import { DecisionModelClient } from '@/modules/search/server/matching/decision-model';
@@ -22,12 +24,15 @@ export async function POST(request: Request) {
 			throw coded('invalid', 'Add skills to your profile or clear the skill match threshold');
 		if (!process.env.OPENROUTER_API_KEY?.trim())
 			throw coded('unavailable', 'Set OPENROUTER_API_KEY to run a search.');
-		const store = await ApplicationStore.open(workspace);
+		await migrateWorkspace(workspace);
+		const memory = await SearchMemory.open(workspace);
+		const list = await ApplicationList.open(workspace);
 
+		// Only search memory is locked for the run; the list locks per write so edits keep working.
 		// lock() releases when its action settles, so hold it until the stream ends; a busy lock answers 409.
 		const finished = Promise.withResolvers<void>();
 		const acquired = Promise.withResolvers<void>();
-		const locked = store.lock(async () => {
+		const locked = memory.lock(async () => {
 			acquired.resolve();
 			await finished.promise;
 		});
@@ -44,7 +49,8 @@ export async function POST(request: Request) {
 			{
 				openRun: (query, signal) => new SearchRun({ sourceIds, query }, signal),
 				match: (detail, signal) => matchJob(detail, { preferences, skills }, { model }, signal),
-				store,
+				memory,
+				list,
 				now: () => new Date(),
 			},
 			controller.signal,

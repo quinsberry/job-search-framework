@@ -43,7 +43,16 @@ export function errorResponse(error: unknown) {
 	return Response.json(
 		{ error: message, code },
 		{
-			status: code === 'forbidden' ? 403 : code === 'conflict' ? 409 : code === 'unavailable' ? 503 : 400,
+			status:
+				code === 'forbidden'
+					? 403
+					: code === 'not-found'
+						? 404
+						: code === 'conflict'
+							? 409
+							: code === 'unavailable'
+								? 503
+								: 400,
 		},
 	);
 }

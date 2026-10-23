@@ -5,12 +5,15 @@ import type { DoneEvent, matchSchema, RunEvent } from '../model/contracts';
 import type { z } from 'zod';
 import { fingerprint } from './fingerprint';
 import { discoveryQueries } from './queries';
-import type { ApplicationStore } from './store';
+import type { ApplicationList } from './application-list';
+import type { SearchMemory } from './search-memory';
 
 export type RunDeps = {
 	openRun(query: DiscoveryQuery, signal: AbortSignal): SearchSourceRun;
 	match(detail: JobDetail, signal: AbortSignal): Promise<MatchResult>;
-	store: Pick<ApplicationStore, 'prepare' | 'has' | 'reject' | 'add'>;
+	memory: Pick<SearchMemory, 'prepare' | 'has' | 'record'>;
+	// Only adding: statuses and edits belong to the job seeker, not the search.
+	list: Pick<ApplicationList, 'has' | 'add'>;
 	now(): Date;
 };
 export type RunInput = {
@@ -49,7 +52,7 @@ export async function* runSearch(input: RunInput, deps: RunDeps, signal: AbortSi
 	};
 	const runs: SearchSourceRun[] = [];
 	try {
-		await deps.store.prepare(input.criteriaDigest, deps.now());
+		await deps.memory.prepare(input.criteriaDigest, deps.now());
 		for (const query of discoveryQueries(input.preferences)) runs.push(deps.openRun(query, signal));
 		const active = [...runs];
 		const reported = new Set<string>();
@@ -86,7 +89,8 @@ export async function* runSearch(input: RunInput, deps: RunDeps, signal: AbortSi
 				if (totals.processed >= maxJobsToProcess || totals.matched >= maxJobsToMatch) break;
 				pulled++;
 				const id = fingerprint(job);
-				if (deps.store.has(id) || seen.has(id)) {
+				// Manual rows exist only in the list, so both stores decide what is known.
+				if (seen.has(id) || deps.memory.has(id) || (await deps.list.has(id))) {
 					totals.skipped++;
 					continue;
 				}
@@ -105,8 +109,8 @@ export async function* runSearch(input: RunInput, deps: RunDeps, signal: AbortSi
 						code: detail.error.code,
 					};
 				} else if (detail.job.availability === 'closed') {
-					await deps.store.reject(
-						rejection(id, 'closed', ['availability'], detail.job, input.criteriaDigest, deps.now()),
+					await deps.memory.record(
+						entry(id, 'closed', ['availability'], detail.job, input.criteriaDigest, deps.now()),
 					);
 				} else {
 					let result: MatchResult;
@@ -124,8 +128,8 @@ export async function* runSearch(input: RunInput, deps: RunDeps, signal: AbortSi
 					if (result.costUsd !== null) costUsd += result.costUsd;
 					else if (result.criteria.some((item) => item.evidence === 'model')) unpricedCalls++;
 					if (result.outcome === 'no-match') {
-						await deps.store.reject(
-							rejection(
+						await deps.memory.record(
+							entry(
 								id,
 								'no-match',
 								result.criteria
@@ -139,13 +143,16 @@ export async function* runSearch(input: RunInput, deps: RunDeps, signal: AbortSi
 					} else {
 						const { description, ...job } = detail.job;
 						void description;
-						const record = {
+						// List first: a crash before the memory write leaves a row that is still known, never a lost one.
+						const record = await deps.list.add({
 							fingerprint: id,
 							job,
 							match: { ...result, outcome: result.outcome },
-							matchedAt: deps.now().toISOString(),
-						};
-						await deps.store.add(record);
+							addedAt: deps.now().toISOString(),
+						});
+						await deps.memory.record(
+							entry(id, 'accepted', [], detail.job, input.criteriaDigest, deps.now()),
+						);
 						totals.matched++;
 						yield { type: 'application', record };
 					}
@@ -167,9 +174,9 @@ export async function* runSearch(input: RunInput, deps: RunDeps, signal: AbortSi
 	}
 }
 
-function rejection(
+function entry(
 	fingerprint: string,
-	outcome: 'no-match' | 'closed',
+	outcome: 'accepted' | 'no-match' | 'closed',
 	failed: string[],
 	job: JobDetail,
 	criteriaDigest: string,

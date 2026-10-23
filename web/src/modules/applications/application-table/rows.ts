@@ -1,23 +1,33 @@
-import type { Application, DoneEvent, LoadResult, RunProgress } from '../model/contracts';
+import type {
+	Application,
+	ApplicationStatus,
+	DoneEvent,
+	LoadResult,
+	RunProgress,
+	SearchApplication,
+} from '../model/contracts';
 
-export type Criterion = Application['match']['criteria'][number];
-type Job = Application['job'];
+export type Criterion = SearchApplication['match']['criteria'][number];
+type Job = SearchApplication['job'];
 
 // Display rules live here so the components only render; columns never read MatchResult internals.
 export type ApplicationRow = {
 	id: string;
+	origin: Application['origin'];
+	status: ApplicationStatus;
+	expectedSalary: string | null;
 	title: string;
 	url: string;
 	company: string | null;
 	location: string | null;
 	arrangement: string | null;
 	salary: string | null;
-	outcome: Application['match']['outcome'];
+	outcome: SearchApplication['match']['outcome'] | 'manual';
 	openQuestions: string[];
 	salaryNotAdvertised: boolean;
 	source: string;
 	publishedAt: string | null;
-	matchedAt: string;
+	addedAt: string;
 	criteria: Criterion[];
 };
 
@@ -35,7 +45,7 @@ export const criterionLabel: Record<Criterion['criterion'], string> = {
 const more = (count: number) => (count > 1 ? ` +${count - 1}` : '');
 const plural = (count: number, noun: string, nouns = noun + 's') => `${count} ${count === 1 ? noun : nouns}`;
 
-export function arrangementOf(application: Application): string | null {
+export function arrangementOf(application: SearchApplication): string | null {
 	const advertised = application.job.advertisedFacts?.workArrangements;
 	if (advertised?.length) return advertised.join(' / ');
 	const detail = application.match.criteria.find((item) => item.criterion === 'workArrangement')?.detail;
@@ -65,13 +75,36 @@ export function salaryOf(job: Job): string | null {
 }
 
 export function toRow(application: Application, sources: LoadResult['sources']): ApplicationRow {
+	const tracked = {
+		id: application.fingerprint,
+		origin: application.origin,
+		status: application.status,
+		expectedSalary: application.expectedSalary,
+		addedAt: application.addedAt,
+	};
+	if (application.origin === 'manual')
+		return {
+			...tracked,
+			title: application.title,
+			url: application.url,
+			company: application.company,
+			location: application.location,
+			arrangement: null,
+			salary: application.salary,
+			outcome: 'manual',
+			openQuestions: [],
+			salaryNotAdvertised: false,
+			source: 'Manual',
+			publishedAt: null,
+			criteria: [],
+		};
 	const { job, match } = application;
 	const salary = salaryOf(job);
 	const unknown = match.criteria.filter((item) => item.result === 'unknown');
 	// An unadvertised salary is expected on most sources, so it is not counted as an open question.
 	const salaryNotAdvertised = !salary && unknown.some((item) => item.criterion === 'salary');
 	return {
-		id: application.fingerprint,
+		...tracked,
 		title: job.title,
 		url: job.url,
 		company: job.company?.name ?? null,
@@ -85,20 +118,19 @@ export function toRow(application: Application, sources: LoadResult['sources']):
 		salaryNotAdvertised,
 		source: sources.find((source) => source.id === job.sourceId)?.name ?? job.sourceId,
 		publishedAt: job.publishedAt,
-		matchedAt: application.matchedAt,
 		criteria: match.criteria,
 	};
 }
 
-// Default order: matches first, then the fewest open questions, then the newest.
+// Default order: matches and hand-picked rows first, then the fewest open questions, then the newest.
 export function toRows({ applications, sources }: LoadResult): ApplicationRow[] {
 	return applications
 		.map((application) => toRow(application, sources))
 		.sort(
 			(a, b) =>
-				Number(b.outcome === 'match') - Number(a.outcome === 'match') ||
+				Number(b.outcome !== 'needs-clarification') - Number(a.outcome !== 'needs-clarification') ||
 				a.openQuestions.length - b.openQuestions.length ||
-				b.matchedAt.localeCompare(a.matchedAt),
+				b.addedAt.localeCompare(a.addedAt),
 		);
 }
 

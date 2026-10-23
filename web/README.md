@@ -22,7 +22,8 @@ The app writes only its own namespaces in the selected workspace:
 ```text
 candidate-profile/   profile.yaml, draft.yaml, sources/<sha256>.*, conversions/<sha256>/
 search-preferences/  config.yaml, draft.yaml
-applications/        inspected.jsonl, applications.json
+search-runs/         inspected.jsonl (search memory)
+applications/        applications.json (the application list)
 ```
 
 - YAML is validated on every read/save; unknown fields or versions error rather than lose values. Save may rewrite comments/formatting.
@@ -68,11 +69,13 @@ Tests use fake decision models and mocked HTTP; no live model calls are needed.
 
 ## Search workflow
 
-`POST /api/applications/run` `{ workspace }` runs a search and streams NDJSON `RunEvent`s (`started`, `progress`, `application`, `job-failed`, `source-failed`, then `done` with reason, totals, reported `costUsd` and `unpricedCalls`). Missing preferences, a skill threshold without profile skills, a missing `OPENROUTER_API_KEY` or a run already in progress (409) fail before streaming. Cancelling the request or the stream aborts the run. `POST /api/applications` `{ action: 'load', workspace }` returns stored applications with the search sources' names and works during a run. On the client, use `useApplications` and `useSearchRun` from `modules/applications/client/queries.ts`.
+`POST /api/applications/run` `{ workspace }` runs a search and streams NDJSON `RunEvent`s (`started`, `progress`, `application`, `job-failed`, `source-failed`, then `done` with reason, totals, reported `costUsd` and `unpricedCalls`). Missing preferences, a skill threshold without profile skills, a missing `OPENROUTER_API_KEY` or a run already in progress (409) fail before streaming. Cancelling the request or the stream aborts the run. `POST /api/applications` takes `{ action, workspace, … }`: `load` returns the application list with the search sources' names; `add` (`row`), `update` (`fingerprint`, `changes`) and `delete` (`fingerprint`) change it, answering 409 for a duplicate and 404 for a row that is gone. All of them work during a run. On the client, use `useApplications` and `useSearchRun` from `modules/applications/client/queries.ts`.
 
 `modules/applications/server/workflow.ts` owns the loop and receives acquisition, matching and storage as dependencies; `app/api/applications/run/route.ts` wires the real ones. It makes one query per position title (narrowed by country when remote is accepted, otherwise by city), alternates between titles and fetches and matches one vacancy at a time. It stops at `maxJobsToMatch` applications, `maxJobsToProcess` new vacancies, five times that many pulled summaries (`no-new` when none of them was new), or when sources run out.
 
-Reruns skip known vacancies before fetching details. A vacancy's fingerprint is normalised company + title + first city (else country, else `remote`), or the source ID without a company; there are no alias tables. `inspected.jsonl` holds rejected and closed vacancies with their failed criterion names and the digest of the criteria that judged them; it is pruned at run start when that digest changes or entries pass 60 days. The digest includes `MATCHING_RULES_VERSION` from `match.ts`; bump it when a matching change could alter earlier outcomes. `applications.json` holds match and needs-clarification results without job descriptions; they are never pruned. Model outages and rate limits stop a run; other per-vacancy failures are reported and retried next run.
+Reruns skip known vacancies before fetching details. A vacancy's fingerprint is normalised company + title + first city (else country, else `remote`), or the source ID without a company; there are no alias tables. Search memory (`search-runs/inspected.jsonl`) records every judged vacancy with its outcome (`accepted`, `no-match`, `closed`), failed criterion names and the digest of the criteria that judged it. Rejections are pruned at run start when that digest changes or after 60 days; accepted vacancies never are, so a deleted application is not found again. The digest includes `MATCHING_RULES_VERSION` from `match.ts`; bump it when a matching change could alter earlier outcomes.
+
+The application list (`applications/applications.json`, schema v2) holds search rows (job without description, match evidence) and manual rows (URL, title, company, location, salary as text), each with a status and an expected salary. A run locks only search memory; every list write takes the list's own lock and re-reads the file, so edits during a run are kept. Search rows may change only status and expected salary; manual rows may also change their facts, which recomputes their fingerprint. Workspaces from before the split migrate on first use (`server/migration.ts`). Model outages and rate limits stop a run; other per-vacancy failures are reported and retried next run.
 
 ## Applications
 

@@ -28,7 +28,10 @@ const record = {
 		availability: 'open',
 	},
 	match: { outcome: 'match', criteria: [], costUsd: 0.1 },
-	matchedAt: '2026-10-22T00:00:00Z',
+	addedAt: '2026-10-22T00:00:00Z',
+	origin: 'search',
+	status: 'new',
+	expectedSalary: null,
 } satisfies Extract<RunEvent, { type: 'application' }>['record'];
 const events: RunEvent[] = [
 	{ type: 'started', budgets: { process: 5, match: 2 } },

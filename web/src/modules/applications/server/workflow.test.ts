@@ -14,7 +14,8 @@ import type { SearchPreferences } from '@/modules/search/model/schema';
 import type { MatchResult } from '@/modules/search/server/matching/match';
 import { runEventSchema, type RunEvent } from '../model/contracts';
 import { criteriaDigest, fingerprint } from './fingerprint';
-import { ApplicationStore } from './store';
+import { ApplicationList } from './application-list';
+import { SearchMemory } from './search-memory';
 import { runSearch, type RunDeps } from './workflow';
 
 let workspace: string;
@@ -148,11 +149,12 @@ async function run(
 	fake: ReturnType<typeof harness>,
 	options: { signal?: AbortSignal; now?: Date; digest?: string } = {},
 ) {
-	const store = await ApplicationStore.open(workspace);
+	const list = await ApplicationList.open(workspace);
 	const deps: RunDeps = {
 		openRun: fake.openRun,
 		match: fake.match,
-		store,
+		memory: await SearchMemory.open(workspace),
+		list,
 		now: () => options.now ?? NOW,
 	};
 	const events: RunEvent[] = [];
@@ -167,8 +169,15 @@ async function run(
 		events.push(runEventSchema.parse(event));
 	const done = events.at(-1)!;
 	if (done.type !== 'done') throw new Error('Run did not finish with done');
-	return { events, done, store };
+	return { events, done, list };
 }
+const indexPath = () => join(workspace, 'search-runs', 'inspected.jsonl');
+const reset = () =>
+	Promise.all(
+		['applications', 'search-runs'].map((name) => rm(join(workspace, name), { recursive: true, force: true })),
+	);
+const listed = async () =>
+	(await (await ApplicationList.open(workspace)).list()).flatMap((row) => (row.origin === 'search' ? [row] : []));
 const matchError = (code: string) => Object.assign(new Error(code), { name: 'MatchError', code });
 
 test('fingerprint normalises company, title and place; falls back to source identity without a company', () => {
@@ -231,7 +240,7 @@ test('budgets stop on matches (counting needs-clarification) and on processed va
 	});
 	expect(fake.calls.matches).toEqual(['1', '2', '3']);
 
-	await rm(join(workspace, 'applications'), { recursive: true });
+	await reset();
 	fake = harness({ Engineer: { jobs } }, { '1': result('no-match'), '2': result('no-match') });
 	outcome = await run(preferences({ maxJobsToProcess: 2, maxJobsToMatch: 2 }), fake);
 	expect(outcome.done).toMatchObject({
@@ -247,7 +256,7 @@ test('closed vacancies are recorded without matching', async () => {
 	const { done } = await run(preferences(), fake);
 	expect(fake.calls.matches).toEqual([]);
 	expect(done.totals.processed).toBe(1);
-	const index = await readFile(join(workspace, 'applications', 'inspected.jsonl'), 'utf8');
+	const index = await readFile(indexPath(), 'utf8');
 	expect(index).toContain('"outcome":"closed"');
 	expect(index).toContain('"failed":["availability"]');
 });
@@ -296,14 +305,12 @@ test('changed criteria and age re-inspect rejections but never applications', as
 		now: new Date('2026-12-30T12:00:00Z'),
 	});
 	expect(fake.calls.details).toEqual(['rejected']);
-	expect((await (await ApplicationStore.open(workspace)).list()).map((item) => item.job.sourceJobId)).toEqual([
-		'kept',
-	]);
+	expect((await listed()).map((item) => item.job.sourceJobId)).toEqual(['kept']);
 });
 
 test('a truncated last index line is ignored and other corruption fails the run', async () => {
 	await run(preferences(), harness({ Engineer: { jobs: [job('1')] } }, { '1': result('no-match') }));
-	const path = join(workspace, 'applications', 'inspected.jsonl');
+	const path = indexPath();
 	await writeFile(path, (await readFile(path, 'utf8')) + '{"fingerprint":"ab');
 	const fake = harness({ Engineer: { jobs: [job('1')] } });
 	await run(preferences(), fake);
@@ -343,7 +350,7 @@ test('failure policy: skip per-job failures, stop on fatal model failures, repor
 	expect(fake.calls.details).toEqual(['detail', 'timeout']);
 
 	for (const code of ['unavailable', 'rate-limited']) {
-		await rm(join(workspace, 'applications'), { recursive: true });
+		await reset();
 		fake = harness({ Engineer: { jobs } }, { detail: matchError(code) });
 		outcome = await run(preferences(), fake);
 		expect(outcome.done).toMatchObject({ reason: 'failed', error: { code } });
@@ -374,7 +381,7 @@ test('cost sums reported costs and counts only unpriced model calls', async () =
 	);
 	const { done } = await run(preferences(), fake);
 	expect(done.costUsd).toBe(0.25);
-	const index = await readFile(join(workspace, 'applications', 'inspected.jsonl'), 'utf8');
+	const index = await readFile(indexPath(), 'utf8');
 	expect(index).toContain('"failed":["availability"]');
 	expect(index).toContain('"failed":["role"]');
 	expect(done.unpricedCalls).toBe(1);
@@ -390,11 +397,35 @@ test('cancellation stops acquisition and matching and leaves files valid', async
 		controller.abort();
 		return value;
 	};
-	const { done, store } = await run(preferences(), fake, {
+	const { done, list } = await run(preferences(), fake, {
 		signal: controller.signal,
 	});
 	expect(done.reason).toBe('cancelled');
 	expect(fake.calls.matches).toEqual(['1']);
 	expect(fake.calls.disposed).toBe(1);
-	expect((await store.list()).length).toBe(1);
+	expect((await list.list()).length).toBe(1);
+});
+
+test('deleted rows stay gone and manual rows are skipped', async () => {
+	const jobs = [job('kept'), job('deleted'), job('manual')];
+	const first = await run(preferences(), harness({ Engineer: { jobs: jobs.slice(0, 2) } }));
+	await first.list.remove(fingerprint(jobs[1]));
+	// A manual row with the same company, title and city as a vacancy the search would find.
+	await first.list.addManual(
+		{
+			url: 'https://example.com/manual',
+			title: 'Engineer manual',
+			company: 'Company manual',
+			location: 'Warsaw, Poland',
+		},
+		NOW,
+	);
+
+	const fake = harness({ Engineer: { jobs } });
+	const { done } = await run(preferences(), fake, { digest: 'f'.repeat(64) });
+	expect(fake.calls.details).toEqual([]);
+	expect(done.totals).toMatchObject({ processed: 0, skipped: 3 });
+	expect((await listed()).map((item) => item.job.sourceJobId)).toEqual(['kept']);
+	const memory = await readFile(indexPath(), 'utf8');
+	expect(memory.match(/"outcome":"accepted"/g)).toHaveLength(2);
 });

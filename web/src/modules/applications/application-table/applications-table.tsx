@@ -88,7 +88,10 @@ export function ApplicationsTable({ rows }: { rows: ApplicationRow[] }) {
 												colSpan={row.getVisibleCells().length}
 												className="bg-muted/30 px-12 py-3"
 											>
-												<ApplicationCriteria criteria={row.original.criteria} />
+												<ApplicationCriteria
+													criteria={row.original.criteria}
+													manual={row.original.origin === 'manual'}
+												/>
 											</TableCell>
 										</TableRow>
 									) : null}

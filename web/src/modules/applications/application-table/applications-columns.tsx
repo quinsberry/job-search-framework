@@ -93,7 +93,13 @@ export const applicationColumns = columnHelper.columns([
 	columnHelper.accessor('outcome', {
 		header: ({ column }) => <ApplicationsTableColumnHeader column={column} title="Outcome" />,
 		cell: ({ getValue }) =>
-			getValue() === 'match' ? <Badge>Match</Badge> : <Badge variant="secondary">Needs clarification</Badge>,
+			getValue() === 'match' ? (
+				<Badge>Match</Badge>
+			) : getValue() === 'manual' ? (
+				<Badge variant="outline">Added manually</Badge>
+			) : (
+				<Badge variant="secondary">Needs clarification</Badge>
+			),
 	}),
 	columnHelper.accessor('openQuestions', {
 		id: 'open questions',
@@ -121,7 +127,7 @@ export const applicationColumns = columnHelper.columns([
 		sortFn: 'datetime',
 		sortUndefined: 'last',
 	}),
-	columnHelper.accessor('matchedAt', {
+	columnHelper.accessor('addedAt', {
 		id: 'found',
 		header: ({ column }) => <ApplicationsTableColumnHeader column={column} title="Found" />,
 		cell: ({ getValue }) => date(getValue()),

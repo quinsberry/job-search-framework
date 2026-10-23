@@ -77,6 +77,9 @@ export class WorkspaceFiles {
 			await rm(temporary, { force: true });
 		}
 	}
+	async remove(name: string) {
+		await rm(await this.path(name), { force: true });
+	}
 	async append(name: string, text: string) {
 		await appendFile(await this.path(name), text, { mode: 0o600 });
 	}

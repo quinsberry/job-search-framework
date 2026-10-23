@@ -45,7 +45,10 @@ const application: Application = {
 		criteria: [{ criterion: 'salary', result: 'unknown', evidence: 'structured', detail: 'Salary not advertised' }],
 		costUsd: 0.0001,
 	},
-	matchedAt: '2026-10-22T00:00:00Z',
+	addedAt: '2026-10-22T00:00:00Z',
+	origin: 'search',
+	status: 'new',
+	expectedSalary: null,
 };
 const sources = [{ id: 'linkedin', name: 'LinkedIn', supportedFilters: [] }];
 const json = (body: unknown, status = 200) =>
