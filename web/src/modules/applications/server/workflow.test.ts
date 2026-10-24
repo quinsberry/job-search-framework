@@ -144,10 +144,12 @@ function harness(byQuery: Record<string, Fake>, outcomes: Record<string, MatchRe
 	};
 	return { openRun, match, calls };
 }
+// The fixed identity of the fake decision model behind the harness's matcher.
+const MODEL = 'fake-model;format=1';
 async function run(
 	prefs: SearchPreferences,
 	fake: ReturnType<typeof harness>,
-	options: { signal?: AbortSignal; now?: Date; digest?: string } = {},
+	options: { signal?: AbortSignal; now?: Date; digest?: string; model?: string } = {},
 ) {
 	const list = await ApplicationList.open(workspace);
 	const deps: RunDeps = {
@@ -161,7 +163,7 @@ async function run(
 	for await (const event of runSearch(
 		{
 			preferences: prefs,
-			criteriaDigest: options.digest ?? criteriaDigest(prefs, [], 1),
+			criteriaDigest: options.digest ?? criteriaDigest(prefs, [], 1, options.model ?? MODEL),
 		},
 		deps,
 		options.signal ?? new AbortController().signal,
@@ -205,20 +207,22 @@ test('fingerprint normalises company, title and place; falls back to source iden
 	expect(fingerprint(job('5', { company: null }))).toBe(fingerprint(job('5', { company: null, title: 'Other' })));
 });
 
-test('criteria digest follows target position, skill threshold, skills and rules version, not budgets', () => {
-	const base = criteriaDigest(preferences(), ['Node.js', 'SQL'], 1);
-	expect(criteriaDigest(preferences({ maxJobsToProcess: 50 }), ['sql', 'nodejs'], 1)).toBe(base);
-	expect(criteriaDigest(preferences({ minSkillMatch: 50 }), ['Node.js', 'SQL'], 1)).not.toBe(base);
-	expect(criteriaDigest(preferences(), ['Node.js'], 1)).not.toBe(base);
-	expect(criteriaDigest(preferences({}, ['Engineer', 'Developer']), ['Node.js', 'SQL'], 1)).not.toBe(base);
-	expect(criteriaDigest(preferences(), ['Node.js', 'SQL'], 2)).not.toBe(base);
+test('criteria digest follows target position, skill threshold, skills, rules version and model, not budgets', () => {
+	const base = criteriaDigest(preferences(), ['Node.js', 'SQL'], 1, MODEL);
+	expect(criteriaDigest(preferences({ maxJobsToProcess: 50 }), ['sql', 'nodejs'], 1, MODEL)).toBe(base);
+	expect(criteriaDigest(preferences({ minSkillMatch: 50 }), ['Node.js', 'SQL'], 1, MODEL)).not.toBe(base);
+	expect(criteriaDigest(preferences(), ['Node.js'], 1, MODEL)).not.toBe(base);
+	expect(criteriaDigest(preferences({}, ['Engineer', 'Developer']), ['Node.js', 'SQL'], 1, MODEL)).not.toBe(base);
+	expect(criteriaDigest(preferences(), ['Node.js', 'SQL'], 2, MODEL)).not.toBe(base);
+	expect(criteriaDigest(preferences(), ['Node.js', 'SQL'], 1, 'other-model;format=1')).not.toBe(base);
 });
 
 // Changing this value means every stored rejection counts as judged under other criteria, so the next
 // run re-evaluates all of them at model cost. Update it only on purpose, saying why in the commit.
+// Last changed when the decision model's identity joined the digest (ADR 0009 amendment).
 test('criteria digest is pinned for a fixed input', () => {
-	expect(criteriaDigest(preferences(), ['Node.js', 'SQL'], 1)).toBe(
-		'642a8e37eb435523f70cd508bf4c53369066ecc27513337b3adb975ca3ef80e4',
+	expect(criteriaDigest(preferences(), ['Node.js', 'SQL'], 1, MODEL)).toBe(
+		'b6384596b7ad2aa869c1f62666cef9d55287d2f3a026ce7548e90fb197b1eff1',
 	);
 });
 
@@ -313,6 +317,22 @@ test('changed criteria and age re-inspect rejections but never applications', as
 		now: new Date('2026-12-30T12:00:00Z'),
 	});
 	expect(fake.calls.details).toEqual(['rejected']);
+	expect((await listed()).map((item) => item.job.sourceJobId)).toEqual(['kept']);
+});
+
+test('a decision model change re-judges rejections but never applications', async () => {
+	const jobs = [job('kept'), job('rejected')];
+	const outcomes = { rejected: result('no-match') };
+	await run(preferences(), harness({ Engineer: { jobs } }, outcomes));
+
+	let fake = harness({ Engineer: { jobs } }, outcomes);
+	await run(preferences(), fake);
+	expect(fake.calls.details).toEqual([]);
+
+	fake = harness({ Engineer: { jobs } }, outcomes);
+	await run(preferences(), fake, { model: 'other-model;format=1' });
+	expect(fake.calls.details).toEqual(['rejected']);
+	expect(fake.calls.matches).toEqual(['rejected']);
 	expect((await listed()).map((item) => item.job.sourceJobId)).toEqual(['kept']);
 });
 

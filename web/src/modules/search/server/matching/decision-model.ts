@@ -73,6 +73,8 @@ export type Answer = z.infer<typeof answerSchema>;
 export type DecisionRequest = z.infer<typeof decisionRequestSchema>;
 export type DecisionResponse = z.infer<typeof decisionResponseSchema>;
 export interface DecisionModel {
+	// Changes whenever anything that affects how the model judges changes; part of the criteria digest.
+	readonly identity: string;
 	readonly maxInputBytes: number;
 	decide(request: DecisionRequest, signal: AbortSignal): Promise<DecisionResponse>;
 }
@@ -149,7 +151,10 @@ const wireResponseSchema = z.object({
 	answers: z.record(key, wireAnswerSchema),
 	usage: z.object({ cost: z.number().nonnegative().nullish() }).optional(),
 });
+const MODEL_ID = 'typesafe/jev-1.14';
 const MAX_INPUT_BYTES = 28000;
+// Bump when question encoding or score mapping changes, so rejections judged the old way are judged again.
+const FORMAT_VERSION = 1;
 const MAX_RESPONSE_BYTES = 256000;
 
 // The SDK buffers bodies without a size cap and falls back to backoff for long Retry-After.
@@ -214,6 +219,7 @@ function guardedFetch(stop: AbortController): TypeSafeClient['fetch'] {
 }
 
 export class DecisionModelClient implements DecisionModel {
+	readonly identity = `${MODEL_ID};input=${MAX_INPUT_BYTES};format=${FORMAT_VERSION}`;
 	readonly maxInputBytes = MAX_INPUT_BYTES;
 
 	async decide(value: DecisionRequest, callerSignal: AbortSignal): Promise<DecisionResponse> {
@@ -234,7 +240,7 @@ export class DecisionModelClient implements DecisionModel {
 						: score(question.text, scoreLevels),
 			]),
 		);
-		const body = JSON.stringify({ model: 'typesafe/jev-1.14', state: request.context, questions });
+		const body = JSON.stringify({ model: MODEL_ID, state: request.context, questions });
 		if (Buffer.byteLength(body, 'utf8') > 32000)
 			throw new MatchError('invalid-input', 'Decision request envelope exceeds its budget');
 		const stop = new AbortController();
@@ -258,7 +264,7 @@ export class DecisionModelClient implements DecisionModel {
 		try {
 			const wire = wireResponseSchema.safeParse(
 				await withCancellation(
-					client.systemOne({ model: 'typesafe/jev-1.14', state: request.context, questions }, { signal }),
+					client.systemOne({ model: MODEL_ID, state: request.context, questions }, { signal }),
 					signal,
 				),
 			);

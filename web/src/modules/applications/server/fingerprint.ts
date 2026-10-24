@@ -34,12 +34,19 @@ export function manualFingerprint(row: {
 	return identity(row.company, row.title, row.location?.split(',')[0]?.trim() || 'remote', ['url', row.url]);
 }
 
-// `rulesVersion` comes from matching, so a rule change re-inspects rejections judged under the old rules.
-export function criteriaDigest(preferences: SearchPreferences, skills: string[], rulesVersion: number): string {
+// `rulesVersion` comes from matching and `modelIdentity` from the decision model, so a rule or model change
+// re-inspects rejections judged under the old ones.
+export function criteriaDigest(
+	preferences: SearchPreferences,
+	skills: string[],
+	rulesVersion: number,
+	modelIdentity: string,
+): string {
 	const normalized = [...new Set(skills.map((skill) => normalize(skill).replaceAll(' ', '')))].sort();
 	return digest(
 		JSON.stringify([
 			rulesVersion,
+			modelIdentity,
 			preferences.targetPosition,
 			preferences.settings.minSkillMatch ?? null,
 			normalized,

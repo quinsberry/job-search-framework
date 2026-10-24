@@ -80,3 +80,12 @@ Search memory stores each rejected vacancy with a digest of the criteria that ju
 - Changing matching rules or bumping the matching rules version.
 - Splitting the decision model port from its adapter (issue 10).
 - The glossary, which is already updated.
+
+### Implementation — 2026-10-24
+
+- `DecisionModel` gains `readonly identity`. `DecisionModelClient` builds it as `typesafe/jev-1.14;input=28000;format=1` from `MODEL_ID` (now also used in both request paths), `MAX_INPUT_BYTES` and a new `FORMAT_VERSION`.
+- `criteriaDigest` takes `modelIdentity` as a required fourth input; the run route passes `model.identity` from the client it constructs.
+- Tests: the digest changes with only the identity changed; a workflow run under another identity re-judges the stored rejection but not the accepted vacancy, and the same identity skips it; the client's identity contains the model sent on the wire, the input budget and a format version. Fake models declare a fixed identity.
+- The digest pin is updated to `b6384596…` (input now includes a fixed fake identity). Removing the identity from the digest fails three workflow tests.
+- README (search workflow and model replacement) and an ADR 0009 amendment describe the versions and the one-off re-judge cost.
+- `MATCHING_RULES_VERSION` is unchanged at 1. The v1 migration's `ACCEPTED_DIGEST` is untouched.

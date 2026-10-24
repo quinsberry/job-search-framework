@@ -71,6 +71,11 @@ test('client maps neutral questions and responses, reports cost and bounds the a
 		},
 		costUsd: 0.00003,
 	});
+	// The identity names what was sent, the input budget and the encoding format.
+	expect(sent.model).toBeString();
+	expect(model.identity).toContain(String(sent.model));
+	expect(model.identity).toContain(String(model.maxInputBytes));
+	expect(model.identity).toMatch(/format=\d+/);
 	const large = { ...request, context: '漢字😀'.repeat(5000) };
 	await expect(model.decide(large, signal())).rejects.toMatchObject({ code: 'invalid-input' });
 });

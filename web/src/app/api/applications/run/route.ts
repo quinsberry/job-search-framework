@@ -45,7 +45,7 @@ export async function POST(request: Request) {
 		const sourceIds = listSearchSources().map((source) => source.id);
 		const model = new DecisionModelClient();
 		const events = runSearch(
-			{ preferences, criteriaDigest: criteriaDigest(preferences, skills, MATCHING_RULES_VERSION) },
+			{ preferences, criteriaDigest: criteriaDigest(preferences, skills, MATCHING_RULES_VERSION, model.identity) },
 			{
 				openRun: (query, signal) => new SearchRun({ sourceIds, query }, signal),
 				match: (detail, signal) => matchJob(detail, { preferences, skills }, { model }, signal),

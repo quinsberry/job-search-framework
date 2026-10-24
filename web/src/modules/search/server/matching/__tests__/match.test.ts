@@ -7,6 +7,7 @@ import { fixture } from './structured.test';
 function fake(overrides: Record<string, Answer> = {}) {
 	const requests: DecisionRequest[] = [];
 	const model: DecisionModel = {
+		identity: 'fake-model',
 		maxInputBytes: 28000,
 		async decide(request) {
 			requests.push(request);
@@ -233,7 +234,8 @@ test('model and input failures reject as errors, never outcomes', async () => {
 		'cancelled',
 	] as const) {
 		const model: DecisionModel = {
-			maxInputBytes: 28000,
+			identity: 'fake-model',
+		maxInputBytes: 28000,
 			async decide() {
 				throw new MatchError(code, 'Fictional failure');
 			},
@@ -241,6 +243,7 @@ test('model and input failures reject as errors, never outcomes', async () => {
 		await expect(matchJob(job, criteria, { model }, signal())).rejects.toMatchObject({ code });
 	}
 	const malformed: DecisionModel = {
+		identity: 'fake-model',
 		maxInputBytes: 28000,
 		async decide() {
 			return { answers: {}, costUsd: null };
@@ -258,6 +261,7 @@ test('model and input failures reject as errors, never outcomes', async () => {
 	await expect(matchJob(job, criteria, deps, controller.signal)).rejects.toMatchObject({ code: 'cancelled' });
 	expect(deps.requests).toHaveLength(0);
 	const pendingModel: DecisionModel = {
+		identity: 'fake-model',
 		maxInputBytes: 28000,
 		async decide() {
 			return new Promise(() => {});
