@@ -1,5 +1,5 @@
 import type { SearchSourceAdapter } from '../../contracts';
-import { runDetail } from './detail';
+import { referenceFromUrl, runDetail } from './detail';
 import { runSearch } from './search';
 
 export const linkedinProvider = {
@@ -10,4 +10,5 @@ export const linkedinProvider = {
 	},
 	search: runSearch,
 	getDetail: runDetail,
+	referenceFromUrl,
 } satisfies SearchSourceAdapter;

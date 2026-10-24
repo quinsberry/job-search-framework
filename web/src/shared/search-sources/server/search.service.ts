@@ -54,6 +54,37 @@ export function listSearchSources(): SourceDescriptor[] {
 	return Object.values(providers).map((adapter) => sourceDescriptorSchema.parse(adapter.descriptor));
 }
 
+export function searchSourceAdapters(): SearchSourceAdapter[] {
+	return Object.values(providers);
+}
+
+// The first source that claims a vacancy URL resolves it; a URL no source claims resolves to null.
+export function resolveJobUrl(url: string, adapters: readonly SearchSourceAdapter[] = searchSourceAdapters()) {
+	for (const adapter of adapters) {
+		const ref = adapter.referenceFromUrl?.(url);
+		if (!ref) continue;
+		const parsed = input(jobRefSchema, ref);
+		if (parsed.sourceId !== adapter.descriptor.id)
+			throw new SearchSourceError('invalid-response', 'Source claimed a URL for another source');
+		return parsed;
+	}
+	return null;
+}
+
+// One detail fetch outside a search, with the checks a run applies; the query is never sent.
+export async function fetchJobDetail(
+	ref: JobRef,
+	signal: AbortSignal,
+	adapters: readonly SearchSourceAdapter[] = searchSourceAdapters(),
+): Promise<DetailResult> {
+	const run = new SearchRun({ sourceIds: [ref.sourceId], query: { query: ref.sourceJobId } }, signal, adapters);
+	try {
+		return await run.getDetail(ref);
+	} finally {
+		run.dispose();
+	}
+}
+
 type SourceState = {
 	adapter: SearchSourceAdapter;
 	cursor: string | undefined;

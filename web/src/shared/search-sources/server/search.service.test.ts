@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { cp, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { SearchRun, listSearchSources } from './search.service';
+import { SearchRun, fetchJobDetail, listSearchSources, resolveJobUrl } from './search.service';
 import { SearchSourceError, type JobSummary, type SearchSourceAdapter } from '../contracts';
 
 const job: JobSummary = {
@@ -209,4 +209,43 @@ test('multiple adapters share the unmodified facade fairly and isolate failures'
 	} finally {
 		await rm(directory, { recursive: true, force: true });
 	}
+});
+
+test('a vacancy URL resolves through the source that claims it and is fetched with run checks', async () => {
+	const claiming = {
+		...adapter(async () => ({ jobs: [], nextCursor: null, filters: [] })),
+		referenceFromUrl: () => ref,
+	};
+	expect(resolveJobUrl('https://www.linkedin.com/jobs/view/123456')).toEqual(ref);
+	expect(resolveJobUrl('https://jobs.example.com/123456')).toBeNull();
+	expect(
+		resolveJobUrl('https://jobs.example.com/123456', [
+			adapter(async () => ({ jobs: [], nextCursor: null, filters: [] })),
+		]),
+	).toBeNull();
+	expect(resolveJobUrl('anything', [claiming])).toEqual(ref);
+	const result = await fetchJobDetail(ref, signal(), [claiming]);
+	expect(result).toMatchObject({ ok: true, job: { sourceJobId: '123456', description: 'Actual content' } });
+	const wrong = {
+		...claiming,
+		getDetail: async () => ({
+			ok: true as const,
+			job: {
+				...job,
+				sourceJobId: '999999',
+				publishedAt: null,
+				description: 'Other',
+				availability: 'unknown' as const,
+			},
+		}),
+	};
+	expect(await fetchJobDetail(ref, signal(), [wrong])).toMatchObject({
+		ok: false,
+		error: { code: 'invalid-response' },
+	});
+	const foreign = {
+		...claiming,
+		referenceFromUrl: () => ({ ...ref, sourceId: 'other' }),
+	} as unknown as SearchSourceAdapter;
+	expect(() => resolveJobUrl('anything', [foreign])).toThrow('Invalid source input');
 });

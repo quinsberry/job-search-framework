@@ -67,11 +67,15 @@ export const decisionRequestSchema = z.strictObject({
 export const decisionResponseSchema = z.strictObject({
 	answers: z.record(key, answerSchema),
 	costUsd: z.number().nonnegative().nullable(),
+	// The model the provider says answered, when it says; it can differ from the one requested.
+	model: z.string().trim().min(1).max(200).optional(),
 });
 export type Question = z.infer<typeof questionSchema>;
 export type Answer = z.infer<typeof answerSchema>;
 export type DecisionRequest = z.infer<typeof decisionRequestSchema>;
 export type DecisionResponse = z.infer<typeof decisionResponseSchema>;
+// The requested model ID: the first part of a client identity.
+export const requestedModel = (identity: string) => identity.split(';')[0];
 export interface DecisionModel {
 	// Changes whenever anything that affects how the model judges changes; part of the criteria digest.
 	readonly identity: string;
@@ -302,7 +306,11 @@ export class DecisionModelClient implements DecisionModel {
 							? { probabilities: answer.probabilities }
 							: { value: answer.score * 25 };
 			}
-			return validateAnswers(request, { answers, costUsd: wire.data.usage?.cost ?? null });
+			return validateAnswers(request, {
+				answers,
+				costUsd: wire.data.usage?.cost ?? null,
+				model: wire.data.model,
+			});
 		} catch (error) {
 			if (stop.signal.aborted) throw stop.signal.reason;
 			checkSignal(signal);

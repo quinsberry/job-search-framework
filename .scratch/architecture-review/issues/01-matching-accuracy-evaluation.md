@@ -104,3 +104,16 @@ Matching (structured checks, then decision model questions) is tested only with 
 - Any UI for capture or labelling.
 - Changing matching behaviour.
 - Committing real vacancy text, reports or the job seeker's profile.
+
+### Implementation — 2026-10-24
+
+- **Source capability:** `SearchSourceAdapter.referenceFromUrl?` (optional). LinkedIn claims `/jobs/view/` URLs on `linkedin.com`, `www.` and country subdomains, with or without slug and query, and returns the canonical `www` URL. `search.service.ts` adds `resolveJobUrl` (first claiming source wins; an unclaimed URL resolves to null) and `fetchJobDetail` (one detail fetch through a one-source `SearchRun`, so the run's identity checks apply).
+- **Evaluation module:** `src/modules/search/server/evaluation/` with `captureVacancy` and `runEvaluation`, dependencies injected (sources, decision model, saved candidate, clock). Storage under `matching-evaluation/`: `set.json` (candidate snapshot), `vacancies/<source>-<id>.json` (schemaVersion 1, detail snapshot, label), `reports/<timestamp>.{md,json}`. One file per write, no lock.
+- **Cost cap:** a metering wrapper around the decision model refuses the next call once summed reported cost reaches the cap, or after any unpriced call unless allowed. A failed call counts as unpriced, as in the search run summary. `matchJob` is unchanged.
+- **Reported model:** `DecisionResponse` gains an optional `model`, which the production client fills from the wire response. `requestedModel(identity)` sits next to where the identity is built; the report flags any reported model that differs.
+- **Agreement excluding needs-clarification** leaves out rows where either the label or the actual outcome is needs-clarification. The report states this definition.
+- **Rows** also list the *deciding* criteria (failed for no-match, unknown for needs-clarification), so disagreements are reviewable without labelled criteria.
+- **Dry run** uses an even-odds fake at no cost, with the real model's input budget, and ignores the cap.
+- **Commands:** `bun run evaluate:capture` / `evaluate:run` (`scripts/evaluation/`). They parse flags and wire the saved candidate (published preferences, published profile skills). They sit outside `src/`, so module boundaries don't apply; `eslint.config.test.ts` pins that.
+- **Tests:** offline tests over a committed fictional set of 6 vacancies cover capture, refusals, relabel, scores, error rows, outage, cap, unpriced, drift, model mismatch, dry run and a damaged file. LinkedIn and registry tests cover URL resolution. Mutation checks (cap comparison, unpriced rule, fatal codes, error rows in agreement, needs-clarification exclusion) each fail a test.
+- **Workspace hazard found:** `bun run format` reformats the golden stored-format fixtures from issue 19, and their tests then fail. The fixtures probably belong in the formatter's ignore list.

@@ -150,6 +150,8 @@ export interface SearchSourceAdapter {
 	readonly descriptor: SourceDescriptor;
 	search(input: z.infer<typeof adapterSearchInputSchema>, signal: AbortSignal): Promise<SourcePage>;
 	getDetail(ref: JobRef, signal: AbortSignal): Promise<DetailResult>;
+	// Optional: claims a vacancy page URL of this source, so a vacancy can be captured from its link.
+	referenceFromUrl?(url: string): JobRef | null;
 }
 export interface SearchSourceRun {
 	next(limit: number): Promise<SearchBatch>;

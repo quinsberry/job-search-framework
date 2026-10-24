@@ -1,0 +1,40 @@
+{
+	"schemaVersion": 1,
+	"capturedAt": "2026-10-20T09:10:00.000Z",
+	"labelledAt": "2026-10-20T09:10:00.000Z",
+	"job": {
+		"sourceId": "linkedin",
+		"sourceJobId": "4200000001",
+		"url": "https://www.linkedin.com/jobs/view/4200000001",
+		"title": "Senior Backend Engineer",
+		"company": {
+			"name": "Fabrikam Payments",
+			"url": null
+		},
+		"locations": [
+			{
+				"label": "Portugal",
+				"city": null,
+				"country": "Portugal"
+			}
+		],
+		"publishedAt": "2026-10-18",
+		"observedAt": "2026-10-20T09:10:00.000Z",
+		"description": "Build payment APIs in Node.js on PostgreSQL. Senior, full-time, fully remote.",
+		"availability": "open",
+		"advertisedFacts": {
+			"workArrangements": null,
+			"workArrangementsText": null,
+			"seniorityText": null,
+			"employmentText": null,
+			"skills": null,
+			"expiresAt": null,
+			"compensation": null
+		}
+	},
+	"label": {
+		"expected": "match",
+		"criteria": {},
+		"note": null
+	}
+}

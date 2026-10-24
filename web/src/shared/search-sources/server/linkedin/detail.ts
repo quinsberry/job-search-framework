@@ -27,6 +27,23 @@ export function validateReference(value: JobRef): JobRef {
 	return ref;
 }
 
+// Job view URLs, with or without a slug, query or country subdomain, map to the canonical reference.
+export function referenceFromUrl(value: string): JobRef | null {
+	if (!URL.canParse(value)) return null;
+	const url = new URL(value);
+	const id = url.pathname.match(/^\/jobs\/view\/(?:[^/]+-)?(\d{6,20})\/?$/)?.[1];
+	if (
+		!id ||
+		!['http:', 'https:'].includes(url.protocol) ||
+		url.port ||
+		url.username ||
+		url.password ||
+		!/^(?:[a-z]{2,3}\.)?linkedin\.com$/.test(url.hostname)
+	)
+		return null;
+	return { sourceId: 'linkedin', sourceJobId: id, url: `https://www.linkedin.com/jobs/view/${id}` };
+}
+
 export async function runDetail(value: JobRef, signal: AbortSignal): Promise<DetailResult> {
 	const ref = validateReference(value);
 	try {

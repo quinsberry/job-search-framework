@@ -190,3 +190,29 @@ test('Retry-After is bounded and deadlines stop retries', async () => {
 	});
 	expect(retryCalls()).toBe(1);
 });
+
+test('job view URLs resolve to the canonical reference and foreign URLs are not claimed', async () => {
+	const canonical = { ...ref, url: 'https://www.linkedin.com/jobs/view/123456' };
+	for (const url of [
+		'https://www.linkedin.com/jobs/view/123456',
+		'https://linkedin.com/jobs/view/123456/',
+		'https://pl.linkedin.com/jobs/view/senior-engineer-at-acme-123456?refId=abc&trk=public_jobs',
+		'http://www.linkedin.com/jobs/view/123456',
+	])
+		expect(provider.referenceFromUrl(url)).toEqual(canonical);
+	for (const url of [
+		'not a url',
+		'https://www.linkedin.com/jobs/search/?currentJobId=123456',
+		'https://www.linkedin.com/in/someone',
+		'https://www.linkedin.com/jobs/view/12345',
+		'https://www.linkedin.com:8443/jobs/view/123456',
+		'https://linkedin.com.example.com/jobs/view/123456',
+		'https://jobs.example.com/jobs/view/123456',
+		'ftp://www.linkedin.com/jobs/view/123456',
+	])
+		expect(provider.referenceFromUrl(url)).toBeNull();
+	// A resolved reference passes the detail fetch's own identity check.
+	expect(validateReference(provider.referenceFromUrl(ref.url)!)).toEqual(canonical);
+	respond(await fixture('detail'));
+	expect((await provider.getDetail(provider.referenceFromUrl(ref.url)!, signal())).ok).toBe(true);
+});

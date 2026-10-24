@@ -18,6 +18,9 @@ test.each([
 	['src/modules/profile/ui/editor.tsx', '@/modules/search/schema', false],
 	['src/modules/profile/server/application.ts', '../../search/server/persistence', false],
 	['src/shared/future/contracts.ts', '@/modules/profile/model/contracts', false],
+	// Command entry points sit outside the source tree and wire modules like a composition root.
+	['scripts/evaluation/run.ts', '@/modules/profile/server/persistence', true],
+	['scripts/evaluation/run.ts', 'node:util', true],
 ])('%s importing %s: allowed=%s', async (filePath, source, allowed) => {
 	const [result] = await eslint.lintText(`import { value } from '${source}';`, { filePath });
 	const errors = result.messages.filter((message) => message.ruleId === 'no-restricted-imports');

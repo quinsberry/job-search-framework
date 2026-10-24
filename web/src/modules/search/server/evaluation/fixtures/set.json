@@ -1,0 +1,24 @@
+{
+	"schemaVersion": 1,
+	"createdAt": "2026-10-20T09:00:00.000Z",
+	"candidate": {
+		"preferences": {
+			"targetPosition": {
+				"positionTitles": ["Backend Engineer"],
+				"seniority": ["senior"],
+				"location": {
+					"city": "Lisbon",
+					"country": "Portugal"
+				},
+				"salaryRange": [],
+				"positionType": ["full-time"],
+				"workArrangements": ["remote"]
+			},
+			"settings": {
+				"maxJobsToProcess": 50,
+				"maxJobsToMatch": 10
+			}
+		},
+		"skills": ["Node.js", "PostgreSQL"]
+	}
+}

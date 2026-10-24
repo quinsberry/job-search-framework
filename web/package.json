@@ -9,7 +9,9 @@
 		"start": "bun --bun next start",
 		"test": "bun test",
 		"format": "oxfmt",
-		"lint": "eslint"
+		"lint": "eslint",
+		"evaluate:capture": "bun scripts/evaluation/capture.ts",
+		"evaluate:run": "bun scripts/evaluation/run.ts"
 	},
 	"dependencies": {
 		"@base-ui/react": "^1.9.0",

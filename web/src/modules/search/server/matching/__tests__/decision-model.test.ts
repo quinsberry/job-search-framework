@@ -70,6 +70,7 @@ test('client maps neutral questions and responses, reports cost and bounds the a
 			skills: { value: 75 },
 		},
 		costUsd: 0.00003,
+		model: 'fictional-response-model',
 	});
 	// The identity names what was sent, the input budget and the encoding format.
 	expect(sent.model).toBeString();
