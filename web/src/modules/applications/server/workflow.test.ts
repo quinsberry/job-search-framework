@@ -214,6 +214,14 @@ test('criteria digest follows target position, skill threshold, skills and rules
 	expect(criteriaDigest(preferences(), ['Node.js', 'SQL'], 2)).not.toBe(base);
 });
 
+// Changing this value means every stored rejection counts as judged under other criteria, so the next
+// run re-evaluates all of them at model cost. Update it only on purpose, saying why in the commit.
+test('criteria digest is pinned for a fixed input', () => {
+	expect(criteriaDigest(preferences(), ['Node.js', 'SQL'], 1)).toBe(
+		'642a8e37eb435523f70cd508bf4c53369066ecc27513337b3adb975ca3ef80e4',
+	);
+});
+
 test('titles alternate and a vacancy found under both is processed once', async () => {
 	const shared = job('shared');
 	const fake = harness({

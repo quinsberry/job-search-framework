@@ -1,0 +1,34 @@
+schemaVersion: 1
+draft:
+  id: 0cde6640-a195-42e5-aa64-bdfafeaa63b0
+  values:
+    targetPosition:
+      positionTitles:
+        - Backend Engineer
+        - Platform Engineer
+        - Site Reliability Engineer
+      seniority:
+        - senior
+      location:
+        city: Lisbon
+        country: Portugal
+      salaryRange:
+        - contractType: permanent
+          currency: EUR
+          period: month
+          min: "5000"
+          desired: "6500"
+        - contractType: B2B
+          currency: EUR
+          period: month
+          min: "6500"
+          desired: ""
+      positionType:
+        - full-time
+      workArrangements:
+        - remote
+        - hybrid
+    settings:
+      maxJobsToProcess: "80"
+      maxJobsToMatch: "15"
+      minSkillMatch: "60"

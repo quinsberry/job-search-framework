@@ -1,0 +1,32 @@
+schemaVersion: 1
+preferences:
+  targetPosition:
+    positionTitles:
+      - Backend Engineer
+      - Platform Engineer
+    seniority:
+      - senior
+    location:
+      city: Lisbon
+      country: Portugal
+    salaryRange:
+      - contractType: permanent
+        currency: EUR
+        period: month
+        min: 5000
+        desired: 6500
+      - contractType: B2B
+        currency: EUR
+        period: month
+        min: 6500
+    positionType:
+      - full-time
+    workArrangements:
+      - remote
+      - hybrid
+  settings:
+    minSkillMatch: 60
+    maxJobsToProcess: 80
+    maxJobsToMatch: 10
+publication:
+  draftId: null

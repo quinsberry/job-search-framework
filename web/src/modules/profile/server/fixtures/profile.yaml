@@ -1,0 +1,55 @@
+schemaVersion: 1
+profile:
+  identity:
+    fullName: Robin Example
+    location: "Lisbon, Portugal"
+    email: robin@example.com
+    links:
+      - https://example.com/robin
+    summary: Backend engineer focused on reliable data pipelines.
+  experience:
+    - company: Northwind Labs
+      role: Senior Backend Engineer
+      startDate: "2022-03"
+      endDate: present
+      achievements:
+        - Cut batch processing time by half
+      technologies:
+        - TypeScript
+        - PostgreSQL
+    - company: Contoso Analytics
+      role: Backend Engineer
+      startDate: "2019-01"
+      endDate: "2022-02"
+  skills:
+    - TypeScript
+    - Node.js
+    - PostgreSQL
+    - Kafka
+  education:
+    - institution: Example University
+      degree: BSc
+      fieldOfStudy: Computer Science
+      endDate: "2018"
+  certifications:
+    - name: Example Cloud Practitioner
+      issuingOrganization: Example Cloud
+      issueDate: "2021-06"
+  languages:
+    - language: English
+      proficiency: C1
+    - language: Portuguese
+      proficiency: Native
+publication:
+  draftId: null
+  recordIds:
+    experience:
+      - e51d950a-b3c1-4a34-a921-b9e2818be6bc
+      - 4a683028-b8e3-4754-8813-39e190174ccd
+    education:
+      - 73be900d-d3c7-4f79-af6c-235a979bbdd4
+    certifications:
+      - b11547d2-2e39-4cc7-bea7-82d03a2a6835
+    languages:
+      - ee96f9e7-1fb0-493e-b26a-90f0a67825b9
+      - ada16f08-9b57-454c-9b11-c3c99616ba0a

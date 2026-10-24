@@ -167,6 +167,8 @@ for (const checkpoint of ['validated', 'raw'] as const) {
 			(await repo.load()).revision,
 		);
 		expect(started.job?.source).toBe(fixture.source);
+		// The committed key pins the cache key computation. A change pays again to convert every CV
+		// already in a workspace's cache; update the fixture only on purpose, saying why in the commit.
 		expect(started.job?.cacheKey).toBe(fixture.cacheKey);
 		const finished = await completed(repo);
 		expect(finished.job?.phase).toBe('ready');

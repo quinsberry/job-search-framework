@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 3,
+  "applications": [
+    {
+      "origin": "search",
+      "fingerprint": "1111111111111111111111111111111111111111111111111111111111111111",
+      "status": "new",
+      "expectedSalary": null,
+      "addedAt": "2026-10-20T09:20:00.000Z",
+      "job": {
+        "sourceId": "linkedin",
+        "sourceJobId": "4100000001",
+        "url": "https://www.linkedin.com/jobs/view/4100000001",
+        "title": "Senior Backend Engineer",
+        "company": {
+          "name": "Fabrikam Systems",
+          "url": "https://example.com/fabrikam-systems"
+        },
+        "locations": [
+          {
+            "label": "Lisbon, Portugal",
+            "city": "Lisbon",
+            "country": "Portugal"
+          }
+        ],
+        "publishedAt": "2026-10-18",
+        "observedAt": "2026-10-20T09:15:00.000Z",
+        "availability": "open"
+      },
+      "match": {
+        "outcome": "match",
+        "criteria": [
+          {
+            "criterion": "role",
+            "result": "met",
+            "evidence": "model",
+            "detail": "Backend role building data services."
+          },
+          {
+            "criterion": "workArrangement",
+            "result": "met",
+            "evidence": "structured",
+            "detail": "Hybrid in Lisbon."
+          }
+        ],
+        "costUsd": 0.0042
+      }
+    },
+    {
+      "origin": "search",
+      "fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+      "status": "applied",
+      "expectedSalary": "6000 EUR per month",
+      "addedAt": "2026-10-20T09:21:00.000Z",
+      "job": {
+        "sourceId": "linkedin",
+        "sourceJobId": "4100000002",
+        "url": "https://www.linkedin.com/jobs/view/4100000002",
+        "title": "Platform Engineer",
+        "company": {
+          "name": "Tailspin Data",
+          "url": "https://example.com/tailspin-data"
+        },
+        "locations": [
+          {
+            "label": "Lisbon, Portugal",
+            "city": "Lisbon",
+            "country": "Portugal"
+          }
+        ],
+        "publishedAt": "2026-10-18",
+        "observedAt": "2026-10-20T09:15:00.000Z",
+        "availability": "open"
+      },
+      "match": {
+        "outcome": "needs-clarification",
+        "criteria": [
+          {
+            "criterion": "salary",
+            "result": "unknown",
+            "evidence": "model",
+            "detail": "The posting gives no salary."
+          }
+        ],
+        "costUsd": null
+      }
+    },
+    {
+      "origin": "manual",
+      "fingerprint": "dfb4d5df57feee54913e24b7812cc47f6add570b31247f5961269a070a9061c8",
+      "status": "interviewing",
+      "expectedSalary": null,
+      "addedAt": "2026-10-21T14:00:00.000Z",
+      "url": "https://careers.example.com/jobs/77",
+      "title": "Staff Engineer",
+      "company": "Adventure Works",
+      "location": "Remote",
+      "salary": "90k-110k EUR"
+    }
+  ],
+  "deleted": [
+    "031447bae694bc7bd725b6033f35b467b7acfcb005ea02f808686ca7bed2ddec"
+  ]
+}

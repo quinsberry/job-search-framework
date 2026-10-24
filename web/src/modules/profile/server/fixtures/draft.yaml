@@ -1,0 +1,85 @@
+schemaVersion: 1
+recordIds:
+  experience:
+    - e51d950a-b3c1-4a34-a921-b9e2818be6bc
+    - 4a683028-b8e3-4754-8813-39e190174ccd
+  education:
+    - 73be900d-d3c7-4f79-af6c-235a979bbdd4
+  certifications:
+    - b11547d2-2e39-4cc7-bea7-82d03a2a6835
+  languages:
+    - ee96f9e7-1fb0-493e-b26a-90f0a67825b9
+    - ada16f08-9b57-454c-9b11-c3c99616ba0a
+draft:
+  id: bd55b032-62c7-4e23-96b4-f6984c877427
+  values:
+    identity:
+      fullName: Robin Example
+      location: "Lisbon, Portugal"
+      email: robin@example.com
+      phone: +351 000 000 000
+      links:
+        - https://example.com/robin
+      summary: Backend engineer focused on reliable data pipelines.
+    experience:
+      - company: Northwind Labs
+        role: Senior Backend Engineer
+        startDate: "2022-03"
+        endDate: present
+        achievements:
+          - Cut batch processing time by half
+        technologies:
+          - TypeScript
+          - PostgreSQL
+        description: ""
+      - company: Contoso Analytics
+        role: Backend Engineer
+        startDate: "2019-01"
+        endDate: "2022-02"
+        achievements: []
+        technologies: []
+        description: ""
+    skills:
+      - TypeScript
+      - Node.js
+      - PostgreSQL
+      - Kafka
+      - Docker
+    education:
+      - institution: Example University
+        degree: BSc
+        fieldOfStudy: Computer Science
+        startDate: ""
+        endDate: "2018"
+    certifications:
+      - name: Example Cloud Practitioner
+        issuingOrganization: Example Cloud
+        issueDate: "2021-06"
+        expirationDate: ""
+        credentialId: ""
+        credentialUrl: ""
+    languages:
+      - language: English
+        proficiency: C1
+      - language: Portuguese
+        proficiency: Native
+  recordIds:
+    experience:
+      - c0bf9fa3-e56c-403b-b89f-3aea18812f57
+      - 901f54da-c103-440f-ad3a-395a3c7f1753
+    education:
+      - a8016342-d82e-4a5b-9a18-e75fb3bfb864
+    certifications:
+      - d98ef804-5d7d-4a4b-81ac-4a02e13cf3ce
+    languages:
+      - 6f89869c-b984-421d-8052-3c15e8e7eac5
+      - 07995a59-f58f-4f91-9107-13ce81f89413
+job:
+  id: 0b5d1c8e-6a52-4c39-9f0e-2d7c4b1a9e33
+  cacheKey: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  source: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.pdf
+  provider: codex
+  phase: ready
+  startedAt: 1792800000000
+  ownerPid: 4242
+  ownerId: f3c9e2a1-7d4b-4e8a-b6c5-1a2b3c4d5e6f
