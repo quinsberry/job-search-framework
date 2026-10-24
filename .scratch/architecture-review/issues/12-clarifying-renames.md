@@ -7,7 +7,7 @@ Several names collide with domain terms or with other files' conventions:
 
 | Current | Problem | Proposed |
 | --- | --- | --- |
-| `modules/search/` | Holds search preferences (and matching until issue 03); the search run itself lives in `modules/applications` | `modules/preferences/` |
+| `modules/search/` | Holds search preferences (matching moves to `domain/matching` in issue 03); the search run itself lives in `modules/applications` | `modules/preferences/` |
 | `profile/server/application.ts` (`createProfileApplication`, `profileApplication`) | "Application" is the job-application domain term | `profile-service.ts` (`createProfileService`, `profileService`) |
 | `applications/server/queries.ts` (`discoveryQueries`) | Every other `queries.ts` holds React Query options/hooks | `discovery-queries.ts` |
 | `shared/search-sources/server/linkedin/search.ts` `runSearch` | Same name as the workflow's `runSearch` | `searchPage` (or similar) |

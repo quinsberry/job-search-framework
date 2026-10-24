@@ -7,10 +7,8 @@ Type: task
 
 **Layers** (after issue 03)
 
-`src/domain/` does not exist yet: issue 03 creates it by moving search sources, AI providers and matching out of `shared/`. `domain` is that issue's working name; use whatever name and paths it settles on, including for the `shared/ai/server/` exemption below, which moves with the AI providers.
+Issue 03 creates `src/domain/` (search sources, matching and vocabulary) and lands its own layer rules with it: `src/domain/**` never imports `src/modules/**` or `src/app/**`, `src/shared/**` never imports `src/domain/**`, and a domain part imports only other parts' contracts. AI providers stay in `shared/ai/`, so the `shared/ai/server/` exemption below keeps its path.
 
-- `src/domain/**` must not import `src/modules/**` or `src/app/**`.
-- `src/shared/**` must not import `src/domain/**`.
 - `src/modules/**` must not import `src/app/**`.
 
 **Restricted imports**

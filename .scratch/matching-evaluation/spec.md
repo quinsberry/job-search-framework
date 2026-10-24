@@ -55,7 +55,7 @@ Nothing I label or measure leaves my workspace unless I choose to publish aggreg
 ## Implementation Decisions
 
 - **Split.** This spec is the tool only. Building the real set, recording the baseline, publishing aggregates and changing bands or the matching rules version belong to issue 35.
-- **Two operations in an evaluation module** on the search module's server side, next to matching:
+- **Two operations in an evaluation module** on the server side next to matching, wherever matching lives (issue 03 moves it to the domain layer):
   - **capture**: workspace, URL, label, and an optional relabel flag;
   - **run**: workspace, cost cap, allow-unpriced flag, and dry-run flag.
 

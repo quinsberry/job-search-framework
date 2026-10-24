@@ -24,7 +24,7 @@ Work top to bottom; within a phase, lower numbers first unless a `Blocked by` sa
 ### Phase 2 — structure
 
 - [05 — One Zod import path](issues/05-consistent-zod-import.md)
-- [03 — Domain layer for sources, AI and matching](issues/03-domain-layer-for-sources-and-ai.md): records ADR 0011.
+- [03 — Domain layer for sources and matching](issues/03-domain-layer-for-sources-and-ai.md): records ADR 0011; blocked by 19 and 01.
 - [10 — Split decision model port and adapter](issues/10-split-decision-model-port-and-adapter.md): after 03.
 - [11 — Split applications contracts](issues/11-split-applications-contracts.md)
 - [06 — Run preconditions and NDJSON helper](issues/06-run-preconditions-and-ndjson-helper.md)
@@ -79,3 +79,4 @@ Resolved tickets add a one-line summary here and link back.
 - [19](issues/19-stored-format-fixtures.md) (ready-for-agent): per-module golden fixtures for applications v2/v3, profile, preferences and search memory; byte-identical round trip for current formats; pin the criteria digest (the conversion cache key is already pinned); no v1. Spec: [stored-format-fixtures](../stored-format-fixtures/spec.md).
 - [14](issues/14-decision-model-identity-in-criteria-digest.md) (ready-for-agent, blocked by 19): decision model port gets a readable identity (model ID, input budget, client format version) passed into the criteria digest; one-off re-judge of stored rejections accepted; rules version covers matching only; ADR 0009 amended with the code. Glossary updated: Inspected vacancy, Decision model. Spec: [decision-model-identity](../decision-model-identity/spec.md).
 - [01](issues/01-matching-accuracy-evaluation.md) (ready-for-agent, blocked by 14): opt-in capture and run commands; labelled set private in the workspace, one JSON file per vacancy, labels given on the command line; cost cap, dry run; report with confusion matrix, agreement and model identity. Labelling, the baseline and calibrating the bands move to [35](issues/35-matching-accuracy-baseline.md) (ready-for-human). Spec: [matching-evaluation](../matching-evaluation/spec.md).
+- [03](issues/03-domain-layer-for-sources-and-ai.md) (ready-for-agent, blocked by 19 and 01): `src/domain/` with search sources, matching (client-safe contracts plus server engine) and vocabulary; AI providers stay in `shared/ai` per ADR 0005; published search criteria schemas move, drafts stay in Search; one match result plus accepted match result schema replaces Applications' mirror; domain imports no features (not even types), shared imports no domain; ADR 0011; no glossary change. Spec: [domain-layer](../domain-layer/spec.md).

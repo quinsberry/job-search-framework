@@ -49,7 +49,7 @@ Decisions from grilling:
   - Cost: total cost and unpriced call count.
 
   It is written to the workspace as timestamped Markdown and JSON.
-- **Placement.** The logic lives in the search module's server side next to matching. Thin entry scripts outside the source tree only parse flags; they get their own lint allowance.
+- **Placement.** The logic lives on the server side next to matching (which issue 03 moves to the domain layer). Thin entry scripts outside the source tree only parse flags; they get their own lint allowance.
 - **Glossary.** No change; "expected outcome" stays tool vocabulary.
 
 ## Agent Brief
