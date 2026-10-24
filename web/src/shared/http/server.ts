@@ -1,12 +1,17 @@
 import { z } from 'zod';
+// True when the browser addressed a loopback host and the caller is that same origin.
+// Judges the Host header: `next start` builds request.url from its own hostname, not the browser's.
+export function isLocalRequest(headers: Headers): boolean {
+	const host = headers.get('host') ?? '';
+	if (!URL.canParse(`http://${host}`)) return false;
+	return (
+		['localhost', '127.0.0.1', '[::1]'].includes(new URL(`http://${host}`).hostname) &&
+		[`http://${host}`, `https://${host}`].includes(headers.get('origin') ?? '')
+	);
+}
 // Rejects non-local callers and reads a bounded body; throws coded errors for `errorResponse`.
 export async function readLocalBody(request: Request): Promise<Response> {
-	const url = new URL(request.url);
-	if (
-		!['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) ||
-		request.headers.get('host') !== url.host ||
-		request.headers.get('origin') !== url.origin
-	) {
+	if (!isLocalRequest(request.headers)) {
 		throw Object.assign(new Error('Operations are only available from the local app.'), { code: 'forbidden' });
 	}
 	// Bound the stream before parsing multipart data; Content-Length is not trusted.

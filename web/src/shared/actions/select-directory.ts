@@ -4,6 +4,7 @@ import { realpath, stat } from 'node:fs/promises';
 import { platform } from 'node:os';
 import { isAbsolute } from 'node:path';
 import { headers } from 'next/headers';
+import { isLocalRequest } from '@/shared/http/server';
 
 const pickerCommands: Partial<Record<NodeJS.Platform, string[]>> = {
 	darwin: [
@@ -22,16 +23,7 @@ const pickerCommands: Partial<Record<NodeJS.Platform, string[]>> = {
 };
 
 export async function selectDirectory(): Promise<string | null> {
-	const requestHeaders = await headers();
-	const host = requestHeaders.get('host');
-	const origin = requestHeaders.get('origin');
-	const hostname = host ? new URL(`http://${host}`).hostname : '';
-
-	if (
-		!['localhost', '127.0.0.1', '[::1]'].includes(hostname) ||
-		!origin ||
-		![`http://${host}`, `https://${host}`].includes(origin)
-	) {
+	if (!isLocalRequest(await headers())) {
 		throw new Error('Folder selection is only available from the local app.');
 	}
 
