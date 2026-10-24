@@ -11,7 +11,7 @@ bunx tsc --noEmit
 bun run lint
 ```
 
-AI conversion needs either an installed Codex CLI with a ChatGPT login (`codex login`) or the Claude Code CLI with a Claude subscription login (`claude auth login`). Profile/preference editing works without it. The folder picker uses `osascript` on macOS, PowerShell on Windows and requires `zenity` on Linux.
+AI conversion needs either an installed Codex CLI with a ChatGPT login (`codex login`) or the Claude Code CLI with a Claude subscription login (`claude auth login`). To run Claude Code on Amazon Bedrock instead, set `JSF_CLAUDE_AUTH=bedrock` and `AWS_REGION` (plus `AWS_PROFILE` if needed) (see `.env.example`); API keys, gateways, Vertex and Foundry are never used. Profile/preference editing works without it. The folder picker uses `osascript` on macOS, PowerShell on Windows and requires `zenity` on Linux.
 
 Keep the Bun server running during conversion: server termination interrupts unfinished jobs, which then need explicit Retry. No hosted/serverless execution.
 

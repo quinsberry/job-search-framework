@@ -164,7 +164,8 @@ ok "App started"
 
 printf '\n  %sOpen %shttp://localhost:%s%s%s in your browser.%s\n' "$BOLD" "$CYAN" "$PORT" "$RESET" "$BOLD" "$RESET"
 printf '  %sPress Ctrl+C to stop.%s\n\n' "$DIM" "$RESET"
-printf '  %sCV conversion needs the Codex CLI (codex login) or Claude Code CLI (claude auth login).%s\n\n' "$DIM" "$RESET"
+printf '  %sCV conversion needs the Codex CLI (codex login) or Claude Code CLI (claude auth login,%s\n' "$DIM" "$RESET"
+printf '  %sor JSF_CLAUDE_AUTH=bedrock with AWS settings; see web/.env.example).%s\n\n' "$DIM" "$RESET"
 
 # From here on, show only what the server prints after its startup banner (errors, mostly).
 tail -n +"$(($(wc -l <"$server_log") + 1))" -f "$server_log" &

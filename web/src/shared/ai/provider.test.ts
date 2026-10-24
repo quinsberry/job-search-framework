@@ -58,9 +58,7 @@ test('Claude readiness requires a subscription login, not an API key', async () 
 	const spawn = spyOn(Bun, 'spawn').mockImplementation(((command: string[], options: { env: object }) => {
 		expect(options.env).not.toHaveProperty('ANTHROPIC_API_KEY');
 		return {
-			stdout: new Blob([
-				command[1] === '--version' ? '2.1.292 (Claude Code)\n' : JSON.stringify(status),
-			]).stream(),
+			stdout: new Blob([command[1] === '--version' ? '2.1.292 (Claude Code)\n' : JSON.stringify(status)]).stream(),
 			exited: Promise.resolve(0),
 		};
 	}) as unknown as typeof Bun.spawn);
@@ -99,3 +97,123 @@ test('Claude conversion uses a tool-less subprocess and returns the structured o
 		spawn.mockRestore();
 	}
 });
+
+function fakeClaude(status: object, seen: Record<string, string>[] = []) {
+	return spyOn(Bun, 'spawn').mockImplementation(((command: string[], options: { env: Record<string, string> }) => {
+		seen.push(options.env);
+		return {
+			stdout: new Blob([
+				command[1] === '--version'
+					? '2.1.292 (Claude Code)\n'
+					: command[1] === '-p'
+						? JSON.stringify({ is_error: false, structured_output: output })
+						: JSON.stringify(status),
+			]).stream(),
+			exited: Promise.resolve(0),
+			kill: () => {},
+		};
+	}) as unknown as typeof Bun.spawn);
+}
+
+function withEnv(values: Record<string, string>, run: () => Promise<void>) {
+	const previous = Object.fromEntries(Object.keys(values).map((key) => [key, process.env[key]]));
+	Object.assign(process.env, values);
+	return run().finally(() => {
+		for (const [key, value] of Object.entries(previous))
+			if (value === undefined) delete process.env[key];
+			else process.env[key] = value;
+	});
+}
+
+test('Claude readiness accepts a long-lived subscription token and hints at Bedrock when it is configured', () =>
+	withEnv({ CLAUDE_CODE_USE_BEDROCK: '1', ANTHROPIC_MODEL: 'fictional-bedrock-profile' }, async () => {
+		const seen: Record<string, string>[] = [];
+		let spawn = fakeClaude({ loggedIn: true, authMethod: 'oauth_token' }, seen);
+		try {
+			expect((await claudeProvider.check()).available).toBe(true);
+			expect(seen[0]).not.toHaveProperty('CLAUDE_CODE_USE_BEDROCK');
+			expect(seen[0]).not.toHaveProperty('ANTHROPIC_MODEL');
+		} finally {
+			spawn.mockRestore();
+		}
+		spawn = fakeClaude({
+			loggedIn: true,
+			authMethod: 'third_party',
+			apiProvider: 'bedrock',
+		});
+		try {
+			const ready = await claudeProvider.check();
+			expect(ready.available).toBe(false);
+			expect(ready.message).toContain('JSF_CLAUDE_AUTH=bedrock');
+		} finally {
+			spawn.mockRestore();
+		}
+	}));
+
+test('Claude on Bedrock switches the CLI to Bedrock, keeps AWS and model variables and caches separately', () =>
+	withEnv(
+		{
+			JSF_CLAUDE_AUTH: 'bedrock',
+			CLAUDE_CODE_USE_BEDROCK: '',
+			AWS_REGION: 'eu-central-1',
+			ANTHROPIC_MODEL: 'fictional-profile',
+			ANTHROPIC_API_KEY: 'fictional-key',
+			CLAUDE_CODE_USE_VERTEX: '1',
+		},
+		async () => {
+			const seen: Record<string, string>[] = [];
+			const spawn = fakeClaude({ loggedIn: true, authMethod: 'third_party', apiProvider: 'bedrock' }, seen);
+			try {
+				const ready = await claudeProvider.check();
+				expect(ready.available).toBe(true);
+				expect(ready.message).toContain('Amazon Bedrock');
+				expect(ready.cacheIdentity).toBe('claude-cli:2.1.292 (Claude Code):bedrock');
+				const request = {
+					instructions: 'Extract fictional facts.',
+					inputText: 'Fictional CV',
+					outputSchema: {},
+				};
+				expect(await claudeProvider.interpret(request, new AbortController().signal)).toEqual(output);
+				for (const env of seen) {
+					expect(env).toMatchObject({
+						CLAUDE_CODE_USE_BEDROCK: '1',
+						AWS_REGION: 'eu-central-1',
+						ANTHROPIC_MODEL: 'fictional-profile',
+					});
+					expect(env).not.toHaveProperty('ANTHROPIC_API_KEY');
+					expect(env).not.toHaveProperty('CLAUDE_CODE_USE_VERTEX');
+				}
+			} finally {
+				spawn.mockRestore();
+			}
+		},
+	));
+
+test('Claude on Bedrock is unavailable with a subscription login', () =>
+	withEnv({ JSF_CLAUDE_AUTH: 'bedrock' }, async () => {
+		const spawn = fakeClaude({ loggedIn: true, authMethod: 'claude.ai' });
+		try {
+			const ready = await claudeProvider.check();
+			expect(ready.available).toBe(false);
+			expect(ready.message).toContain('AWS credentials');
+		} finally {
+			spawn.mockRestore();
+		}
+	}));
+
+test('an unknown Claude auth mode lists the available options instead of choosing billing', () =>
+	withEnv({ JSF_CLAUDE_AUTH: 'aws' }, async () => {
+		const spawn = fakeClaude({ loggedIn: true, authMethod: 'claude.ai' });
+		try {
+			const ready = await claudeProvider.check();
+			expect(ready.available).toBe(false);
+			expect(ready.message).toBe("Available JSF_CLAUDE_AUTH options: 'subscription', 'bedrock'.");
+			const request = { instructions: 'x', inputText: 'x', outputSchema: {} };
+			await expect(claudeProvider.interpret(request, new AbortController().signal)).rejects.toThrow(
+				'JSF_CLAUDE_AUTH options',
+			);
+			expect(spawn).not.toHaveBeenCalled();
+		} finally {
+			spawn.mockRestore();
+		}
+	}));
