@@ -18,7 +18,8 @@ Work top to bottom; within a phase, lower numbers first unless a `Blocked by` sa
 
 - [19 — Stored-format and digest fixtures](issues/19-stored-format-fixtures.md): land before 03, 09, 11 and 12, which touch the schemas that read workspace files.
 - [14 — Decision model identity in the criteria digest](issues/14-decision-model-identity-in-criteria-digest.md): updates the digest pinned by 19 once, deliberately.
-- [01 — Matching accuracy evaluation](issues/01-matching-accuracy-evaluation.md): product priority; independent of the refactors.
+- [01 — Matching accuracy evaluation](issues/01-matching-accuracy-evaluation.md): product priority; independent of the refactors; blocked by 14.
+- [35 — Matching accuracy baseline and band calibration](issues/35-matching-accuracy-baseline.md): human; blocked by 01.
 
 ### Phase 2 — structure
 
@@ -77,3 +78,4 @@ Resolved tickets add a one-line summary here and link back.
 - [16](issues/16-ci-checks.md) (ready-for-agent): replace the Python `tests` workflow with `web / checks` (typecheck, lint, test, build in one job); push to `main`, PRs and manual dispatch; skip non-code-only changes; no pre-push hook; done on the PR that merges `next-migration`.
 - [19](issues/19-stored-format-fixtures.md) (ready-for-agent): per-module golden fixtures for applications v2/v3, profile, preferences and search memory; byte-identical round trip for current formats; pin the criteria digest (the conversion cache key is already pinned); no v1. Spec: [stored-format-fixtures](../stored-format-fixtures/spec.md).
 - [14](issues/14-decision-model-identity-in-criteria-digest.md) (ready-for-agent, blocked by 19): decision model port gets a readable identity (model ID, input budget, client format version) passed into the criteria digest; one-off re-judge of stored rejections accepted; rules version covers matching only; ADR 0009 amended with the code. Glossary updated: Inspected vacancy, Decision model. Spec: [decision-model-identity](../decision-model-identity/spec.md).
+- [01](issues/01-matching-accuracy-evaluation.md) (ready-for-agent, blocked by 14): opt-in capture and run commands; labelled set private in the workspace, one JSON file per vacancy, labels given on the command line; cost cap, dry run; report with confusion matrix, agreement and model identity. Labelling, the baseline and calibrating the bands move to [35](issues/35-matching-accuracy-baseline.md) (ready-for-human). Spec: [matching-evaluation](../matching-evaluation/spec.md).
