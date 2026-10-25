@@ -1,7 +1,7 @@
 import { PreferencesRepository } from '@/modules/search/server/persistence';
 import { assessApplication } from '@/modules/applications/model/manual-assessment';
 import { localRequest } from '@/shared/http/server';
-import { listSearchSources } from '@/shared/search-sources/server/search.service';
+import { listSearchSources } from '@/domain/search-sources/server/search.service';
 import { applicationsRequestSchema } from '@/modules/applications/model/contracts';
 import { ApplicationList } from '@/modules/applications/server/application-list';
 import { migrateWorkspace } from '@/modules/applications/server/migration';

@@ -1,7 +1,8 @@
 import { YAML } from 'bun';
 import { WorkspaceFiles, StorageError, digest } from '@/shared/server/workspace-files';
 import { configFileSchema, draftFileSchema, type PreferencesSnapshot } from '../model/contracts';
-import { preferencesDraftSchema, searchPreferencesSchema } from '../model/schema';
+import { searchPreferencesSchema } from '@/domain/matching/criteria';
+import { preferencesDraftSchema } from '../model/schema';
 import { toPreferences } from '../model/form-model';
 
 export class PreferencesRepository {

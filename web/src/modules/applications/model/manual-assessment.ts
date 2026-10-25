@@ -1,5 +1,5 @@
-import { workArrangementSchema } from '@/shared/search-sources/contracts';
-import { matchOutcome } from '@/shared/match-outcome';
+import { workArrangementSchema } from '@/domain/search-sources/contracts';
+import { matchOutcome } from '@/domain/matching/contracts';
 import type { Assessment, SearchApplication } from './contracts';
 
 export type SalaryMinimum = { min: number; currency: string; period: string; contractType: string };

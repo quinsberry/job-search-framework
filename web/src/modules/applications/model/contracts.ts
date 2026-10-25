@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { acceptedMatchResultSchema } from '@/domain/matching/contracts';
 import {
 	httpUrlSchema,
 	compensationSchema,
@@ -8,32 +9,7 @@ import {
 	sourceDescriptorSchema,
 	sourceFailureSchema,
 	sourceIdSchema,
-} from '@/shared/search-sources/contracts';
-
-// Mirrors Search's MatchResult; modules share no runtime schemas, so `workflow.ts` type-checks that they stay in step.
-export const matchSchema = z.strictObject({
-	outcome: z.enum(['match', 'needs-clarification']),
-	criteria: z
-		.array(
-			z.strictObject({
-				criterion: z.enum([
-					'availability',
-					'salary',
-					'workArrangement',
-					'location',
-					'role',
-					'seniority',
-					'positionType',
-					'skills',
-				]),
-				result: z.enum(['met', 'failed', 'unknown']),
-				evidence: z.enum(['structured', 'model']),
-				detail: z.string().trim().min(1).max(2000),
-			}),
-		)
-		.max(8),
-	costUsd: z.number().nonnegative().nullable(),
-});
+} from '@/domain/search-sources/contracts';
 
 const timestamp = z.iso.datetime({ offset: true });
 const fingerprint = z.string().regex(/^[0-9a-f]{64}$/);
@@ -61,11 +37,11 @@ const arrangementOverrideSchema = z
 	.max(3)
 	.refine((items) => new Set(items).size === items.length, 'Duplicate arrangements')
 	.nullable();
-const effectiveCriterionSchema = matchSchema.shape.criteria.element.extend({
+const effectiveCriterionSchema = acceptedMatchResultSchema.shape.criteria.element.extend({
 	evidence: z.enum(['structured', 'model', 'manual']),
 });
 export const assessmentSchema = z.strictObject({
-	match: matchSchema.extend({ criteria: z.array(effectiveCriterionSchema).max(8) }),
+	match: acceptedMatchResultSchema.extend({ criteria: z.array(effectiveCriterionSchema).max(8) }),
 	workArrangements: z.array(workArrangementSchema).nullable(),
 });
 export type Assessment = z.output<typeof assessmentSchema>;
@@ -79,7 +55,7 @@ const tracked = {
 };
 const searchFound = {
 	job: jobDetailSchema.omit({ description: true }),
-	match: matchSchema,
+	match: acceptedMatchResultSchema,
 };
 const manualFields = {
 	url: z.string().trim().min(1, 'Paste the link to the posting').pipe(httpUrlSchema),

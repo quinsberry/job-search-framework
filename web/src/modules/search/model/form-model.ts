@@ -1,10 +1,5 @@
-import {
-	emptyPreferences,
-	preferencesDraftSchema,
-	searchPreferencesSchema,
-	type PreferencesDraft,
-	type SearchPreferences,
-} from './schema';
+import { searchPreferencesSchema, type SearchPreferences } from '@/domain/matching/criteria';
+import { emptyPreferences, preferencesDraftSchema, type PreferencesDraft } from './schema';
 
 const number = (value: string) => (value.trim() === '' ? undefined : Number(value));
 export function toPreferences(values: PreferencesDraft) {

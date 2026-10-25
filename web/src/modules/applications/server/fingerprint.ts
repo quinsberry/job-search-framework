@@ -1,6 +1,6 @@
 import { digest } from '@/shared/server/workspace-files';
-import type { JobSummary } from '@/shared/search-sources/contracts';
-import type { SearchPreferences } from '@/modules/search/model/schema';
+import type { JobSummary } from '@/domain/search-sources/contracts';
+import type { SearchPreferences } from '@/domain/matching/criteria';
 
 export function normalize(value: string): string {
 	return value

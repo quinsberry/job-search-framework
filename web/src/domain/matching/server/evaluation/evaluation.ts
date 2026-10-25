@@ -2,12 +2,11 @@ import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { WorkspaceFiles } from '@/shared/server/workspace-files';
-import { jobDetailSchema, type SearchSourceAdapter } from '@/shared/search-sources/contracts';
-import { fetchJobDetail, resolveJobUrl } from '@/shared/search-sources/server/search.service';
-import { searchPreferencesSchema } from '../../model/schema';
-import { requestedModel, type DecisionModel, type DecisionRequest } from '../matching/decision-model';
-import { MATCHING_RULES_VERSION, MatchError, matchJob } from '../matching/match';
-import { criterionSchema, type Criterion } from '../matching/structured';
+import { jobDetailSchema, type DetailResult, type JobRef } from '@/domain/search-sources/contracts';
+import { criterionSchema, type Criterion } from '../../contracts';
+import { searchPreferencesSchema } from '../../criteria';
+import { requestedModel, type DecisionModel, type DecisionRequest } from '../decision-model';
+import { MATCHING_RULES_VERSION, MatchError, matchJob } from '../match';
 import { renderReport } from './report';
 
 // Opt-in matching accuracy evaluation: the job seeker's labelled vacancies, kept in their workspace only.
@@ -54,8 +53,11 @@ export class EvaluationError extends Error {
 const writeJson = (files: WorkspaceFiles, name: string, value: unknown) =>
 	files.writeBytes(name, JSON.stringify(value, null, '\t') + '\n');
 
+// Search sources are supplied by the caller: matching never reaches source adapters itself.
 export type CaptureDeps = {
-	sources: readonly SearchSourceAdapter[];
+	// The reference of the source that claims this vacancy page URL, or null when none does.
+	resolveUrl(url: string): JobRef | null;
+	fetchDetail(ref: JobRef, signal: AbortSignal): Promise<DetailResult>;
 	// The workspace's saved (published) matching inputs, never drafts; null when nothing is saved.
 	candidate(): Promise<Candidate | null>;
 	now(): Date;
@@ -69,7 +71,7 @@ export async function captureVacancy(
 	const parsed = labelSchema.safeParse(input.label);
 	if (!parsed.success) throw new EvaluationError('Invalid label: ' + z.prettifyError(parsed.error));
 	const label = parsed.data;
-	const ref = resolveJobUrl(input.url, deps.sources);
+	const ref = deps.resolveUrl(input.url);
 	if (!ref)
 		throw new EvaluationError(
 			'No search source recognises this URL. Give the vacancy page link, such as a LinkedIn job view URL.',
@@ -93,7 +95,7 @@ export async function captureVacancy(
 			throw new EvaluationError('Save your search preferences first: labels refer to a snapshot of them.');
 		await writeJson(files, SET, { schemaVersion: 1, createdAt: now, candidate: candidateSchema.parse(candidate) });
 	}
-	const detail = await fetchJobDetail(ref, signal, deps.sources);
+	const detail = await deps.fetchDetail(ref, signal);
 	if (!detail.ok)
 		throw new EvaluationError(`The vacancy could not be fetched (${detail.error.code}): ${detail.error.message}`);
 	await writeJson(files, file, { schemaVersion: 1, capturedAt: now, labelledAt: now, job: detail.job, label });

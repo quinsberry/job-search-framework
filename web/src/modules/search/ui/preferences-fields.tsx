@@ -22,16 +22,9 @@ import {
 } from '@/shared/components/ui/select';
 import { Button } from '@/shared/components/ui/button';
 import { fieldMessages } from '@/shared/lib/field-messages';
-import {
-	contractTypes,
-	currencies,
-	emptySalary,
-	payPeriods,
-	positionTypes,
-	seniorities,
-	workArrangements,
-	type PreferencesDraft,
-} from '../model/schema';
+import { positionTypes, seniorities } from '@/domain/matching/criteria';
+import { contractTypes, currencies, payPeriods, workArrangements } from '@/domain/vocabulary';
+import { emptySalary, type PreferencesDraft } from '../model/schema';
 import {
 	Combobox,
 	ComboboxChip,

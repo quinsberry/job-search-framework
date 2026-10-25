@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { preferencesDraftSchema, searchPreferencesSchema } from './schema';
+import { searchPreferencesSchema } from '@/domain/matching/criteria';
+import { preferencesDraftSchema } from './schema';
 
 export const draftSchema = z.strictObject({ id: z.uuid(), values: preferencesDraftSchema });
 export const configFileSchema = z.strictObject({

@@ -1,6 +1,6 @@
 import { parseArgs } from 'node:util';
-import { DecisionModelClient } from '@/modules/search/server/matching/decision-model';
-import { EvaluationError, runEvaluation } from '@/modules/search/server/evaluation/evaluation';
+import { DecisionModelClient } from '@/domain/matching/server/decision-model';
+import { EvaluationError, runEvaluation } from '@/domain/matching/server/evaluation/evaluation';
 import { fail, interruptSignal, savedCandidate, workspacePath } from './workspace';
 
 const usage = `Usage: bun run evaluate:run --workspace <folder> --max-usd <amount> [--allow-unpriced] [--dry-run]

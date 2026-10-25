@@ -1,8 +1,7 @@
-import type { DiscoveryQuery, JobDetail, SearchSourceRun } from '@/shared/search-sources/contracts';
-import type { SearchPreferences } from '@/modules/search/model/schema';
-import type { MatchResult } from '@/modules/search/server/matching/match';
-import type { DoneEvent, matchSchema, RunEvent } from '../model/contracts';
-import type { z } from 'zod';
+import type { DiscoveryQuery, JobDetail, SearchSourceRun } from '@/domain/search-sources/contracts';
+import type { SearchPreferences } from '@/domain/matching/criteria';
+import type { MatchResult } from '@/domain/matching/contracts';
+import type { DoneEvent, RunEvent } from '../model/contracts';
 import { fingerprint } from './fingerprint';
 import { discoveryQueries } from './queries';
 import type { ApplicationList } from './application-list';
@@ -21,13 +20,9 @@ export type RunInput = {
 	criteriaDigest: string;
 };
 
-type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
-const inStep: Same<z.output<typeof matchSchema>['criteria'], MatchResult['criteria']> = true;
-void inStep;
-
 const PAGE = 25;
 const PULL_FACTOR = 5;
-// MatchError lives in Search; modules share no runtime code, so recognise it by shape.
+// Matching arrives as a dependency, so its MatchError is recognised by shape rather than by class.
 const matchCode = (error: unknown) =>
 	error instanceof Error && error.name === 'MatchError' && 'code' in error ? String(error.code) : null;
 const fatalMatchCodes = new Set(['invalid-input', 'unavailable', 'rate-limited']);

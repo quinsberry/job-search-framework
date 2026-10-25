@@ -5,7 +5,8 @@ import { join } from 'node:path';
 import { configFileSchema } from '../model/contracts';
 import { YAML } from 'bun';
 import { WorkspaceFiles } from '@/shared/server/workspace-files';
-import { emptyPreferences, emptySalary, searchPreferencesSchema } from '../model/schema';
+import { searchPreferencesSchema } from '@/domain/matching/criteria';
+import { emptyPreferences, emptySalary } from '../model/schema';
 import { toDraft } from '../model/form-model';
 import { PreferencesRepository } from './persistence';
 

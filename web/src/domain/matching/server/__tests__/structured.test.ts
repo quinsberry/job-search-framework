@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
-import type { JobDetail } from '@/shared/search-sources/contracts';
-import { searchPreferencesSchema, type SearchPreferences } from '../../../model/schema';
+import type { JobDetail } from '@/domain/search-sources/contracts';
+import { searchPreferencesSchema, type SearchPreferences } from '../../criteria';
 import { structuredChecks } from '../structured';
 
 export function fixture(): { job: JobDetail; preferences: SearchPreferences; skills: string[] } {

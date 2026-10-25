@@ -1,5 +1,5 @@
-import type { DiscoveryQuery } from '@/shared/search-sources/contracts';
-import type { SearchPreferences } from '@/modules/search/model/schema';
+import type { DiscoveryQuery } from '@/domain/search-sources/contracts';
+import type { SearchPreferences } from '@/domain/matching/criteria';
 
 export function discoveryQueries(preferences: SearchPreferences): DiscoveryQuery[] {
 	const { positionTitles, location, workArrangements } = preferences.targetPosition;

@@ -1,23 +1,14 @@
 import { z } from 'zod';
-import { matchOutcome } from '@/shared/match-outcome';
-import { jobDetailSchema, type JobDetail } from '@/shared/search-sources/contracts';
-import { searchPreferencesSchema } from '../../model/schema';
+import { jobDetailSchema, type JobDetail } from '@/domain/search-sources/contracts';
+import { matchOutcome, matchResultSchema, type MatchResult } from '../contracts';
+import { searchPreferencesSchema } from '../criteria';
 import { checkSignal, MatchError, validateAnswers, withCancellation, type DecisionModel } from './decision-model';
 import { buildQuestions, fitRequest, modelResults } from './questions';
-import { criterionResultSchema, structuredChecks, type MatchCriteria } from './structured';
+import { structuredChecks, type MatchCriteria } from './structured';
 
 export { MatchError } from './decision-model';
 // Part of the search workflow's criteria digest: bump it when a rule change could alter earlier outcomes.
 export const MATCHING_RULES_VERSION = 1;
-export const matchResultSchema = z.strictObject({
-	outcome: z.enum(['match', 'no-match', 'needs-clarification']),
-	criteria: z
-		.array(criterionResultSchema)
-		.max(8)
-		.refine((items) => new Set(items.map((item) => item.criterion)).size === items.length),
-	costUsd: z.number().nonnegative().nullable(),
-});
-export type MatchResult = z.infer<typeof matchResultSchema>;
 const criteriaSchema = z.strictObject({
 	preferences: searchPreferencesSchema,
 	skills: z.array(z.string().trim().min(1).max(20000)).max(1000),

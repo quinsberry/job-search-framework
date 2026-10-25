@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
-import { emptyPreferences, emptySalary, preferencesDraftSchema, searchPreferencesSchema } from './schema';
+import { searchPreferencesSchema } from '@/domain/matching/criteria';
+import { emptyPreferences, emptySalary, preferencesDraftSchema } from './schema';
 import { formSchema, hasChanges, toDraft, toPreferences } from './form-model';
 
 export const validPreferences = () => ({

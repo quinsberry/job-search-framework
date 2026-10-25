@@ -1,6 +1,6 @@
 import { parseArgs } from 'node:util';
-import { searchSourceAdapters } from '@/shared/search-sources/server/search.service';
-import { captureVacancy, EvaluationError, labelSchema } from '@/modules/search/server/evaluation/evaluation';
+import { fetchJobDetail, resolveJobUrl } from '@/domain/search-sources/server/search.service';
+import { captureVacancy, EvaluationError, labelSchema } from '@/domain/matching/server/evaluation/evaluation';
 import { fail, interruptSignal, savedCandidate, workspacePath } from './workspace';
 
 const usage = `Usage: bun run evaluate:capture --workspace <folder> --url <vacancy URL> --expected <outcome>
@@ -37,7 +37,12 @@ if (!label.success) fail(`Invalid label.\n\n${usage}`);
 try {
 	const { file, relabelled } = await captureVacancy(
 		{ workspace, url: values.url, label: label.data, relabel: values.relabel },
-		{ sources: searchSourceAdapters(), candidate: () => savedCandidate(workspace), now: () => new Date() },
+		{
+			resolveUrl: resolveJobUrl,
+			fetchDetail: fetchJobDetail,
+			candidate: () => savedCandidate(workspace),
+			now: () => new Date(),
+		},
 		interruptSignal(),
 	);
 	console.log(`${relabelled ? 'Relabelled' : 'Captured'} ${file} as ${label.data.expected}.`);

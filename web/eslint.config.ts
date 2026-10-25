@@ -9,9 +9,14 @@ const sourceFiles = '**/*.{ts,tsx}';
 const serverFiles = ['**/server/**', '**/server.{ts,tsx}', '**/actions/**', '**/*.test.{ts,tsx}'];
 const serverImports = ['bun', 'node:*', '**/server/**', '**/server', '**/server.*'];
 const featureImports = ['@/modules/**', '**/modules/**'];
-const modules = readdirSync(new URL('./src/modules/', import.meta.url), { withFileTypes: true })
-	.filter((entry) => entry.isDirectory())
-	.map((entry) => entry.name);
+const appImports = ['@/app/**', '**/app/**'];
+const domainImports = ['@/domain/**', '**/domain/**'];
+const directories = (path: string) =>
+	readdirSync(new URL(path, import.meta.url), { withFileTypes: true })
+		.filter((entry) => entry.isDirectory())
+		.map((entry) => entry.name);
+const modules = directories('./src/modules/');
+const domainParts = directories('./src/domain/');
 
 type ImportBoundary = { group: string[]; allowTypeImports?: boolean };
 function boundaries(directory: string, restrictedImports: ImportBoundary[]): Linter.Config[] {
@@ -34,7 +39,24 @@ const eslintConfig = defineConfig([
 	...pluginQuery.configs['flat/recommended-strict'],
 	...nextVitals,
 	...nextTs,
-	...boundaries('src/shared', [{ group: featureImports }]),
+	...boundaries('src/shared', [{ group: [...featureImports, ...domainImports] }]),
+	// Domain parts may share contracts, never server code; nothing in the domain knows features or the app.
+	...boundaries('src/domain', [{ group: [...featureImports, ...appImports] }]),
+	...domainParts.flatMap((part) =>
+		boundaries('src/domain/' + part, [
+			{ group: [...featureImports, ...appImports] },
+			{
+				group: domainParts
+					.filter((other) => other !== part)
+					.flatMap((other) => [
+						'@/domain/' + other + '/server',
+						'@/domain/' + other + '/server/**',
+						'**/' + other + '/server',
+						'**/' + other + '/server/**',
+					]),
+			},
+		]),
+	),
 	...modules.flatMap((module) =>
 		boundaries('src/modules/' + module, [
 			{

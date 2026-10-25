@@ -1,25 +1,7 @@
-import { z } from 'zod';
-import type { JobDetail } from '@/shared/search-sources/contracts';
-import type { SearchPreferences } from '../../model/schema';
+import type { JobDetail } from '@/domain/search-sources/contracts';
+import type { Criterion, CriterionResult } from '../contracts';
+import type { SearchPreferences } from '../criteria';
 
-export const criterionSchema = z.enum([
-	'availability',
-	'salary',
-	'workArrangement',
-	'location',
-	'role',
-	'seniority',
-	'positionType',
-	'skills',
-]);
-export const criterionResultSchema = z.strictObject({
-	criterion: criterionSchema,
-	result: z.enum(['met', 'failed', 'unknown']),
-	evidence: z.enum(['structured', 'model']),
-	detail: z.string().trim().min(1).max(2000),
-});
-export type Criterion = z.infer<typeof criterionSchema>;
-export type CriterionResult = z.infer<typeof criterionResultSchema>;
 export type MatchCriteria = { preferences: SearchPreferences; skills: string[] };
 
 export function locationApplies(job: JobDetail, preferences: SearchPreferences): boolean {

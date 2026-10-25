@@ -1,5 +1,5 @@
 import { errorResponse, readLocalBody } from '@/shared/http/server';
-import { listSearchSources, SearchRun } from '@/shared/search-sources/server/search.service';
+import { listSearchSources, SearchRun } from '@/domain/search-sources/server/search.service';
 import { runRequestSchema } from '@/modules/applications/model/contracts';
 import { criteriaDigest } from '@/modules/applications/server/fingerprint';
 import { ApplicationList } from '@/modules/applications/server/application-list';
@@ -7,8 +7,8 @@ import { migrateWorkspace } from '@/modules/applications/server/migration';
 import { SearchMemory } from '@/modules/applications/server/search-memory';
 import { runSearch } from '@/modules/applications/server/workflow';
 import { PreferencesRepository } from '@/modules/search/server/persistence';
-import { DecisionModelClient } from '@/modules/search/server/matching/decision-model';
-import { MATCHING_RULES_VERSION, matchJob } from '@/modules/search/server/matching/match';
+import { DecisionModelClient } from '@/domain/matching/server/decision-model';
+import { MATCHING_RULES_VERSION, matchJob } from '@/domain/matching/server/match';
 import { ProfileRepository } from '@/modules/profile/server/persistence';
 
 const coded = (code: string, message: string) => Object.assign(new Error(message), { code });

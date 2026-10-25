@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
-import { matchJob, MatchError, matchResultSchema } from '../match';
+import { matchResultSchema } from '../../contracts';
+import { matchJob, MatchError } from '../match';
 import { probabilityResult, scaleResult } from '../questions';
 import type { Answer, DecisionModel, DecisionRequest } from '../decision-model';
 import { fixture } from './structured.test';
@@ -235,7 +236,7 @@ test('model and input failures reject as errors, never outcomes', async () => {
 	] as const) {
 		const model: DecisionModel = {
 			identity: 'fake-model',
-		maxInputBytes: 28000,
+			maxInputBytes: 28000,
 			async decide() {
 				throw new MatchError(code, 'Fictional failure');
 			},

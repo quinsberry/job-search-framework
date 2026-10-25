@@ -1,6 +1,6 @@
 # Job Search Framework web app
 
-Local Bun/Next.js app for a job seeker: candidate profile, search preferences and vacancy acquisition. Decisions live in `../docs/adr/` (0005–0008); vocabulary in `../CONTEXT.md`.
+Local Bun/Next.js app for a job seeker: candidate profile, search preferences and vacancy acquisition. Decisions live in `../docs/adr/` (0005–0011); vocabulary in `../CONTEXT.md`.
 
 ## Run and check
 
@@ -36,10 +36,13 @@ matching-evaluation/ set.json, vacancies/<source>-<id>.json, reports/ (only the 
 
 `app/workspace-content.tsx` composes the independent Workspace, Agent, Profile and Search modules and flushes both editors before switching workspaces.
 
+`src/domain/` holds the job-search concepts features share (ADR 0011): `search-sources/` (contracts; adapters and registry in `server/`), `matching/` (client-safe `contracts.ts` and published search criteria in `criteria.ts`; the engine and evaluation in `server/`) and `vocabulary.ts` (contract types, currencies, pay periods, work arrangements). `src/shared/` holds only generic code, AI provider adapters included.
+
 ESLint enforces these boundaries:
 
 - Feature modules under `src/modules/` don't import each other at runtime (type-only is fine); composition belongs in `app/`.
-- Shared code never imports features.
+- Shared code never imports features or the domain layer.
+- Domain code never imports features or `app/`, not even types. A domain part may import another part's contracts but never its `server/` code. Features and `app/` import the domain at runtime.
 - Outside `server/`, `server.ts`, `actions/` and tests, code cannot import server modules, Node built-ins or Bun.
 
 Prefer Bun built-ins; exclusive file creation, atomic rename, directory locks and symlink checks keep Node APIs.
@@ -48,21 +51,21 @@ Prefer Bun built-ins; exclusive file creation, atomic rename, directory locks an
 
 ## Vacancy acquisition
 
-Server-only entry points: `listSearchSources` and `SearchRun` in `shared/search-sources/server/search.service.ts`. Construct a run with `new SearchRun({ sourceIds, query }, signal, optionalAdapters)`. A run keeps all continuation in memory: call `next(limit)` until `done`, inspect `batch.sources` for failures, and always `dispose()`. There is no persistence, restart resume, cache or cross-source identity inference. Acquisition never judges fit; filters are reported as applied, approximate or unsupported.
+Server-only entry points: `listSearchSources` and `SearchRun` in `domain/search-sources/server/search.service.ts`. Construct a run with `new SearchRun({ sourceIds, query }, signal, optionalAdapters)`. A run keeps all continuation in memory: call `next(limit)` until `done`, inspect `batch.sources` for failures, and always `dispose()`. There is no persistence, restart resume, cache or cross-source identity inference. Acquisition never judges fit; filters are reported as applied, approximate or unsupported.
 
-**Adding a source**: implement `SearchSourceAdapter` under `server/<source>/`, add its ID to `sourceIdSchema` and its adapter to the private registry in `server/search.service.ts` (checked for enum coverage). Validate cursors and external payloads, preserve overflow and source-owned IDs, never fetch arbitrary reference URLs, and add fixtures for parsing, access failures, pagination and cancellation. Adapters import only the portable contracts.
+**Adding a source**: in `src/domain/search-sources/`, implement `SearchSourceAdapter` under `server/<source>/`, add its ID to `sourceIdSchema` in `contracts.ts` and its adapter to the private registry in `server/search.service.ts` (checked for enum coverage). Validate cursors and external payloads, preserve overflow and source-owned IDs, never fetch arbitrary reference URLs, and add fixtures for parsing, access failures, pagination and cancellation. Adapters import only the portable contracts.
 
 LinkedIn uses public guest HTML endpoints; upstream HTML changes can require parser updates. Its guest search ignores workplace filters and its pages omit the workplace type, so the adapter reports `workArrangements` as unsupported and leaves the arrangement to matching.
 
 ## Matching
 
-`modules/search/server/matching/match.ts` exports `matchJob(detail, { preferences, skills }, { model }, signal)`. It runs structured checks first, then one decision request for unresolved criteria, and returns strict `match`, `no-match` or `needs-clarification` results with criterion evidence and reported cost. Evaluation/transport failures reject with `MatchError`; they never become rejection decisions. Salary is compared only from structured advertised pay in matching contract, currency and period units, never inferred from description text or converted between units.
+`domain/matching/server/match.ts` exports `matchJob(detail, { preferences, skills }, { model }, signal)`. It runs structured checks first, then one decision request for unresolved criteria, and returns strict `match`, `no-match` or `needs-clarification` results with criterion evidence and reported cost; the result schemas and the Outcome rule are in `domain/matching/contracts.ts`, and Applications stores the accepted match result. Evaluation/transport failures reject with `MatchError`; they never become rejection decisions. Salary is compared only from structured advertised pay in matching contract, currency and period units, never inferred from description text or converted between units.
 
 A workplace outside the residence city fails location unless the vacancy is confirmed remote; LinkedIn's public pages do not state the workplace type, so this relies on the title and description.
 
 The optional **Minimum skill match (%)** field accepts 1–100; empty skips the skills criterion. Older configs and recovery drafts remain valid. Required skill names compare after lowercasing/removing non-alphanumerics; no alias table is supplied. Structured lists currently count as must-have. With a threshold but no candidate skills, matching rejects with “Add skills to your profile or clear the skill match threshold”. The future workflow must check that before starting acquisition.
 
-Production callers supply `new DecisionModelClient()` from `decision-model.ts`. It currently calls Jev (`typesafe/jev-1.14`) through `@typesafe-ai/sdk`, using the OpenRouter base URL and server-side `OPENROUTER_API_KEY`. The SDK owns HTTP, JSON decoding and retries; a fetch guard preserves the response-size limit and rejects Retry-After waits above two seconds. Responses still pass runtime Zod validation. Compression and SDK logging are disabled to keep the wire budget explicit and vacancy content out of logs. The [OpenRouter System One documentation](https://openrouter.ai/docs/guides/community/typesafe-sdk) defines its HTTP envelope; [TypeSafe's API reference](https://docs.typesafe.ai/api) defines typed answers. The model client maps an expected score over five coverage levels to 0–100. To replace the decision model, change only the implementation, `MODEL_ID` and input budget in `decision-model.ts`; callers and matching rules use neutral questions and answers. A model change alters the client's `identity`, so the next run judges stored rejections again once, at model cost.
+Production callers supply `new DecisionModelClient()` from `domain/matching/server/decision-model.ts`. It currently calls Jev (`typesafe/jev-1.14`) through `@typesafe-ai/sdk`, using the OpenRouter base URL and server-side `OPENROUTER_API_KEY`. The SDK owns HTTP, JSON decoding and retries; a fetch guard preserves the response-size limit and rejects Retry-After waits above two seconds. Responses still pass runtime Zod validation. Compression and SDK logging are disabled to keep the wire budget explicit and vacancy content out of logs. The [OpenRouter System One documentation](https://openrouter.ai/docs/guides/community/typesafe-sdk) defines its HTTP envelope; [TypeSafe's API reference](https://docs.typesafe.ai/api) defines typed answers. The model client maps an expected score over five coverage levels to 0–100. To replace the decision model, change only the implementation, `MODEL_ID` and input budget in `decision-model.ts`; callers and matching rules use neutral questions and answers. A model change alters the client's `identity`, so the next run judges stored rejections again once, at model cost.
 
 All questions for a job share one context. The client allows 28,000 UTF-8 bytes for the neutral request, reserving space below the 32,000-byte wire budget. Oversized criteria reject before calling the model; descriptions are truncated to fit, making all model-derived criteria unknown. Probability bands are fixed at 0.2/0.8; model skill coverage uses a ±10-point band around the threshold. These rules have deterministic fake-model tests; real accuracy and threshold calibration are measured with the evaluation tool below, with no baseline recorded yet (architecture review issue 35). HTTP retries stop after three attempts, cap Retry-After waits at two seconds, bound response bodies and obey cancellation/deadlines.
 
@@ -81,7 +84,7 @@ bun run evaluate:run --workspace <folder> --max-usd 0.50 [--allow-unpriced] [--d
 - Capture resolves the URL through the search source that claims it (sources implement the optional `referenceFromUrl`; LinkedIn claims job view URLs), fetches the vacancy and stores the detail snapshot with the label. The first capture also snapshots the saved search preferences and profile skills; labels are judged against that snapshot. Capturing a vacancy again needs `--relabel`, which replaces only the label.
 - Run matches every stored vacancy with the production decision model against the snapshot, as the search workflow would. It stops before the next model call once reported cost reaches `--max-usd`; a call of unknown cost, including a failed one, stops it too unless `--allow-unpriced`. Per-vacancy errors become error rows, excluded from agreement; outages, rate limits and the cap stop the run with a partial report. `--dry-run` answers every question with even odds at no cost, to check the set and the report.
 - Each run writes `reports/<timestamp>.md` and `.json`: matching rules version, decision model identity and the models responses reported (a mismatch is flagged), an outcome confusion matrix, agreement overall and excluding needs-clarification (either side), confusion for labelled criteria, one row per vacancy, cost, and warnings when the saved preferences or skills differ from the snapshot.
-- Code: `src/modules/search/server/evaluation/` (tested offline over a fictional sample set in `fixtures/`); the commands in `scripts/evaluation/` only parse flags and wire dependencies.
+- Code: `src/domain/matching/server/evaluation/` (tested offline over a fictional sample set in `fixtures/`); the commands in `scripts/evaluation/` only parse flags and wire dependencies, including the search sources capture resolves URLs and fetches vacancies through.
 
 ## Search workflow
 

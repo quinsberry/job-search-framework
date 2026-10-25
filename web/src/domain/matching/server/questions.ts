@@ -1,7 +1,9 @@
-import type { JobDetail } from '@/shared/search-sources/contracts';
-import { positionTypes, seniorities, workArrangements } from '../../model/schema';
+import type { JobDetail } from '@/domain/search-sources/contracts';
+import { workArrangements } from '@/domain/vocabulary';
+import type { Criterion, CriterionResult } from '../contracts';
+import { positionTypes, seniorities } from '../criteria';
 import { MatchError, type DecisionRequest, type DecisionResponse } from './decision-model';
-import { locationApplies, type Criterion, type CriterionResult, type MatchCriteria } from './structured';
+import { locationApplies, type MatchCriteria } from './structured';
 
 const ACCEPT = 0.8;
 const REJECT = 0.2;

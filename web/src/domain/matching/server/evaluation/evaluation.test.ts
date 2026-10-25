@@ -2,11 +2,17 @@ import { afterEach, expect, test } from 'bun:test';
 import { cp, mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { JobDetail, SearchSourceAdapter } from '@/shared/search-sources/contracts';
-import { referenceFromUrl } from '@/shared/search-sources/server/linkedin/detail';
-import type { Answer, DecisionModel, DecisionRequest } from '../matching/decision-model';
-import { MatchError } from '../matching/match';
-import { captureVacancy, runEvaluation, type Candidate, type EvaluationReport, type Label } from './evaluation';
+import type { JobDetail } from '@/domain/search-sources/contracts';
+import type { Answer, DecisionModel, DecisionRequest } from '../decision-model';
+import { MatchError } from '../match';
+import {
+	captureVacancy,
+	runEvaluation,
+	type Candidate,
+	type CaptureDeps,
+	type EvaluationReport,
+	type Label,
+} from './evaluation';
 
 const NOW = new Date('2026-10-24T12:00:00.000Z');
 const signal = () => new AbortController().signal;
@@ -87,21 +93,22 @@ const outcomesOf = (report: EvaluationReport) =>
 
 function fakeSource(jobs: JobDetail[]) {
 	const details: string[] = [];
-	const adapter: SearchSourceAdapter = {
-		descriptor: { id: 'linkedin', name: 'LinkedIn', supportedFilters: [] },
-		async search() {
-			throw new Error('Capture never searches');
+	const sources: Pick<CaptureDeps, 'resolveUrl' | 'fetchDetail'> = {
+		resolveUrl(url) {
+			const id = url.match(/^https:\/\/[a-z.]*linkedin\.com\/jobs\/view\/(?:[^/]+-)?(\d+)\/?(?:\?.*)?$/)?.[1];
+			return id
+				? { sourceId: 'linkedin', sourceJobId: id, url: `https://www.linkedin.com/jobs/view/${id}` }
+				: null;
 		},
-		async getDetail(ref) {
+		async fetchDetail(ref) {
 			details.push(ref.sourceJobId);
 			const job = jobs.find((item) => item.sourceJobId === ref.sourceJobId);
 			return job
 				? { ok: true, job }
 				: { ok: false, ref, error: { code: 'not-found', message: 'The vacancy is gone' } };
 		},
-		referenceFromUrl,
 	};
-	return { adapter, details };
+	return { sources, details };
 }
 async function sampleJob(id: string): Promise<JobDetail> {
 	const file = join(import.meta.dir, 'fixtures', 'vacancies', `linkedin-${id}.json`);
@@ -124,7 +131,7 @@ test('capture stores a validated snapshot with its label and the candidate snaps
 			url: 'https://pl.linkedin.com/jobs/view/senior-backend-engineer-at-fabrikam-4200000001/?trk=public',
 			label: label('match', { criteria: { role: 'met' }, note: 'Exactly my stack' }),
 		},
-		{ sources: [source.adapter], candidate: async () => candidate, now: () => NOW },
+		{ ...source.sources, candidate: async () => candidate, now: () => NOW },
 		signal(),
 	);
 	expect(result).toEqual({ file: 'vacancies/linkedin-4200000001.json', relabelled: false });
@@ -143,7 +150,7 @@ test('capture stores a validated snapshot with its label and the candidate snaps
 test('capture refuses unknown URLs, unflagged re-captures and a workspace without saved preferences', async () => {
 	const path = await workspace();
 	const source = fakeSource([await sampleJob('4200000001')]);
-	const deps = { sources: [source.adapter], candidate: async () => sampleCandidate(), now: () => NOW };
+	const deps = { ...source.sources, candidate: async () => sampleCandidate(), now: () => NOW };
 	const url = 'https://www.linkedin.com/jobs/view/4200000001';
 	for (const other of ['https://jobs.example.com/view/4200000001', 'https://www.linkedin.com/in/someone'])
 		await expect(
@@ -178,7 +185,7 @@ test('relabel replaces only the label and never fetches again', async () => {
 	const url = 'https://www.linkedin.com/jobs/view/4200000003';
 	await captureVacancy(
 		{ workspace: path, url, label: label('match') },
-		{ sources: [source.adapter], candidate: sampleCandidate, now: () => NOW },
+		{ ...source.sources, candidate: sampleCandidate, now: () => NOW },
 		signal(),
 	);
 	const file = join(path, 'matching-evaluation', 'vacancies', 'linkedin-4200000003.json');
@@ -186,7 +193,7 @@ test('relabel replaces only the label and never fetches again', async () => {
 	const later = new Date('2026-10-25T08:00:00.000Z');
 	const result = await captureVacancy(
 		{ workspace: path, url, label: label('needs-clarification', { note: 'Seniority is unclear' }), relabel: true },
-		{ sources: [source.adapter], candidate: async () => null, now: () => later },
+		{ ...source.sources, candidate: async () => null, now: () => later },
 		signal(),
 	);
 	expect(result.relabelled).toBe(true);

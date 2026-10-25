@@ -1,8 +1,8 @@
 'use client';
 import { useId } from 'react';
 import { useController, useWatch, type UseFormReturn } from 'react-hook-form';
-import { contractTypes, currencies, payPeriods } from '@/shared/compensation';
-import { workArrangementSchema } from '@/shared/search-sources/contracts';
+import { contractTypes, currencies, payPeriods } from '@/domain/vocabulary';
+import { workArrangementSchema } from '@/domain/search-sources/contracts';
 import { TextField } from '@/shared/components/form/controls';
 import { Button } from '@/shared/components/ui/button';
 import {

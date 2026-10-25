@@ -1,4 +1,4 @@
-import { requestedModel } from '../matching/decision-model';
+import { requestedModel } from '../decision-model';
 import type { EvaluationReport } from './evaluation';
 
 const cell = (value: string | null) => (value ?? '').replace(/\|/g, '\\|').replace(/\s+/g, ' ').trim();

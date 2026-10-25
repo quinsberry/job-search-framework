@@ -186,14 +186,13 @@ test('separate run instances keep identities, cursors and cancellation isolated'
 // Extend only the enum in an isolated copy, exactly as adding a second production source would.
 // Fictional IDs never become accepted production inputs or leak through Bun's global module mocks.
 test('multiple adapters share the unmodified facade fairly and isolate failures', async () => {
-	const directory = await mkdtemp(join(tmpdir(), 'search-source-contract-'));
+	const root = await mkdtemp(join(tmpdir(), 'search-source-contract-'));
+	const directory = join(root, 'search-sources');
 	try {
+		// The contracts read the shared vocabulary beside them, as in the domain layer.
 		await cp(new URL('../', import.meta.url), directory, { recursive: true });
-		await symlink(
-			new URL('../../../../node_modules', import.meta.url).pathname,
-			join(directory, 'node_modules'),
-			'dir',
-		);
+		await cp(new URL('../../vocabulary.ts', import.meta.url), join(root, 'vocabulary.ts'));
+		await symlink(new URL('../../../../node_modules', import.meta.url).pathname, join(root, 'node_modules'), 'dir');
 		const contracts = join(directory, 'contracts.ts');
 		await writeFile(
 			contracts,
@@ -207,7 +206,7 @@ test('multiple adapters share the unmodified facade fairly and isolate failures'
 		expect(stderr).toBe('');
 		expect(code).toBe(0);
 	} finally {
-		await rm(directory, { recursive: true, force: true });
+		await rm(root, { recursive: true, force: true });
 	}
 });
 

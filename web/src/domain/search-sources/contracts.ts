@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { contractTypes, payPeriods, workArrangements } from '../vocabulary';
 
 export const sourceIdSchema = z.enum(['linkedin']);
 export type SourceId = z.infer<typeof sourceIdSchema>;
@@ -13,7 +14,7 @@ export const httpUrlSchema = z
 		return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password;
 	}, 'Expected an HTTP(S) URL without credentials');
 export const sourceDateSchema = z.union([z.iso.date(), z.iso.datetime({ offset: true })]);
-export const workArrangementSchema = z.enum(['remote', 'hybrid', 'on-site']);
+export const workArrangementSchema = z.enum(workArrangements);
 export const discoveryFilterSchema = z.enum(['location', 'workArrangements', 'publishedAfter']);
 export const sourceDescriptorSchema = z.strictObject({
 	id: sourceIdSchema,
@@ -50,9 +51,10 @@ export const compensationSchema = z
 	.strictObject({
 		min: z.number().finite().nonnegative().nullable(),
 		max: z.number().finite().nonnegative().nullable(),
+		// Any three-letter code, so pay in a currency the job seeker can't choose is still recorded.
 		currency: z.string().regex(/^[A-Z]{3}$/),
-		period: z.enum(['annual', 'month', 'hourly', 'unknown']),
-		contractType: z.enum(['permanent', 'B2B', 'unknown']),
+		period: z.enum([...payPeriods, 'unknown']),
+		contractType: z.enum([...contractTypes, 'unknown']),
 		rawText: text,
 	})
 	.refine((value) => value.min === null || value.max === null || value.min <= value.max);

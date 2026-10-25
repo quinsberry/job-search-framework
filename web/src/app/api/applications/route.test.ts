@@ -7,7 +7,7 @@ import { ApplicationList } from '@/modules/applications/server/application-list'
 import { loadResultSchema } from '@/modules/applications/model/contracts';
 import { PreferencesRepository } from '@/modules/search/server/persistence';
 import { toDraft } from '@/modules/search/model/form-model';
-import { searchPreferencesSchema } from '@/modules/search/model/schema';
+import { searchPreferencesSchema } from '@/domain/matching/criteria';
 
 let workspace: string;
 beforeEach(async () => {

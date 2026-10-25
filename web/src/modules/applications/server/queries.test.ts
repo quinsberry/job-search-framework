@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import type { SearchPreferences } from '@/modules/search/model/schema';
+import type { SearchPreferences } from '@/domain/matching/criteria';
 import { discoveryQueries } from './queries';
 
 function preferences(workArrangements: SearchPreferences['targetPosition']['workArrangements']): SearchPreferences {

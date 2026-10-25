@@ -9,9 +9,9 @@ import {
 	type SearchBatch,
 	type SearchSourceRun,
 	type SourceReport,
-} from '@/shared/search-sources/contracts';
-import type { SearchPreferences } from '@/modules/search/model/schema';
-import type { MatchResult } from '@/modules/search/server/matching/match';
+} from '@/domain/search-sources/contracts';
+import type { SearchPreferences } from '@/domain/matching/criteria';
+import type { MatchResult } from '@/domain/matching/contracts';
 import { runEventSchema, type RunEvent } from '../model/contracts';
 import { criteriaDigest, fingerprint } from './fingerprint';
 import { ApplicationList } from './application-list';

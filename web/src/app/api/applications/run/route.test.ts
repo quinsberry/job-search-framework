@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { searchPreferencesSchema } from '@/modules/search/model/schema';
+import { searchPreferencesSchema } from '@/domain/matching/criteria';
 import { toDraft } from '@/modules/search/model/form-model';
 import { PreferencesRepository } from '@/modules/search/server/persistence';
 import { readEvents } from '@/modules/applications/client/api';
